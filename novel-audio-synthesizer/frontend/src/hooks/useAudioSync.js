@@ -53,6 +53,9 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
   const [playbackMode, setPlaybackMode] = useState(isBrowserEnv ? 'tts' : 'studio');
   const ttsReadAlongEnabled = playbackMode === 'tts';
 
+  // 3-Engine Selection: 'msedge-tts' | 'kokoro-tts' | 'machine-tts'
+  const [ttsEngine, setTtsEngine] = useState('msedge-tts');
+
   // Stop any active Web Speech or secondary audio
   const stopSpeech = useCallback(() => {
     speechCancelledRef.current = true;
@@ -212,11 +215,20 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
         return;
       }
 
-      // Try /api/voices/speak if not previously failed
+      // If user selected machine-tts directly in browser
+      if (ttsEngine === 'machine-tts') {
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+          speakWithSpeechSynthesis(entry, targetSegId);
+          return;
+        }
+      }
+
+      // Try /api/voices/speak with selected engine if not previously failed
       if (!apiSpeakFailedRef.current && typeof Audio !== 'undefined') {
         const voiceParam = encodeURIComponent(entry.voice_id || 'en-GB-RyanNeural');
         const textParam = encodeURIComponent(rawText);
-        const speakUrl = `/api/voices/speak?text=${textParam}&voice_id=${voiceParam}`;
+        const engineParam = encodeURIComponent(ttsEngine || 'msedge-tts');
+        const speakUrl = `/api/voices/speak?text=${textParam}&voice_id=${voiceParam}&engine=${engineParam}`;
 
         if (!secondaryAudioRef.current) {
           secondaryAudioRef.current = new Audio();
@@ -256,7 +268,7 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
         speakWithSpeechSynthesis(entry, targetSegId);
       }
     },
-    [timeline, advanceToNextSegment, speakWithSpeechSynthesis]
+    [timeline, advanceToNextSegment, speakWithSpeechSynthesis, ttsEngine]
   );
 
   speakActiveSegmentRef.current = speakActiveSegment;
@@ -492,6 +504,8 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
     setPlaybackMode,
     togglePlaybackMode,
     ttsReadAlongEnabled,
+    ttsEngine,
+    setTtsEngine,
     seekToSegment,
     seekToTimeMs,
     play,

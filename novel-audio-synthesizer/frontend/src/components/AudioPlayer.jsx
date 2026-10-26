@@ -39,6 +39,8 @@ export default function AudioPlayer({
   onSeekSegment,
   playbackMode = 'studio',
   onTogglePlaybackMode,
+  ttsEngine = 'msedge-tts',
+  onChangeTtsEngine,
 }) {
   const [speed, setSpeed] = useState(1.0);
   const [volume, setVolume] = useState(1.0);
@@ -371,6 +373,32 @@ export default function AudioPlayer({
 
           {/* Right: Audio Speed, Playback Engine Mode & Volume Controls */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* 3-Engine Selector Pill / Dropdown */}
+            {onChangeTtsEngine && (
+              <div className="relative flex items-center">
+                <select
+                  value={ttsEngine}
+                  onChange={(e) => onChangeTtsEngine(e.target.value)}
+                  className="px-2 py-1 rounded-lg border theme-card hover:border-[var(--border-focus)] text-[11px] font-mono font-bold transition shadow-xs cursor-pointer focus:outline-none appearance-none pr-5 bg-no-repeat bg-[right_0.35rem_center]"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+                  }}
+                  title={`TTS Engine: ${
+                    ttsEngine === 'msedge-tts'
+                      ? 'Microsoft Edge Cloud Neural TTS'
+                      : ttsEngine === 'kokoro-tts'
+                      ? 'Kokoro-TTS Local ONNX Fallback'
+                      : 'Machine Local OS Speech Synthesis'
+                  }`}
+                  aria-label="Select TTS Engine"
+                >
+                  <option value="msedge-tts">Microsoft TTS</option>
+                  <option value="kokoro-tts">Kokoro-TTS</option>
+                  <option value="machine-tts">Machine TTS</option>
+                </select>
+              </div>
+            )}
+
             {/* Playback Engine Mode Toggle */}
             {onTogglePlaybackMode && (
               <button

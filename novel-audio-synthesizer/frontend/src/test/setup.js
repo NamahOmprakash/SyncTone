@@ -24,4 +24,20 @@ if (typeof window !== 'undefined' && window.HTMLElement && !window.HTMLElement.p
 
 if (typeof window !== 'undefined') {
   window.scrollTo = () => {};
+
+  if (!window.localStorage || typeof window.localStorage.getItem !== 'function') {
+    const store = {};
+    window.localStorage = {
+      getItem: (key) => (key in store ? store[key] : null),
+      setItem: (key, value) => {
+        store[key] = String(value);
+      },
+      removeItem: (key) => {
+        delete store[key];
+      },
+      clear: () => {
+        for (const k in store) delete store[k];
+      },
+    };
+  }
 }

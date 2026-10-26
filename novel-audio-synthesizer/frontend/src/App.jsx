@@ -61,6 +61,15 @@ export default function App() {
   // Real-time WebSocket Synthesis Progress Hook
   const synthesisProgress = useSynthesisProgress(currentChapter?.id);
 
+  // Fetch TTS / LLM model engine status when settings is opened
+  useEffect(() => {
+    if (showSettings && !modelStatus) {
+      api.get('/status/models')
+        .then((res) => setModelStatus(res))
+        .catch(() => {});
+    }
+  }, [showSettings, modelStatus]);
+
   // Helper for safe scroll without jsdom not-implemented warning
   const safeScrollToTop = (behavior = 'instant') => {
     try {
@@ -414,6 +423,8 @@ export default function App() {
             currentChapter={currentChapter}
             playbackMode={audioSync.playbackMode}
             onTogglePlaybackMode={audioSync.togglePlaybackMode}
+            ttsEngine={audioSync.ttsEngine}
+            onChangeTtsEngine={audioSync.setTtsEngine}
             onSeekSegment={(dir) => {
               const currentIdx = chapterSegments.findIndex(
                 (s) => (s.segment_id ?? s.order) === audioSync.activeSegmentId

@@ -12,10 +12,13 @@ async function handleSpeak(req, res) {
     const rawText = req.query.text !== undefined ? req.query.text : req.body?.text;
     const voice_id = (req.query.voice_id || req.body?.voice_id || 'en-GB-RyanNeural').toString().trim();
     const speed = parseFloat(req.query.speed || req.body?.speed) || 1.0;
+    const engine = req.query.engine || req.body?.engine || 'auto';
 
-    const text = String(rawText !== undefined && rawText !== null ? rawText : 'Hello, this is a sample preview.').slice(0, 1500);
+    const cleanText = String(rawText !== undefined && rawText !== null ? rawText : 'Hello, this is a sample preview.').slice(0, 1500);
 
-    const result = await ttsEngine.synthesizeSegment(text, voice_id, speed);
+    const result = await ttsEngine.synthesizeSegment(cleanText, String(voice_id), speed, String(engine));
+
+    res.set('X-TTS-Engine', result.engine || 'msedge-tts');
 
     if (result.format === 'pcm') {
       const wavHeader = audioStitcher.createWavHeader(result.audio_buffer.length, 24000, 1, 16);

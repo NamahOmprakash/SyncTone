@@ -302,7 +302,7 @@ export default function ReaderView({
                 </div>
               </button>
 
-              {/* Card 2: Moon+ OpenGL 3D Mode */}
+              {/* Card 2: Apple Books / Moon+ OpenGL 3D Spread Mode */}
               <button
                 type="button"
                 onClick={() => handleChooseMode('opengl')}
@@ -317,10 +317,10 @@ export default function ReaderView({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-amber-300 group-hover:text-amber-200 transition">
-                    OpenGL 3D Mode
+                    Apple Books / Moon+ OpenGL 3D Spread
                   </h4>
                   <p className="text-[10px] theme-muted mt-1 leading-relaxed">
-                    Moon+ Reader Pro 3D book physics, page-turn curl and live yellow read-along.
+                    Two-page side-by-side spread with 3D page-curl, deluxe cover artwork showcase and synchronized WTR-Lab voice highlight.
                   </p>
                 </div>
               </button>
@@ -391,7 +391,7 @@ export default function ReaderView({
                   ? 'bg-amber-400 text-slate-950 font-bold shadow-xs'
                   : 'theme-muted hover:text-[var(--text-main)]'
               }`}
-              title="Moon+ Reader Pro 3D OpenGL page-turn mode"
+              title="Apple Books & Moon+ Reader Pro 3D OpenGL page-turn two-page spread mode"
             >
               <IconBook className="w-3.5 h-3.5" />
               <span>OpenGL 3D</span>
