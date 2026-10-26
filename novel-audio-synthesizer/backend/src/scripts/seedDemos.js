@@ -697,15 +697,16 @@ async function seedDemos({ closeConnections = false } = {}) {
 
     // 4NF Aliases (character_id, alias)
     for (const alias of c.aliases) {
-      await pool.query(
-        `
-        INSERT INTO character_aliases (character_id, alias)
-        VALUES ($1, $2)
-        ON CONFLICT (character_id, alias) DO UPDATE SET
-          alias = EXCLUDED.alias;
-      `,
+      const aliasCheck = await pool.query(
+        'SELECT id FROM character_aliases WHERE character_id = $1 AND alias = $2 LIMIT 1',
         [charId, alias]
       );
+      if (aliasCheck.rows.length === 0) {
+        await pool.query(
+          'INSERT INTO character_aliases (character_id, alias) VALUES ($1, $2) ON CONFLICT (character_id, alias) DO NOTHING',
+          [charId, alias]
+        );
+      }
     }
   }
   console.log(`  ✔ Seeded ${hpCast.length} British cast characters with 4NF aliases.`);
@@ -734,6 +735,12 @@ async function seedDemos({ closeConnections = false } = {}) {
         const endMs = startMs + estDurationMs;
         chCurrentMs = endMs + pauseMs;
 
+        const rawSource = s.attribution_source || (s.type === 'narration' ? 'narrator_default' : 'manual');
+        const validSources = ['regex_rule', 'dependency_tree', 'llm_fallback', 'narrator_default', 'manual', 'unresolved'];
+        const normalizedSource = validSources.includes(rawSource)
+          ? rawSource
+          : (s.type === 'narration' ? 'narrator_default' : 'regex_rule');
+
         return {
           order: idx + 1,
           segment_id: s.segment_id || (idx + 1),
@@ -747,7 +754,7 @@ async function seedDemos({ closeConnections = false } = {}) {
           start_ms: startMs,
           end_ms: endMs,
           confidence: s.attribution_confidence || 1.0,
-          source: s.attribution_source || (s.type === 'narration' ? 'narrator_default' : 'manual'),
+          source: normalizedSource,
           needs_review: false,
         };
       });
@@ -1109,15 +1116,16 @@ async function seedDemos({ closeConnections = false } = {}) {
 
     // 4NF Aliases (character_id, alias)
     for (const alias of c.aliases) {
-      await pool.query(
-        `
-        INSERT INTO character_aliases (character_id, alias)
-        VALUES ($1, $2)
-        ON CONFLICT (character_id, alias) DO UPDATE SET
-          alias = EXCLUDED.alias;
-      `,
+      const aliasCheck = await pool.query(
+        'SELECT id FROM character_aliases WHERE character_id = $1 AND alias = $2 LIMIT 1',
         [charId, alias]
       );
+      if (aliasCheck.rows.length === 0) {
+        await pool.query(
+          'INSERT INTO character_aliases (character_id, alias) VALUES ($1, $2) ON CONFLICT (character_id, alias) DO NOTHING',
+          [charId, alias]
+        );
+      }
     }
   }
   console.log(`  ✔ Seeded ${shCast.length} Sherlock cast characters with 4NF aliases.`);
@@ -1168,6 +1176,7 @@ async function seedDemos({ closeConnections = false } = {}) {
     },
   ];
 
+  const pauseMs = (config.audio && config.audio.interSpeakerPauseMs) || 300;
   let shCh1CurrentMs = 0;
   const shCh1Segments = shCh1RawSegments.map((s, idx) => {
     const startMs = shCh1CurrentMs;
