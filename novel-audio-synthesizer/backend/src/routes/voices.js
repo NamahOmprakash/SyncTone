@@ -1,8 +1,47 @@
 const { Router } = require('express');
 const { voiceProfiler, VOICE_PALETTE } = require('../engine/voiceProfiler');
+const { ttsEngine } = require('../engine/ttsEngine');
+const { audioStitcher } = require('../engine/audioStitcher');
 const { authenticateUser, requireRole } = require('../middleware/auth');
 
 const router = Router();
+
+// Handler for on-demand segment speech preview
+async function handleSpeak(req, res) {
+  try {
+    const rawText = req.query.text !== undefined ? req.query.text : req.body?.text;
+    const voice_id = (req.query.voice_id || req.body?.voice_id || 'en-GB-RyanNeural').toString().trim();
+    const speed = parseFloat(req.query.speed || req.body?.speed) || 1.0;
+
+    const text = String(rawText !== undefined && rawText !== null ? rawText : 'Hello, this is a sample preview.').slice(0, 1500);
+
+    const result = await ttsEngine.synthesizeSegment(text, voice_id, speed);
+
+    if (result.format === 'pcm') {
+      const wavHeader = audioStitcher.createWavHeader(result.audio_buffer.length, 24000, 1, 16);
+      const fullWav = Buffer.concat([wavHeader, result.audio_buffer]);
+      res.set('Content-Type', 'audio/wav');
+      res.set('Content-Length', String(fullWav.length));
+      return res.send(fullWav);
+    }
+
+    if (result.format === 'mp3') {
+      res.set('Content-Type', 'audio/mpeg');
+      res.set('Content-Length', String(result.audio_buffer.length));
+      return res.send(result.audio_buffer);
+    }
+
+    res.set('Content-Type', 'audio/wav');
+    return res.send(result.audio_buffer);
+  } catch (err) {
+    console.error('[Voices Speak Error]:', err.message);
+    return res.status(500).json({ error: 'Failed to synthesize speech segment' });
+  }
+}
+
+// GET & POST /api/voices/speak (On-demand preview synthesis)
+router.get('/voices/speak', handleSpeak);
+router.post('/voices/speak', handleSpeak);
 
 // GET /api/voices
 router.get('/voices', (_req, res) => {

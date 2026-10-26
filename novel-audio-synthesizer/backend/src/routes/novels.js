@@ -1,5 +1,11 @@
 const { Router } = require('express');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const child_process = require('child_process');
 const { pool } = require('../db');
+const { Chapter } = require('../models');
+const { parseChapter } = require('../engine/textParser');
 const { optionalAuth } = require('../middleware/auth');
 
 const router = Router();
@@ -55,8 +61,64 @@ router.get('/novels', async (req, res) => {
 });
 
 /**
+ * POST /api/novels/parse-file
+ * Parses an uploaded book file (EPUB, PDF, TXT, MD, HTML) into title, synopsis, and chapters.
+ * No authentication required to preview/parse within the upload modal.
+ */
+router.post('/novels/parse-file', async (req, res) => {
+  let tmpPath = null;
+  try {
+    const { file_name, file_base64 } = req.body;
+    if (!file_base64) {
+      return res.status(400).json({ error: 'file_base64 is required.' });
+    }
+
+    const ext = path.extname(file_name || 'book.txt').toLowerCase() || '.txt';
+    const tmpName = `book_upload_${Date.now()}_${Math.random().toString(36).slice(2, 9)}${ext}`;
+    tmpPath = path.join(os.tmpdir(), tmpName);
+
+    // Support data URL prefix if sent from frontend FileReader: data:...;base64,XYZ
+    const base64Data = file_base64.includes(',') ? file_base64.split(',')[1] : file_base64;
+    const fileBuffer = Buffer.from(base64Data, 'base64');
+    fs.writeFileSync(tmpPath, fileBuffer);
+
+    const scriptPath = path.resolve(__dirname, '../scripts/parseUploadedBook.py');
+    const pyOutput = child_process.execFileSync('python3', [scriptPath, tmpPath], {
+      maxBuffer: 50 * 1024 * 1024,
+      timeout: 30000,
+      encoding: 'utf-8',
+    });
+
+    const parsed = JSON.parse(pyOutput);
+    const defaultTitle = file_name
+      ? path.basename(file_name, ext).replace(/[_-]+/g, ' ').trim()
+      : 'Imported Novel';
+    const finalTitle =
+      parsed.title && !parsed.title.toLowerCase().startsWith('book_upload') && !parsed.title.toLowerCase().startsWith('book upload')
+        ? parsed.title
+        : defaultTitle;
+
+    return res.json({
+      title: finalTitle,
+      synopsis: parsed.synopsis || '',
+      chapters: parsed.chapters || [],
+    });
+  } catch (err) {
+    console.error('[Parse File Error]:', err.message);
+    return res.status(500).json({ error: `Failed to parse uploaded book file: ${err.message}` });
+  } finally {
+    if (tmpPath && fs.existsSync(tmpPath)) {
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch (_) {}
+    }
+  }
+});
+
+/**
  * POST /api/novels
  * Inserts a new novel using specified fields: title, synopsis, channel, added_by
+ * If `chapters` array is provided, automatically ingests up to 50 chapters into PostgreSQL & MongoDB!
  */
 router.post('/novels', optionalAuth, async (req, res) => {
   try {
@@ -67,6 +129,7 @@ router.post('/novels', optionalAuth, async (req, res) => {
       added_by: requestedAddedBy,
       global_tone = null,
       cover_object = null,
+      chapters: rawChapters = [],
     } = req.body;
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
@@ -162,11 +225,102 @@ router.post('/novels', optionalAuth, async (req, res) => {
         [createdJob.id, createdNovel.id]
       );
 
+      // Auto-Chapter Ingestion: If chapters array provided, insert up to 50 chapters into PG & MongoDB
+      const createdChapters = [];
+      if (Array.isArray(rawChapters) && rawChapters.length > 0) {
+        const chaptersToIngest = rawChapters.slice(0, 50);
+
+        for (let idx = 0; idx < chaptersToIngest.length; idx++) {
+          const ch = chaptersToIngest[idx];
+          const chNum = parseInt(ch.chapter_number, 10) || (idx + 1);
+          const chTitle = ch.title && typeof ch.title === 'string' && ch.title.trim()
+            ? ch.title.trim()
+            : `Chapter ${chNum}`;
+          const rawText = ch.raw_text || ch.text || '';
+
+          // Parse chapter text into attributed segments
+          const parsedData = parseChapter(rawText, chTitle, String(chNum));
+
+          let currentMs = 0;
+          const mappedSegments = (parsedData.segments || []).map((s, segIdx) => {
+            const words = (s.text || '').trim().split(/\s+/).length;
+            const durationMs = Math.max(800, Math.round((words / 2.8) * 1000));
+            const start_ms = currentMs;
+            const end_ms = start_ms + durationMs;
+            currentMs = end_ms + 250;
+
+            const voiceId = s.assigned_voice_id || (s.type === 'narration' ? 'en-GB-RyanNeural' : 'en-GB-ThomasNeural');
+
+            return {
+              order: segIdx + 1,
+              segment_id: segIdx + 1,
+              type: s.type,
+              text: s.text,
+              character_id: s.speaker_id || (s.type === 'narration' ? 'narrator' : 'unknown'),
+              speaker_id: s.speaker_id || (s.type === 'narration' ? 'narrator' : 'unknown'),
+              speaker_name: s.speaker_name || (s.type === 'narration' ? 'Narrator' : 'Unknown'),
+              voice_id: voiceId,
+              assigned_voice_id: voiceId,
+              start_ms,
+              end_ms,
+              confidence: s.attribution_confidence !== undefined ? s.attribution_confidence : 1.0,
+              source: s.attribution_source || 'narrator_default',
+            };
+          });
+
+          const totalDurationMs = mappedSegments.length > 0 ? mappedSegments[mappedSegments.length - 1].end_ms : 0;
+          const timeline = mappedSegments.map((s) => ({
+            order: s.order,
+            segment_id: s.segment_id,
+            start_ms: s.start_ms,
+            end_ms: s.end_ms,
+            character_id: s.character_id,
+            voice_id: s.voice_id,
+            text: s.text,
+          }));
+
+          // Insert into PostgreSQL chapters with status = 'completed'
+          const chRes = await client.query(
+            `
+            INSERT INTO chapters (novel_id, chapter_number, title, status, audio_version, total_duration_ms)
+            VALUES ($1, $2, $3, 'completed', 1, $4)
+            RETURNING *;
+            `,
+            [createdNovel.id, chNum, chTitle, totalDurationMs]
+          );
+          const pgChapter = chRes.rows[0];
+
+          // Insert into MongoDB Chapter model
+          try {
+            const mongoDoc = new Chapter({
+              pg_chapter_id: pgChapter.id,
+              novel_id: createdNovel.id,
+              chapter_number: chNum,
+              title: chTitle,
+              raw_text: rawText,
+              audio_version: 1,
+              manifest: {
+                total_duration_ms: totalDurationMs,
+                audio_url: `/api/stream/${pgChapter.id}`,
+                timeline,
+              },
+              segments: mappedSegments,
+            });
+            await mongoDoc.save();
+          } catch (mErr) {
+            console.warn(`[Novels] Could not save chapter ${chNum} to MongoDB:`, mErr.message);
+          }
+
+          createdChapters.push(pgChapter);
+        }
+      }
+
       await client.query('COMMIT');
 
       return res.status(201).json({
         message: 'Novel created successfully',
         novel: createdNovel,
+        chapters: createdChapters,
         job: {
           ...createdJob,
           novel_id: createdNovel.id,

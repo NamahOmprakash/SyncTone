@@ -95,6 +95,7 @@ export const api = {
     get: (id) => api.get(`/novels/${id}`),
     create: (novelData) => api.post('/novels', novelData),
     uploadChapter: (novelId, chapterData) => api.post(`/novels/${novelId}/chapters`, chapterData),
+    parseFile: (payload) => request('/novels/parse-file', { method: 'POST', body: JSON.stringify(payload) }),
   },
 
   // Chapters & Synthesis Endpoints

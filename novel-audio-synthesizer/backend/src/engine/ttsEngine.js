@@ -1,8 +1,33 @@
 const fs = require('fs');
 const path = require('path');
+const child_process = require('child_process');
+const os = require('os');
 const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
 const { config } = require('../config');
 const { VOICE_CATALOG } = require('./voiceProfiler');
+
+const MAC_VOICE_MAP = {
+  'en-GB-RyanNeural': 'Daniel',
+  'en-GB-ArthurNeural': 'Grandpa (English (UK))',
+  'en-GB-SoniaNeural': 'Kate (Enhanced)',
+  'en-GB-LibbyNeural': 'Serena (Premium)',
+  'en-GB-ThomasNeural': 'Eddy (English (UK))',
+  'en-GB-AlfieNeural': 'Reed (English (UK))',
+  'en-GB-NoahNeural': 'Rocko (English (UK))',
+  'en-GB-OliverNeural': 'Flo (English (UK))',
+  bm_george: 'Daniel',
+  bm_daniel: 'Eddy (English (UK))',
+  bf_emma: 'Serena (Premium)',
+  am_adam: 'Daniel',
+  am_michael: 'Rocko (English (UK))',
+  am_george: 'Grandpa (English (UK))',
+  am_onyx: 'Rocko (English (UK))',
+  af_heart: 'Serena (Premium)',
+  af_bella: 'Flo (English (UK))',
+  af_nicole: 'Sandy (English (UK))',
+  af_sarah: 'Kate (Enhanced)',
+  af_sky: 'Shelley (English (UK))',
+};
 
 const KOKORO_TO_EDGE_MAP = {
   af_heart: 'en-GB-SoniaNeural',
@@ -105,7 +130,7 @@ class TTSEngine {
     });
   }
 
-  // Fallback: Kokoro-style Acoustic Harmonic Synthesis / Local PCM Buffer
+  // Fallback: macOS Neural / System Speech or Clean Silence Buffer (No Sine Wave Hum!)
   async synthesizeFallback(text, voiceId, speed = 1.0) {
     const trimmed = text.trim();
     if (!trimmed) {
@@ -118,40 +143,82 @@ class TTSEngine {
       };
     }
 
-    const baseDurationSec = Math.max(0.6, trimmed.length / 15 / (speed || 1.0));
-    const sampleCount = Math.floor(this.sampleRate * baseDurationSec);
-    const buffer = Buffer.alloc(sampleCount * 2);
+    // Check if macOS /usr/bin/say is available, not in test mode, and not disabled
+    if (
+      fs.existsSync('/usr/bin/say') &&
+      process.env.NODE_ENV !== 'test' &&
+      !process.env.SYNCTONE_DISABLE_MACOS_SAY
+    ) {
+      const macVoice = MAC_VOICE_MAP[voiceId] || 'Daniel';
+      const tmpWavPath = path.join(
+        os.tmpdir(),
+        `say_${Date.now()}_${Math.random().toString(36).slice(2, 9)}.wav`
+      );
 
-    const voicePitchMap = {
-      'en-GB-RyanNeural': 140,
-      'en-GB-ThomasNeural': 175,
-      'en-GB-LibbyNeural': 240,
-      'en-GB-AlfieNeural': 160,
-      'en-GB-ArthurNeural': 110,
-      'en-GB-NoahNeural': 95,
-      'en-GB-SoniaNeural': 210,
-      'en-GB-OliverNeural': 170,
-      bm_george: 146,
-      bf_emma: 230,
-      am_adam: 130,
-      am_onyx: 98,
-      af_heart: 220,
-    };
-    const fundamentalFreq = voicePitchMap[voiceId] || 160;
+      try {
+        child_process.execFileSync(
+          '/usr/bin/say',
+          [
+            '-v',
+            macVoice,
+            '-r',
+            String(Math.round(185 * (speed || 1.0))),
+            '--data-format=LEI16@24000',
+            '-o',
+            tmpWavPath,
+            trimmed,
+          ],
+          { timeout: 15000 }
+        );
 
-    for (let i = 0; i < sampleCount; i++) {
-      const t = i / this.sampleRate;
-      const envelope = Math.sin((Math.PI * i) / sampleCount);
-      const s1 = Math.sin(2 * Math.PI * fundamentalFreq * t);
-      const s2 = 0.3 * Math.sin(2 * Math.PI * fundamentalFreq * 2 * t);
-      const sampleVal = Math.floor((s1 + s2) * envelope * 8000);
-      buffer.writeInt16LE(Math.max(-32768, Math.min(32767, sampleVal)), i * 2);
+        if (fs.existsSync(tmpWavPath)) {
+          const wavBuf = fs.readFileSync(tmpWavPath);
+          fs.unlinkSync(tmpWavPath);
+
+          let pcmBuffer;
+          const dataIdx = wavBuf.indexOf(Buffer.from('data'));
+          if (dataIdx !== -1 && dataIdx + 8 <= wavBuf.length) {
+            const dataLen = wavBuf.readUInt32LE(dataIdx + 4);
+            pcmBuffer =
+              dataLen > 0 && dataIdx + 8 + dataLen <= wavBuf.length
+                ? wavBuf.subarray(dataIdx + 8, dataIdx + 8 + dataLen)
+                : wavBuf.subarray(dataIdx + 8);
+          } else {
+            pcmBuffer = wavBuf.subarray(44);
+          }
+
+          const durationMs = Math.max(
+            100,
+            Math.round((pcmBuffer.length / 2 / this.sampleRate) * 1000)
+          );
+
+          return {
+            audio_buffer: pcmBuffer,
+            duration_ms: durationMs,
+            format: 'pcm',
+            engine: 'macos-neural-say',
+          };
+        }
+      } catch (sayErr) {
+        if (fs.existsSync(tmpWavPath)) {
+          try {
+            fs.unlinkSync(tmpWavPath);
+          } catch (_) {}
+        }
+        console.warn(
+          `[TTSEngine] macOS say fallback failed: ${sayErr.message}. Falling back to clean silence.`
+        );
+      }
     }
 
-    const durationMs = Math.round(baseDurationSec * 1000);
+    // If /usr/bin/say is not available (or in test mode), return a clean SILENT buffer — NEVER generate the sine wave hum!
+    const baseDurationSec = Math.max(0.6, trimmed.length / 15 / (speed || 1.0));
+    const sampleCount = Math.floor(this.sampleRate * baseDurationSec);
+    const silentBuffer = Buffer.alloc(sampleCount * 2);
+
     return {
-      audio_buffer: buffer,
-      duration_ms: durationMs,
+      audio_buffer: silentBuffer,
+      duration_ms: Math.round(baseDurationSec * 1000),
       format: 'pcm',
       engine: 'kokoro-fallback',
     };

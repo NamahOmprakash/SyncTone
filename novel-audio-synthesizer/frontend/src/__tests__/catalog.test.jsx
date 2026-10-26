@@ -153,6 +153,36 @@ describe('Milestone 2 — Novel Catalog & Details', () => {
         expect(screen.getAllByText("Harry Potter and the Philosopher's Stone")[0]).toBeInTheDocument();
       });
     });
+
+    it('renders Netflix-style billboard indicators and transitions slides', async () => {
+      vi.spyOn(api.novels, 'list').mockResolvedValue({ novels: MOCK_NOVELS });
+
+      render(
+        <AuthProvider>
+          <NovelCatalog onSelectNovel={vi.fn()} />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Featured Novel Billboard/i)).toBeInTheDocument();
+      });
+
+      // Jump to slide 2
+      const slide2Button = screen.getByLabelText(/Jump to slide 2/i);
+      expect(slide2Button).toBeInTheDocument();
+      fireEvent.click(slide2Button);
+
+      // Now Sherlock Holmes is spotlighted in the billboard
+      const billboard = screen.getByLabelText(/Featured Novel Billboard/i);
+      expect(billboard).toHaveTextContent('The Adventures of Sherlock Holmes');
+
+      // Hovering pauses the billboard
+      fireEvent.mouseEnter(billboard);
+      expect(screen.getByText('Paused')).toBeInTheDocument();
+
+      fireEvent.mouseLeave(billboard);
+      expect(screen.queryByText('Paused')).not.toBeInTheDocument();
+    });
   });
 
   describe('NovelDetails', () => {

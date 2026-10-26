@@ -181,9 +181,26 @@ export default function App() {
           manifest.audio_url ||
           manifest.audio_stream_url ||
           `/api/stream/${chapter.id}`;
+        const enrichedTimeline = (manifest.timeline || []).map((t, idx) => {
+          const seg =
+            segments.find(
+              (s) =>
+                (s.segment_id !== undefined ? s.segment_id : s.order) ===
+                (t.segment_id !== undefined ? t.segment_id : t.order)
+            ) || segments[idx];
+          return {
+            ...t,
+            text: t.text || seg?.text || '',
+            speaker_name: t.speaker_name || seg?.speaker_name || '',
+            voice_id: t.voice_id || seg?.voice_id || 'en-GB-RyanNeural',
+            character_id: t.character_id || seg?.character_id || 'narrator',
+            type: t.type || seg?.type || 'narration',
+          };
+        });
         setChapterManifest({
           ...manifest,
           audio_stream_url: streamUrl,
+          timeline: enrichedTimeline,
         });
       } else {
         setChapterManifest({
@@ -196,6 +213,9 @@ export default function App() {
             end_ms: s.end_ms || 0,
             character_id: s.character_id,
             voice_id: s.voice_id || 'en-GB-RyanNeural',
+            text: s.text || '',
+            speaker_name: s.speaker_name || '',
+            type: s.type || 'narration',
           })),
         });
       }
@@ -355,6 +375,7 @@ export default function App() {
                 <ReaderView
                   segments={chapterSegments}
                   activeSegmentId={audioSync.activeSegmentId}
+                  segmentProgress={audioSync.segmentProgress}
                   isPlaying={audioSync.isPlaying}
                   onSegmentClick={(segmentId) => {
                     audioSync.seekToSegment(segmentId);
@@ -391,6 +412,8 @@ export default function App() {
             onLoadedMetadata={audioSync.handleLoadedMetadata}
             currentNovel={currentNovel}
             currentChapter={currentChapter}
+            playbackMode={audioSync.playbackMode}
+            onTogglePlaybackMode={audioSync.togglePlaybackMode}
             onSeekSegment={(dir) => {
               const currentIdx = chapterSegments.findIndex(
                 (s) => (s.segment_id ?? s.order) === audioSync.activeSegmentId
@@ -434,8 +457,13 @@ export default function App() {
           isOpen={showAddNovelModal}
           onClose={() => setShowAddNovelModal(false)}
           onOpenAuth={handleOpenAuth}
-          onNovelCreated={(newNovel) => {
-            handleNavigate('details', newNovel.id);
+          onSelectChapter={handleSelectChapter}
+          onNovelCreated={(newNovel, firstChapter) => {
+            if (firstChapter) {
+              handleSelectChapter(newNovel, firstChapter);
+            } else {
+              handleNavigate('details', newNovel.id);
+            }
           }}
         />
 

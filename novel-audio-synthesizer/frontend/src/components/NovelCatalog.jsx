@@ -87,10 +87,31 @@ export default function NovelCatalog({
     });
   }, [novels, searchQuery]);
 
-  // Featured Hero Novel (first novel in list)
+  // Netflix-style automatic billboard rotation state
+  const [featuredIndex, setFeaturedIndex] = useState(0);
+  const [isBillboardPaused, setIsBillboardPaused] = useState(false);
+
+  // Reset rotation index when channel filter changes
+  useEffect(() => {
+    setFeaturedIndex(0);
+  }, [channel]);
+
+  // Netflix-style automatic rotation timer (every 6000ms when not paused or searching)
+  useEffect(() => {
+    if (searchQuery || isBillboardPaused || novels.length <= 1) return;
+
+    const timer = setInterval(() => {
+      setFeaturedIndex((prev) => (prev + 1) % novels.length);
+    }, 6000);
+
+    return () => clearInterval(timer);
+  }, [searchQuery, isBillboardPaused, novels.length]);
+
+  // Featured Hero Novel (cycles automatically through novels)
   const featuredNovel = useMemo(() => {
-    return novels.length > 0 ? novels[0] : null;
-  }, [novels]);
+    if (novels.length === 0) return null;
+    return novels[featuredIndex % novels.length] || novels[0];
+  }, [novels, featuredIndex]);
 
   // Top 10 Ranked List (up to 10 novels)
   const top10Novels = useMemo(() => {
@@ -272,12 +293,16 @@ export default function NovelCatalog({
           {/* ================================================================= */}
           {featuredNovel && !searchQuery && (
             <section
-              className="relative w-full rounded-3xl overflow-hidden p-6 sm:p-12 md:p-16 border theme-border shadow-2xl flex flex-col md:flex-row items-center md:items-end justify-between gap-8 min-h-[480px] sm:min-h-[520px]"
+              className="relative w-full rounded-3xl overflow-hidden p-6 sm:p-12 md:p-16 border theme-border shadow-2xl flex flex-col md:flex-row items-center md:items-end justify-between gap-8 min-h-[480px] sm:min-h-[520px] transition-all duration-300"
               style={{
                 background:
                   'linear-gradient(135deg, rgba(16, 22, 36, 0.98) 0%, rgba(8, 12, 20, 0.99) 100%)',
               }}
               aria-label="Featured Novel Billboard"
+              onMouseEnter={() => setIsBillboardPaused(true)}
+              onMouseLeave={() => setIsBillboardPaused(false)}
+              onFocus={() => setIsBillboardPaused(true)}
+              onBlur={() => setIsBillboardPaused(false)}
             >
               {/* Radial Atmospheric Spotlight Glow */}
               <div
@@ -291,19 +316,37 @@ export default function NovelCatalog({
 
               {/* Left Column: Atmospheric Typography & High-Impact CTA */}
               <div className="relative z-10 max-w-2xl space-y-4">
-                {/* Eyebrow Badges Row */}
+                {/* Eyebrow Badges Row with Channel Indicator & Quick Switcher */}
                 <div className="flex flex-wrap items-center gap-2.5 stagger-1">
                   <span className="px-3 py-1 rounded-lg theme-card text-amber-400 border border-amber-500/30 text-[11px] font-mono font-bold uppercase tracking-wider shadow-sm flex items-center gap-1.5">
                     <IconStar className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Top Pick of the Week</span>
+                    <span>Top Pick</span>
+                  </span>
+                  {/* Channel Badge with Quick Channel Switcher */}
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (featuredNovel.channel && channel !== featuredNovel.channel) {
+                        setChannel(featuredNovel.channel);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-lg theme-card theme-sub border text-[11px] font-mono font-semibold cursor-pointer hover:border-[var(--accent)] transition"
+                    title="Click to filter by this channel"
+                  >
+                    {featuredNovel.channel === 'community' ? 'Community Channel' : 'Verified Channel'}
                   </span>
                   <span className="px-2.5 py-1 rounded-lg theme-card theme-sub border text-[11px] font-mono font-semibold">
                     {featuredNovel.global_tone || 'Dramatic Ensemble'}
                   </span>
                   <span className="text-xs text-emerald-400 font-mono font-bold flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Follow Along</span>
+                    <span>Auto-Rotating</span>
                   </span>
+                  {isBillboardPaused && (
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest px-2 py-0.5 rounded bg-white/5 border border-white/10">
+                      Paused
+                    </span>
+                  )}
                 </div>
 
                 {/* Massive Serif Title */}
@@ -386,6 +429,63 @@ export default function NovelCatalog({
                   ★ 9.4 Verified
                 </div>
               </div>
+
+              {/* Netflix-Style Slide Indicator Bars & Carousel Navigation */}
+              {novels.length > 1 && (
+                <div className="absolute bottom-4 left-6 sm:left-12 right-6 sm:right-12 flex items-center justify-between z-20 pointer-events-auto">
+                  {/* Indicator Bars */}
+                  <div className="flex items-center gap-2">
+                    {novels.map((novelItem, idx) => {
+                      const isActive = idx === (featuredIndex % novels.length);
+                      return (
+                        <button
+                          key={novelItem.id || idx}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFeaturedIndex(idx);
+                          }}
+                          aria-label={`Jump to slide ${idx + 1}: ${novelItem.title}`}
+                          className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                            isActive
+                              ? 'w-8 bg-[var(--accent)] shadow-sm'
+                              : 'w-2.5 bg-white/30 hover:bg-white/60'
+                          }`}
+                        />
+                      );
+                    })}
+                    <span className="text-[10px] font-mono text-slate-400 ml-1.5 hidden sm:inline">
+                      {(featuredIndex % novels.length) + 1} / {novels.length}
+                    </span>
+                  </div>
+
+                  {/* Previous / Next Arrows */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFeaturedIndex((prev) => (prev - 1 + novels.length) % novels.length);
+                      }}
+                      aria-label="Previous featured novel"
+                      className="p-1.5 rounded-lg bg-black/40 hover:bg-black/70 border border-white/10 text-white/80 hover:text-white transition backdrop-blur-sm cursor-pointer"
+                    >
+                      <IconChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFeaturedIndex((prev) => (prev + 1) % novels.length);
+                      }}
+                      aria-label="Next featured novel"
+                      className="p-1.5 rounded-lg bg-black/40 hover:bg-black/70 border border-white/10 text-white/80 hover:text-white transition backdrop-blur-sm cursor-pointer"
+                    >
+                      <IconChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
           )}
 

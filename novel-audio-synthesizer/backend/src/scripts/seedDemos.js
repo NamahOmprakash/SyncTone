@@ -716,8 +716,8 @@ async function seedDemos({ closeConnections = false } = {}) {
   if (hpExtractedData && Array.isArray(hpExtractedData.chapters) && hpExtractedData.chapters.length > 0) {
     console.log(`  ▶ Seeding ${hpExtractedData.chapters.length} chapters from extracted EPUB dataset...`);
 
-    for (const chData of hpExtractedData.chapters) {
-      const chNumber = chData.chapter_number;
+    for (const [idx, chData] of hpExtractedData.chapters.entries()) {
+      const chNumber = chData.chapter_number || (idx + 1);
       const chTitle = chData.title || `Chapter ${chNumber}`;
       const rawText = chData.raw_text || '';
 
@@ -779,8 +779,8 @@ async function seedDemos({ closeConnections = false } = {}) {
       const chapterId = chRes.rows[0].id;
       hpChapterIds.push(chapterId);
 
-      // Chapter 1: synthesize up to 12 segments via neural TTS; Chapters 2-17: 0 (use silence/tone buffer)
-      const maxSynth = chNumber === 1 ? 12 : 0;
+      // Chapter 1: synthesize up to 30 segments via neural TTS; Chapters 2-17: 0 (use silence/tone buffer)
+      const maxSynth = (chNumber === 1 || idx === 0) ? 30 : 0;
       const stitched = await ensureChapterAudio(chapterId, mappedSegments, { maxSynthesizeCount: maxSynth });
 
       const finalAudioFormat = stitched?.audio_format || 'mp3';
@@ -961,7 +961,7 @@ async function seedDemos({ closeConnections = false } = {}) {
     hpChapterIds.push(hpChapterId);
 
     // Synthesize/stitch demo chapter audio and capture real durations & format
-    const stitchedHp = await ensureChapterAudio(hpChapterId, hpSegments, { maxSynthesizeCount: 12 });
+    const stitchedHp = await ensureChapterAudio(hpChapterId, hpSegments, { maxSynthesizeCount: 30 });
     const hpAudioFormat = stitchedHp?.audio_format || 'mp3';
     const hpFinalDurationMs = stitchedHp?.total_duration_ms || hpTotalDurationMs;
     const hpFinalTimeline = (stitchedHp?.timeline && stitchedHp.timeline.length > 0) ? stitchedHp.timeline : hpTimeline;
@@ -1228,7 +1228,7 @@ async function seedDemos({ closeConnections = false } = {}) {
   const shCh1Id = shCh1Res.rows[0].id;
 
   // Synthesize/stitch demo chapter audio and capture real durations & format
-  const stitchedSh1 = await ensureChapterAudio(shCh1Id, shCh1Segments);
+  const stitchedSh1 = await ensureChapterAudio(shCh1Id, shCh1Segments, { maxSynthesizeCount: 10 });
   const sh1AudioFormat = stitchedSh1?.audio_format || (fs.existsSync(path.join(outputDir, `${shCh1Id}.wav`)) ? 'wav' : 'mp3');
   const sh1FinalDurationMs = stitchedSh1?.total_duration_ms || shCh1TotalDurationMs;
   const sh1FinalTimeline = (stitchedSh1?.timeline && stitchedSh1.timeline.length > 0) ? stitchedSh1.timeline : shCh1Timeline;
@@ -1359,7 +1359,7 @@ async function seedDemos({ closeConnections = false } = {}) {
   const shCh2Id = shCh2Res.rows[0].id;
 
   // Synthesize/stitch demo chapter audio and capture real durations & format
-  const stitchedSh2 = await ensureChapterAudio(shCh2Id, shCh2Segments);
+  const stitchedSh2 = await ensureChapterAudio(shCh2Id, shCh2Segments, { maxSynthesizeCount: 10 });
   const sh2AudioFormat = stitchedSh2?.audio_format || (fs.existsSync(path.join(outputDir, `${shCh2Id}.wav`)) ? 'wav' : 'mp3');
   const sh2FinalDurationMs = stitchedSh2?.total_duration_ms || shCh2TotalDurationMs;
   const sh2FinalTimeline = (stitchedSh2?.timeline && stitchedSh2.timeline.length > 0) ? stitchedSh2.timeline : shCh2Timeline;

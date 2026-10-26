@@ -37,6 +37,8 @@ export default function AudioPlayer({
   currentNovel,
   currentChapter,
   onSeekSegment,
+  playbackMode = 'studio',
+  onTogglePlaybackMode,
 }) {
   const [speed, setSpeed] = useState(1.0);
   const [volume, setVolume] = useState(1.0);
@@ -367,8 +369,39 @@ export default function AudioPlayer({
             </button>
           </div>
 
-          {/* Right: Audio Speed & Volume Controls */}
+          {/* Right: Audio Speed, Playback Engine Mode & Volume Controls */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Playback Engine Mode Toggle */}
+            {onTogglePlaybackMode && (
+              <button
+                type="button"
+                onClick={onTogglePlaybackMode}
+                className={`px-2.5 py-1 rounded-lg border text-xs font-mono font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5 ${
+                  playbackMode === 'tts'
+                    ? 'bg-amber-400/20 text-amber-300 border-amber-400/40 hover:bg-amber-400/30'
+                    : 'theme-card hover:border-[var(--border-focus)] theme-sub'
+                }`}
+                title={
+                  playbackMode === 'tts'
+                    ? 'Currently using Live Multi-Voice TTS Read-Along. Click for Studio Track.'
+                    : 'Currently using Studio Track stream. Click for Live Multi-Voice TTS Read-Along.'
+                }
+                aria-label={`Playback engine: ${playbackMode === 'tts' ? 'Voice TTS' : 'Studio Track'}`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    playbackMode === 'tts' ? 'bg-amber-400 animate-pulse' : 'bg-slate-400'
+                  }`}
+                />
+                <span className="hidden sm:inline">
+                  {playbackMode === 'tts' ? 'Voice TTS' : 'Studio'}
+                </span>
+                <span className="sm:hidden font-mono">
+                  {playbackMode === 'tts' ? 'TTS' : 'Studio'}
+                </span>
+              </button>
+            )}
+
             {/* Speed Pill Selector */}
             <button
               onClick={handleSpeedChange}
