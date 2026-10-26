@@ -207,7 +207,7 @@ export default function App() {
   };
 
   const handleOpenAuth = (mode = 'login') => {
-    setAuthMode(mode);
+    setAuthMode(typeof mode === 'string' ? mode : 'login');
     setShowAuthModal(true);
   };
 
@@ -319,7 +319,6 @@ export default function App() {
               onOpenAddNovel={() => setShowAddNovelModal(true)}
               onOpenSettings={() => setShowSettings(true)}
               onOpenAuth={handleOpenAuth}
-              onToggleRoster={() => setShowRoster((prev) => !prev)}
             />
           )}
 
@@ -406,7 +405,7 @@ export default function App() {
         )}
 
         {/* Character Cast Roster Drawer */}
-        {showRoster && (
+        {showRoster && view === 'reader' && (
           <CharacterRoster
             chapterId={currentChapter?.id || ''}
             segments={chapterSegments}

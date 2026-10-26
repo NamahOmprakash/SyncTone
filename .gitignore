@@ -84,6 +84,9 @@ audio_cache/
 *.mp3
 *.aac
 
+# Extracted Novel Text & EPUB Dialogue Datasets (Local Ingestion Only)
+**/hp1_extracted.json
+
 # Database Volumes & Local Data Mounts
 pg_data/
 mongo_data/

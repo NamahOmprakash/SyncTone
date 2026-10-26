@@ -51,7 +51,7 @@ def upgrade() -> None:
         sa.Column("language", sa.String(length=10), server_default="en-us", nullable=False),
         sa.Column("reserved_narrator", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.CheckConstraint("age_band IN ('child', 'young', 'adult', 'elder')", name="chk_voices_age_band"),
+        sa.CheckConstraint("age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')", name="chk_voices_age_band"),
         sa.CheckConstraint("gender IN ('male', 'female')", name="chk_voices_gender"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -119,7 +119,7 @@ def upgrade() -> None:
         sa.Column("source", sa.String(length=20), server_default="ai", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.CheckConstraint("age_band IN ('child', 'young', 'adult', 'elder')", name="chk_characters_age_band"),
+        sa.CheckConstraint("age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')", name="chk_characters_age_band"),
         sa.CheckConstraint("gender IN ('male', 'female', 'unknown')", name="chk_characters_gender"),
         sa.CheckConstraint("source IN ('manual', 'ai')", name="chk_characters_source"),
         sa.CheckConstraint("speed_multiplier >= 0.5 AND speed_multiplier <= 2.0", name="chk_characters_speed_multiplier"),

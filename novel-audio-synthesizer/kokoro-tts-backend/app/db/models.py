@@ -104,7 +104,7 @@ class Voice(Base):
 
     __table_args__ = (
         CheckConstraint("gender IN ('male', 'female')", name="chk_voices_gender"),
-        CheckConstraint("age_band IN ('child', 'young', 'adult', 'elder')", name="chk_voices_age_band"),
+        CheckConstraint("age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')", name="chk_voices_age_band"),
     )
 
     # Relationships
@@ -324,7 +324,7 @@ class Character(Base):
     __table_args__ = (
         UniqueConstraint("novel_id", "canonical_name", name="uq_characters_novel_canonical_name"),
         CheckConstraint("gender IN ('male', 'female', 'unknown')", name="chk_characters_gender"),
-        CheckConstraint("age_band IN ('child', 'young', 'adult', 'elder')", name="chk_characters_age_band"),
+        CheckConstraint("age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')", name="chk_characters_age_band"),
         CheckConstraint("source IN ('manual', 'ai')", name="chk_characters_source"),
         CheckConstraint("speed_multiplier >= 0.5 AND speed_multiplier <= 2.0", name="chk_characters_speed_multiplier"),
         # Partial unique index: at most one narrator per novel
@@ -357,7 +357,7 @@ class CharacterAlias(Base):
     )
     character_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("characters.id", ondelete="CASCADE"),
+        ForeignKey("characters.id", ondelete="CASCADE", name="fk_character_aliases_character"),
         nullable=False,
         index=True,
     )

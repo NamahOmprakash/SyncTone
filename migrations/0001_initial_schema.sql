@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS voices (
     id VARCHAR(64) PRIMARY KEY,
     label VARCHAR(100) NOT NULL,
     gender VARCHAR(10) NOT NULL CHECK (gender IN ('male', 'female', 'other')),
-    age_band VARCHAR(10) NOT NULL DEFAULT 'adult' CHECK (age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')),
+    age_band VARCHAR(10) NOT NULL DEFAULT 'adult' CONSTRAINT chk_voices_age_band CHECK (age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')),
     language VARCHAR(10) NOT NULL DEFAULT 'en-us',
     reserved_narrator BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS characters (
     novel_id UUID NOT NULL REFERENCES novels(id) ON DELETE CASCADE,
     canonical_name VARCHAR(100) NOT NULL,
     gender VARCHAR(10) NOT NULL DEFAULT 'unknown' CHECK (gender IN ('male', 'female', 'unknown')),
-    age_band VARCHAR(10) NOT NULL DEFAULT 'adult' CHECK (age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')),
+    age_band VARCHAR(10) NOT NULL DEFAULT 'adult' CONSTRAINT chk_characters_age_band CHECK (age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')),
     temperament VARCHAR(100),
     sample_quote TEXT,
     voice_id VARCHAR(64) REFERENCES voices(id) ON DELETE SET NULL,

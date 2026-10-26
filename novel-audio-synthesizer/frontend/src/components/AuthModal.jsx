@@ -137,7 +137,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
               </div>
 
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="p-1.5 rounded-lg theme-muted hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition"
                 aria-label="Close modal"
               >

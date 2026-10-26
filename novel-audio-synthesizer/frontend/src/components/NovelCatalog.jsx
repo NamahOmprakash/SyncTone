@@ -11,7 +11,6 @@ import {
   IconSparkles,
   IconPlus,
   IconRefresh,
-  IconUsers,
   IconSettings,
   IconUser,
   IconChevronLeft,
@@ -25,7 +24,6 @@ export default function NovelCatalog({
   onOpenAddNovel,
   onOpenSettings,
   onOpenAuth,
-  onToggleRoster,
 }) {
   const { user, isAuthenticated } = useAuth();
   const isWriterOrAdmin = user && (user.role === 'writer' || user.role === 'admin');
@@ -193,18 +191,6 @@ export default function NovelCatalog({
             </button>
           </div>
 
-          {/* Quick Roster Drawer Toggle */}
-          {onToggleRoster && (
-            <button
-              onClick={onToggleRoster}
-              className="px-3 py-1.5 theme-card border hover:border-[var(--border-focus)] rounded-xl text-xs font-medium transition flex items-center gap-1.5 flex-shrink-0"
-              title="Open Cast Roster"
-            >
-              <IconUsers className="w-3.5 h-3.5 text-[var(--accent)]" />
-              <span className="hidden lg:inline">Cast Roster</span>
-            </button>
-          )}
-
           {/* Add Novel Button for Writers/Admins */}
           {isWriterOrAdmin && onOpenAddNovel && (
             <button
@@ -219,7 +205,11 @@ export default function NovelCatalog({
           {/* Auth Button */}
           {onOpenAuth && (
             <button
-              onClick={onOpenAuth}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  onOpenAuth('login');
+                }
+              }}
               className="px-3 py-1.5 theme-card border hover:border-[var(--border-focus)] rounded-xl text-xs font-semibold transition flex items-center gap-1.5 flex-shrink-0"
             >
               <IconUser className="w-3.5 h-3.5 text-[var(--accent)]" />
