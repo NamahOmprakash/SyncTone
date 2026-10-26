@@ -59,6 +59,7 @@ jobs:
         run: |
           PGPASSWORD=synctone_pass psql -h localhost -U synctone_user -d synctone -f migrations/0001_initial_schema.sql
           python3 -m py_compile novel-audio-synthesizer/kokoro-tts-backend/app/worker.py novel-audio-synthesizer/kokoro-tts-backend/app/db/models.py novel-audio-synthesizer/kokoro-tts-backend/app/db/session.py
+          pip install --break-system-packages alembic "sqlalchemy[asyncio]" greenlet asyncpg "psycopg[binary]" psycopg2-binary python-dotenv || pip install alembic "sqlalchemy[asyncio]" greenlet asyncpg "psycopg[binary]" psycopg2-binary python-dotenv
 
       - name: Setup Node.js 20
         uses: actions/setup-node@v4

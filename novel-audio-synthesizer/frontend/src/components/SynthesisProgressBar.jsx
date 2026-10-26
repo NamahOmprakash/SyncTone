@@ -1,4 +1,11 @@
 import React from 'react';
+import {
+  IconMic,
+  IconScroll,
+  IconSoundwave,
+  IconCheck,
+  IconX,
+} from './icons';
 
 export default function SynthesisProgressBar({
   status = 'idle',
@@ -15,66 +22,61 @@ export default function SynthesisProgressBar({
   const isComplete = status === 'complete';
   const isFailed = status === 'failed';
 
-  let statusIcon = '🎙️';
-  let badgeColor = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-  let barColor = 'bg-indigo-600';
+  let StatusIcon = IconMic;
+  let barColor = 'bg-[var(--accent)]';
 
   if (status === 'parsing') {
-    statusIcon = '📝';
-    badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
-    barColor = 'bg-blue-600';
+    StatusIcon = IconScroll;
   } else if (status === 'stitching') {
-    statusIcon = '🎵';
-    badgeColor = 'bg-purple-50 text-purple-700 border-purple-200';
-    barColor = 'bg-purple-600';
+    StatusIcon = IconSoundwave;
   } else if (isComplete) {
-    statusIcon = '🎉';
-    badgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+    StatusIcon = IconCheck;
     barColor = 'bg-emerald-500';
   } else if (isFailed) {
-    statusIcon = '⚠️';
-    badgeColor = 'bg-red-50 text-red-700 border-red-200';
-    barColor = 'bg-red-500';
+    StatusIcon = IconX;
+    barColor = 'bg-rose-500';
   }
 
   return (
     <div
-      className="bg-white rounded-2xl border border-gray-200 p-4 shadow-md space-y-3 animate-fadeIn"
+      className="theme-card rounded-2xl border p-4 shadow-lg space-y-3 animate-fadeIn"
       role="region"
-      aria-label="Live Synthesis Progress"
+      aria-label="Chapter Audio Progress"
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="text-xl">{statusIcon}</span>
-          <div>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-[var(--accent-surface)] border border-[var(--border-focus)] text-[var(--accent)] flex items-center justify-center flex-shrink-0">
+            <StatusIcon className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${badgeColor}`}>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md theme-surface theme-sub border">
                 {status}
               </span>
               {isConnected && !isComplete && !isFailed && (
-                <span className="flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                  Live WebSocket
+                <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-mono font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  Live Sync
                 </span>
               )}
             </div>
-            <p className="text-xs font-semibold text-gray-800 mt-1">
+            <p className="text-xs font-semibold theme-heading mt-1 truncate">
               {error || message || 'Processing audio chapter...'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-gray-700 font-mono">
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="text-xs font-bold theme-heading font-mono">
             {Math.round(percentComplete)}%
           </span>
           {(isComplete || isFailed) && onDismiss && (
             <button
               onClick={onDismiss}
-              className="text-gray-400 hover:text-gray-600 text-xs p-1 rounded"
+              className="theme-muted hover:text-[var(--text-main)] text-xs p-1 rounded-lg transition"
               aria-label="Dismiss progress"
             >
-              ✕
+              <IconX className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -82,25 +84,23 @@ export default function SynthesisProgressBar({
 
       {/* Progress Bar Container */}
       <div
-        className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden"
+        className="w-full bg-[var(--bg-surface)] rounded-full h-2 overflow-hidden border theme-border"
         role="progressbar"
         aria-valuenow={Math.round(percentComplete)}
-        aria-valuemin="0"
-        aria-valuemax="100"
+        aria-valuemin={0}
+        aria-valuemax={100}
       >
         <div
-          className={`h-full rounded-full transition-all duration-300 ${barColor} ${
-            !isComplete && !isFailed ? 'animate-pulse' : ''
-          }`}
+          className={`h-full rounded-full transition-all duration-300 ${barColor}`}
           style={{ width: `${Math.max(3, Math.min(100, percentComplete))}%` }}
         />
       </div>
 
       {/* Segment Counter */}
       {currentSegment !== null && totalSegments !== null && (
-        <div className="flex items-center justify-between text-[11px] text-gray-400 pt-0.5">
+        <div className="flex items-center justify-between text-[11px] theme-muted font-mono pt-0.5">
           <span>
-            Processing segment <strong className="text-gray-600">{currentSegment}</strong> of {totalSegments}
+            Synthesizing audio segment <strong className="theme-heading font-bold">{currentSegment}</strong> of {totalSegments}
           </span>
           <span>{totalSegments - currentSegment} remaining</span>
         </div>

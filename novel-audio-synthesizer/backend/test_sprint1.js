@@ -278,7 +278,12 @@ async function runTests() {
     `  ✔ POST /api/novels created novel '${createdNovel.title}' and enqueued profile_novel job (${profileJob.id})`
   );
 
-  // Insert narrator character for relationship join
+  // Insert narrator character for relationship join (ensuring am_adam voice exists)
+  await pool.query(`
+    INSERT INTO voices (id, label, gender, age_band, language, reserved_narrator)
+    VALUES ('am_adam', 'Adam (Narrator Default)', 'male', 'adult', 'en-us', true)
+    ON CONFLICT (id) DO NOTHING;
+  `);
   await pool.query(
     `
     INSERT INTO characters (novel_id, canonical_name, voice_id, is_narrator)

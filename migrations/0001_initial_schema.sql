@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS voices (
     id VARCHAR(64) PRIMARY KEY,
     label VARCHAR(100) NOT NULL,
     gender VARCHAR(10) NOT NULL CHECK (gender IN ('male', 'female', 'other')),
-    age_band VARCHAR(10) NOT NULL DEFAULT 'adult' CHECK (age_band IN ('child', 'teen', 'adult', 'elderly')),
+    age_band VARCHAR(10) NOT NULL DEFAULT 'adult' CHECK (age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')),
     language VARCHAR(10) NOT NULL DEFAULT 'en-us',
     reserved_narrator BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS characters (
     novel_id UUID NOT NULL REFERENCES novels(id) ON DELETE CASCADE,
     canonical_name VARCHAR(100) NOT NULL,
     gender VARCHAR(10) NOT NULL DEFAULT 'unknown' CHECK (gender IN ('male', 'female', 'unknown')),
-    age_band VARCHAR(10) NOT NULL DEFAULT 'adult' CHECK (age_band IN ('child', 'teen', 'adult', 'elderly')),
+    age_band VARCHAR(10) NOT NULL DEFAULT 'adult' CHECK (age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')),
     temperament VARCHAR(100),
     sample_quote TEXT,
     voice_id VARCHAR(64) REFERENCES voices(id) ON DELETE SET NULL,
@@ -96,12 +96,13 @@ CREATE TABLE IF NOT EXISTS characters (
 
 CREATE INDEX IF NOT EXISTS ix_characters_novel_id ON characters(novel_id);
 CREATE INDEX IF NOT EXISTS ix_characters_voice_id ON characters(voice_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_characters_narrator_per_novel ON characters(novel_id) WHERE is_narrator = true;
 
 -- 6. Character Aliases Table (Strict 4NF Alias Normalization)
 -- Transitive novel_id removed; uniqueness per novel enforced via DB trigger + advisory lock
 CREATE TABLE IF NOT EXISTS character_aliases (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    character_id UUID NOT NULL CONSTRAINT fk_character_aliases_character REFERENCES characters(id) ON DELETE CASCADE,
     alias VARCHAR(100) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT uq_character_aliases_character_alias UNIQUE (character_id, alias)
@@ -113,7 +114,7 @@ CREATE INDEX IF NOT EXISTS ix_character_aliases_character_id ON character_aliase
 CREATE TABLE IF NOT EXISTS synthesis_jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     requested_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    job_type VARCHAR(30) NOT NULL CHECK (job_type IN ('profile_novel', 'synthesize_chapter')),
+    job_type VARCHAR(30) NOT NULL CONSTRAINT chk_synthesis_jobs_job_type CHECK (job_type IN ('profile_novel', 'synthesize_chapter')),
     status VARCHAR(20) NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'processing', 'completed', 'failed', 'dead_letter')),
     progress_pct REAL NOT NULL DEFAULT 0.0,
     attempts INT NOT NULL DEFAULT 0,

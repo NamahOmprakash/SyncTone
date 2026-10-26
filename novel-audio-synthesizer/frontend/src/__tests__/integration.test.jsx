@@ -85,6 +85,7 @@ describe('Milestone 7 — Full-Stack Frontend Integration (Catalog → Details �
     vi.spyOn(api.novels, 'list').mockResolvedValue({ novels: MOCK_NOVELS });
     vi.spyOn(api.novels, 'get').mockResolvedValue(MOCK_DETAIL);
     vi.spyOn(api.chapters, 'get').mockResolvedValue(MOCK_CHAPTER);
+    vi.spyOn(api.voices, 'list').mockResolvedValue({ available_voices: {} });
     vi.spyOn(api.status, 'models').mockResolvedValue({ primary: 'Edge Neural', fallback: 'Kokoro' });
     vi.spyOn(api.playback, 'getProgress').mockResolvedValue({ progress: null });
   });
@@ -98,12 +99,12 @@ describe('Milestone 7 — Full-Stack Frontend Integration (Catalog → Details �
 
     // 1. In Catalog
     await waitFor(() => {
-      expect(screen.getByText("Harry Potter and the Philosopher's Stone")).toBeInTheDocument();
+      expect(screen.getAllByText("Harry Potter and the Philosopher's Stone")[0]).toBeInTheDocument();
       expect(screen.getByText('Novel Library')).toBeInTheDocument();
     });
 
     // 2. Click novel to view details
-    fireEvent.click(screen.getByText("Harry Potter and the Philosopher's Stone"));
+    fireEvent.click(screen.getAllByText("Harry Potter and the Philosopher's Stone")[0]);
 
     await waitFor(() => {
       expect(screen.getByText('The Boy Who Lived')).toBeInTheDocument();

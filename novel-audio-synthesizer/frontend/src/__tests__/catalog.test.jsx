@@ -95,8 +95,8 @@ describe('Milestone 2 — Novel Catalog & Details', () => {
       // Verified channel requested initially
       await waitFor(() => {
         expect(listSpy).toHaveBeenCalledWith('verified');
-        expect(screen.getByText("Harry Potter and the Philosopher's Stone")).toBeInTheDocument();
-        expect(screen.getByText(/By jk_rowling/i)).toBeInTheDocument();
+        expect(screen.getAllByText("Harry Potter and the Philosopher's Stone")[0]).toBeInTheDocument();
+        expect(screen.getAllByText(/By jk_rowling/i)[0]).toBeInTheDocument();
       });
 
       // Switch to Community channel tab
@@ -106,7 +106,7 @@ describe('Milestone 2 — Novel Catalog & Details', () => {
       });
 
       // Clicking a card invokes onSelectNovel
-      fireEvent.click(screen.getByText("Harry Potter and the Philosopher's Stone"));
+      fireEvent.click(screen.getAllByText("Harry Potter and the Philosopher's Stone")[0]);
       expect(handleSelect).toHaveBeenCalledWith('n-1');
     });
 
@@ -120,8 +120,8 @@ describe('Milestone 2 — Novel Catalog & Details', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Harry Potter and the Philosopher's Stone")).toBeInTheDocument();
-        expect(screen.getByText('The Adventures of Sherlock Holmes')).toBeInTheDocument();
+        expect(screen.getAllByText("Harry Potter and the Philosopher's Stone")[0]).toBeInTheDocument();
+        expect(screen.getAllByText('The Adventures of Sherlock Holmes')[0]).toBeInTheDocument();
       });
 
       // Search for "sherlock"
@@ -150,7 +150,7 @@ describe('Milestone 2 — Novel Catalog & Details', () => {
       fireEvent.click(screen.getByText('Retry'));
 
       await waitFor(() => {
-        expect(screen.getByText("Harry Potter and the Philosopher's Stone")).toBeInTheDocument();
+        expect(screen.getAllByText("Harry Potter and the Philosopher's Stone")[0]).toBeInTheDocument();
       });
     });
   });
@@ -172,7 +172,7 @@ describe('Milestone 2 — Novel Catalog & Details', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Harry Potter and the Philosopher's Stone")).toBeInTheDocument();
+        expect(screen.getAllByText("Harry Potter and the Philosopher's Stone")[0]).toBeInTheDocument();
         expect(screen.getByText('The Boy Who Lived')).toBeInTheDocument();
         expect(screen.getByText(/3:05/)).toBeInTheDocument(); // 185000ms = 3m 5s
       });

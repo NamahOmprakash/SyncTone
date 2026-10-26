@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api, ApiError } from '../services/api';
+import { IconUpload, IconX } from './icons';
 
 export default function UploadChapterModal({ isOpen, novel, onClose, onChapterUploaded }) {
   const [title, setTitle] = useState('');
@@ -41,33 +42,40 @@ export default function UploadChapterModal({ isOpen, novel, onClose, onChapterUp
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm modal-scrim-enter"
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+      <div className="w-full max-w-xl theme-surface rounded-2xl shadow-2xl border overflow-hidden modal-panel-enter">
+        <div className="p-6 border-b theme-border flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <span>➕</span> Upload Chapter to {novel.title}
+            <h2 className="text-base font-bold theme-heading flex items-center gap-2">
+              <IconUpload className="w-4 h-4 text-[var(--accent)]" />
+              <span>Upload Chapter to {novel.title}</span>
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Prose will be ingested into PostgreSQL & MongoDB with dialogue segmentation.
+            <p className="text-xs theme-muted mt-0.5">
+              Prose will be prepared for multi-voice performance with dialogue detection.
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg theme-muted hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition"
+            aria-label="Close modal"
+          >
+            <IconX className="w-4 h-4" />
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200">
+            <div className="p-3 bg-rose-500/10 text-rose-400 text-xs rounded-xl border border-rose-500/20">
               {error}
             </div>
           )}
 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold theme-sub uppercase tracking-wider mb-1.5 font-mono">
                 Chapter Title
               </label>
               <input
@@ -75,11 +83,11 @@ export default function UploadChapterModal({ isOpen, novel, onClose, onChapterUp
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Chapter 1: The Boy Who Lived"
-                className="w-full px-3.5 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                className="w-full px-3.5 py-2 text-xs theme-card border rounded-xl placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-focus)] transition"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold theme-sub uppercase tracking-wider mb-1.5 font-mono">
                 Number (optional)
               </label>
               <input
@@ -88,40 +96,39 @@ export default function UploadChapterModal({ isOpen, novel, onClose, onChapterUp
                 value={chapterNumber}
                 onChange={(e) => setChapterNumber(e.target.value)}
                 placeholder="Auto"
-                className="w-full px-3.5 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                className="w-full px-3.5 py-2 text-xs theme-card border rounded-xl placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-focus)] transition"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold theme-sub uppercase tracking-wider mb-1.5 font-mono">
               Chapter Prose Text
             </label>
             <textarea
+              rows={8}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              rows={10}
-              placeholder="Paste raw prose text here... The system will parse narration and quoted dialogues automatically."
+              placeholder="Paste raw prose text here. Quotes will be automatically detected and attributed to distinct character voices..."
               required
-              className="w-full px-3.5 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none font-serif leading-relaxed"
+              className="w-full px-3.5 py-2.5 text-xs theme-card border rounded-xl placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-focus)] transition font-serif leading-relaxed"
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="pt-2 flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl"
+              className="px-4 py-2 theme-card border rounded-xl text-xs font-semibold theme-muted hover:text-[var(--text-main)] transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm disabled:opacity-50"
+              className="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold rounded-xl shadow-md transition disabled:opacity-50"
             >
-              {isSubmitting ? 'Uploading...' : 'Upload & Enqueue'}
+              {isSubmitting ? 'Ingesting...' : 'Upload & Parse Prose'}
             </button>
           </div>
         </form>

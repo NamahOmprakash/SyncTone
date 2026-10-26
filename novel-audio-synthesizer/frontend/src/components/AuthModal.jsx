@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import NovelCover from './NovelCover';
+import {
+  IconSoundwave,
+  IconX,
+  IconUser,
+  IconLock,
+  IconSparkles,
+  IconShield,
+  IconPlay,
+} from './icons';
 
 export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
   const { login, register, error, clearError } = useAuth();
@@ -99,7 +109,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md modal-scrim-enter"
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
@@ -109,158 +119,204 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
     >
       <div
         ref={modalRef}
-        className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-scaleUp"
+        className="w-full max-w-md md:max-w-3xl theme-surface rounded-3xl shadow-2xl border overflow-hidden flex flex-col md:flex-row modal-panel-enter"
       >
-        {/* Header Tabs */}
-        <div className="flex border-b border-gray-100 bg-gray-50/50">
-          <button
-            type="button"
-            onClick={() => {
-              setMode('login');
-              setValidationError('');
-              clearError();
-            }}
-            className={`flex-1 py-4 text-sm font-semibold transition-all border-b-2 ${
-              mode === 'login'
-                ? 'border-indigo-600 text-indigo-600 bg-white shadow-sm'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('register');
-              setValidationError('');
-              clearError();
-            }}
-            className={`flex-1 py-4 text-sm font-semibold transition-all border-b-2 ${
-              mode === 'register'
-                ? 'border-indigo-600 text-indigo-600 bg-white shadow-sm'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
-            }`}
-          >
-            Create Account
-          </button>
-        </div>
-
-        {/* Form Body */}
-        <form noValidate onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 id="auth-modal-title" className="text-xl font-bold text-gray-900 tracking-tight">
-              {mode === 'login' ? 'Welcome Back' : 'Join SyncTone'}
-            </h2>
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={isSubmitting}
-              className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition"
-              aria-label="Close dialog"
-            >
-              ✕
-            </button>
-          </div>
-
-          <p className="text-xs text-gray-500">
-            {mode === 'login'
-              ? 'Enter your credentials to access your reading progress and catalog.'
-              : 'Sign up to read, synthesize audio, and save your progress across devices.'}
-          </p>
-
-          {displayError && (
-            <div className="p-3 bg-red-50/80 border border-red-200/60 rounded-xl text-red-700 text-xs flex items-start gap-2 animate-shake">
-              <span className="text-red-500 font-bold">⚠️</span>
-              <span className="flex-1">{displayError}</span>
-            </div>
-          )}
-
-          {mode === 'register' && (
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                Username
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. synctone_reader"
-                required
-                disabled={isSubmitting}
-                className="w-full px-3.5 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition outline-none"
-              />
-            </div>
-          )}
-
+        {/* Left Column: Accessible Authentication Form */}
+        <div className="w-full md:w-1/2 p-6 sm:p-8 flex flex-col justify-between">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-              Email Address
-            </label>
-            <input
-              ref={emailInputRef}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-              disabled={isSubmitting}
-              className="w-full px-3.5 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition outline-none"
-            />
-          </div>
+            {/* Header with Brand Logo & Close Button */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[var(--accent)] text-white flex items-center justify-center font-bold shadow-sm">
+                  <IconSoundwave className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold theme-heading font-display">SyncTone</h3>
+                  <p className="text-[10px] theme-muted font-mono uppercase tracking-wider">Dramatic Audio</p>
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              disabled={isSubmitting}
-              className="w-full px-3.5 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition outline-none"
-            />
-          </div>
-
-          {mode === 'register' && (
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                Account Role
-              </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                disabled={isSubmitting}
-                className="w-full px-3.5 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition outline-none"
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg theme-muted hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition"
+                aria-label="Close modal"
               >
-                <option value="reader">Reader (Browse & Listen)</option>
-                <option value="writer">Writer / Author (Upload Novels & Chapters)</option>
-              </select>
-              <p className="mt-1 text-[11px] text-gray-400">
-                Writers can create novels and manage character voice assignments.
+                <IconX className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Title & Subheading */}
+            <div className="mb-6">
+              <h2 id="auth-modal-title" className="text-2xl font-bold theme-heading font-serif">
+                {mode === 'login' ? 'Welcome Back' : 'Join SyncTone'}
+              </h2>
+              <p className="text-xs theme-sub mt-1 leading-relaxed">
+                {mode === 'login'
+                  ? 'Sign in to access your saved audio library and synced progress.'
+                  : 'Create an account to start listening and assigning character voices.'}
               </p>
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-xl shadow-md shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
-          >
-            {isSubmitting ? (
-              <>
-                <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                <span>{mode === 'login' ? 'Signing in...' : 'Creating account...'}</span>
-              </>
-            ) : (
-              <span>{mode === 'login' ? 'Sign In to SyncTone' : 'Create Account'}</span>
+            {/* Error Message Box */}
+            {displayError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold">
+                {displayError}
+              </div>
             )}
-          </button>
-        </form>
+
+            {/* Authentication Form */}
+            <form noValidate onSubmit={handleSubmit} className="space-y-4">
+              {mode === 'register' && (
+                <div>
+                  <label htmlFor="auth-username" className="block text-xs font-semibold theme-sub mb-1.5">
+                    Username
+                  </label>
+                  <input
+                    id="auth-username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="e.g. synctone_reader"
+                    autoComplete="username"
+                    disabled={isSubmitting}
+                    className="w-full px-3.5 py-2.5 theme-card border rounded-xl text-xs placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-focus)] transition"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="auth-email" className="block text-xs font-semibold theme-sub mb-1.5">
+                  Email address
+                </label>
+                <input
+                  ref={emailInputRef}
+                  id="auth-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  disabled={isSubmitting}
+                  className="w-full px-3.5 py-2.5 theme-card border rounded-xl text-xs placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-focus)] transition"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="auth-password" className="block text-xs font-semibold theme-sub mb-1.5">
+                  Password
+                </label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  disabled={isSubmitting}
+                  className="w-full px-3.5 py-2.5 theme-card border rounded-xl text-xs placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-focus)] transition"
+                />
+              </div>
+
+              {mode === 'register' && (
+                <div>
+                  <label htmlFor="auth-role" className="block text-xs font-semibold theme-sub mb-1.5">
+                    Account Type
+                  </label>
+                  <select
+                    id="auth-role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    disabled={isSubmitting}
+                    className="w-full px-3.5 py-2.5 theme-card border rounded-xl text-xs focus:outline-none focus:border-[var(--border-focus)] transition"
+                  >
+                    <option value="reader">Reader (Listen & Read only)</option>
+                    <option value="writer">Writer (Upload Novels & Manage Cast)</option>
+                  </select>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)] font-bold rounded-xl shadow-md text-xs transition min-h-[44px] cursor-pointer disabled:opacity-50 select-none"
+              >
+                {isSubmitting
+                  ? 'Connecting...'
+                  : mode === 'login'
+                  ? 'Sign In to SyncTone'
+                  : 'Join as ' + (role === 'writer' ? 'Writer' : 'Reader')}
+              </button>
+            </form>
+          </div>
+
+          {/* Mode Switcher Footer */}
+          <div className="mt-6 pt-3 border-t theme-border text-center text-xs theme-muted">
+            {mode === 'login' ? (
+              <span>
+                New to SyncTone?{' '}
+                <button
+                  type="button"
+                  onClick={() => setMode('register')}
+                  className="text-[var(--accent)] hover:underline font-bold cursor-pointer"
+                >
+                  Create Account
+                </button>
+              </span>
+            ) : (
+              <span>
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setMode('login')}
+                  className="text-[var(--accent)] hover:underline font-bold cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: Luxury Cinematic Spotlight Showcase (Desktop only) */}
+        <div className="hidden md:flex w-1/2 relative bg-[var(--bg-card)] overflow-hidden flex-col justify-end p-8 border-l theme-border">
+          <div className="absolute inset-0 opacity-40">
+            <NovelCover
+              title="Harry Potter"
+              author="J.K. Rowling"
+              className="w-full h-full object-cover scale-110 blur-sm"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-card)] via-[var(--bg-card)]/75 to-transparent" />
+          </div>
+
+          {/* Spotlight Card */}
+          <div className="relative z-10 theme-surface border rounded-2xl p-5 shadow-2xl space-y-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 text-status-success font-bold uppercase tracking-wider text-[10px] font-mono">
+                <span className="w-2 h-2 rounded-full bg-[var(--color-status-success)] animate-ping" />
+                Featured Audio Story
+              </span>
+              <span className="text-[10px] theme-muted font-mono">Studio Audio</span>
+            </div>
+
+            <div>
+              <h4 className="text-base font-bold theme-heading font-serif">
+                Harry Potter and the Philosopher&apos;s Stone
+              </h4>
+              <p className="text-[11px] theme-muted font-mono mt-0.5">
+                Ch. 1: The Boy Who Lived • Multi-Voice Dramatic Cast
+              </p>
+            </div>
+
+            <p className="text-xs theme-sub italic border-l-2 border-[var(--accent)] pl-3 font-serif leading-relaxed">
+              &ldquo;Mr. and Mrs. Dursley, of number four, Privet Drive, were proud to say that they were perfectly normal, thank you very much.&rdquo;
+            </p>
+
+            <div className="pt-2 border-t theme-border flex items-center justify-between text-[11px] font-mono theme-muted">
+              <span>Narrated by a full dramatic cast</span>
+              <span className="text-status-success font-bold font-mono">Synchronized Reading</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

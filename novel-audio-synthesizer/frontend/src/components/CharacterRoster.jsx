@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { api, ApiError } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { getSpeakerColor } from '../utils/speakerColors';
+import {
+  IconUsers,
+  IconLock,
+  IconX,
+  IconCheck,
+  IconMic,
+} from './icons';
 
 export default function CharacterRoster({
   chapterId,
@@ -94,84 +101,91 @@ export default function CharacterRoster({
 
   return (
     <div
-      className="fixed inset-y-0 right-0 w-88 max-w-full bg-white shadow-2xl border-l border-gray-200 z-50 flex flex-col animate-slideLeft"
+      className="fixed inset-y-0 right-0 w-88 max-w-full theme-surface shadow-2xl border-l z-50 flex flex-col animate-slideLeft transition-colors duration-200"
       role="dialog"
       aria-label="Character Roster"
       aria-modal="true"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50/70">
+      <div className="flex items-center justify-between p-5 border-b theme-border theme-card">
         <div>
-          <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-            <span>👥</span> Character Roster
+          <h2 className="text-base font-bold theme-heading flex items-center gap-2">
+            <IconUsers className="w-4 h-4 text-[var(--accent)]" />
+            <span>Character Roster</span>
           </h2>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs theme-muted mt-0.5">
             {characters.length} character{characters.length === 1 ? '' : 's'} detected in this chapter
           </p>
         </div>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition"
+          className="theme-muted hover:text-[var(--text-main)] p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition"
           aria-label="Close roster"
         >
-          ✕
+          <IconX className="w-4 h-4" />
         </button>
       </div>
 
       {/* Alerts */}
       {errorMessage && (
-        <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center justify-between">
-          <span>❌ {errorMessage}</span>
-          <button onClick={() => setErrorMessage(null)} className="text-red-500 font-bold ml-2">✕</button>
+        <div className="mx-4 mt-3 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs flex items-center justify-between">
+          <span>{errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="text-rose-400 font-bold ml-2">
+            <IconX className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
       {successMessage && (
-        <div className="mx-4 mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center justify-between">
-          <span>✔ {successMessage}</span>
-          <button onClick={() => setSuccessMessage(null)} className="text-emerald-600 font-bold ml-2">✕</button>
+        <div className="mx-4 mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <IconCheck className="w-3.5 h-3.5" />
+            <span>{successMessage}</span>
+          </span>
+          <button onClick={() => setSuccessMessage(null)} className="text-emerald-400 font-bold ml-2">
+            <IconX className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
       {/* Roster List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {characters.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 text-sm">
-            <span className="text-3xl block mb-2">🎭</span>
+          <div className="text-center py-12 theme-muted text-sm">
+            <IconMic className="w-8 h-8 mx-auto mb-2 opacity-50" />
             No speaking characters detected in this chapter.
           </div>
         ) : (
           characters.map((char) => {
-            const color = getSpeakerColor(char.id);
             const isUpdating = updatingId === char.id;
 
             return (
               <div
                 key={char.id}
-                className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200/70 space-y-3 transition"
+                className="p-4 theme-card rounded-2xl border space-y-3 transition-transform duration-120 hover:-translate-y-0.5 active:scale-[0.99]"
               >
                 {/* Character Name & Dialogue count */}
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
-                    <span className={`w-2.5 h-2.5 rounded-full ${color.border.replace('border', 'bg')}`} />
+                  <span className="font-bold theme-heading text-sm flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)]" />
                     {char.name}
                   </span>
-                  <span className="text-[11px] font-semibold text-gray-400 bg-white px-2 py-0.5 rounded-md border border-gray-200">
+                  <span className="text-[11px] font-mono theme-muted theme-surface px-2 py-0.5 rounded-md border">
                     {char.segmentCount} line{char.segmentCount === 1 ? '' : 's'}
                   </span>
                 </div>
 
                 {/* Sample Quote */}
                 {char.sampleQuote && (
-                  <p className="text-xs text-gray-600 italic bg-white p-2.5 rounded-xl border border-gray-100 line-clamp-2">
+                  <p className="text-xs theme-sub italic theme-surface p-2.5 rounded-xl border line-clamp-2 font-serif">
                     "{char.sampleQuote.replace(/^["“”]|["“”]$/g, '')}"
                   </p>
                 )}
 
                 {/* Voice Selection / Read-Only View */}
-                <div className="pt-2 border-t border-gray-100">
+                <div className="pt-2 border-t theme-border">
                   <div className="flex items-center justify-between gap-2">
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                    <label className="text-[11px] font-semibold theme-muted uppercase tracking-wider font-mono">
                       Voice:
                     </label>
 
@@ -180,7 +194,7 @@ export default function CharacterRoster({
                         value={char.voiceId}
                         disabled={isUpdating}
                         onChange={(e) => handleVoiceSelect(char.id, e.target.value)}
-                        className="text-xs px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition outline-none font-medium text-gray-800 disabled:opacity-50"
+                        className="text-xs px-2.5 py-1.5 theme-surface border rounded-xl focus:outline-none focus:border-[var(--border-focus)] transition font-medium theme-heading disabled:opacity-50"
                       >
                         {Object.entries(availableVoices).map(([archetype, voiceId]) => (
                           <option key={archetype} value={voiceId}>
@@ -189,15 +203,15 @@ export default function CharacterRoster({
                         ))}
                       </select>
                     ) : (
-                      <span className="text-xs font-semibold text-gray-700 bg-white px-2.5 py-1 rounded-lg border border-gray-200 flex items-center gap-1">
-                        <span>🔒</span>
+                      <span className="text-xs font-semibold theme-sub theme-surface px-2.5 py-1 rounded-lg border flex items-center gap-1 font-mono">
+                        <IconLock className="w-3 h-3 text-[var(--accent)]" />
                         <span>{char.voiceId}</span>
                       </span>
                     )}
                   </div>
 
                   {!isWriterOrAdmin && (
-                    <p className="text-[10px] text-gray-400 mt-1 text-right">
+                    <p className="text-[10px] theme-muted mt-1 text-right">
                       Sign in as writer/admin to override voices.
                     </p>
                   )}
