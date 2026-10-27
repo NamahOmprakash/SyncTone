@@ -57,8 +57,11 @@ export default function ReaderView({
     typeof document !== 'undefined' ? !document.hidden : true
   );
 
-  // Listen to Escape key to exit Focus Mode
+  // Listen to Escape key to exit Focus Mode and toggle full-screen body class
   useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.body.classList.toggle('focus-fullscreen-mode', isFocusMode);
+    }
     if (!isFocusMode) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -66,7 +69,12 @@ export default function ReaderView({
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (typeof document !== 'undefined') {
+        document.body.classList.remove('focus-fullscreen-mode');
+      }
+    };
   }, [isFocusMode]);
 
   // Monitor tab visibility to pause animations when user switches tabs
@@ -531,6 +539,8 @@ export default function ReaderView({
             onSwitchToNormal={() => setReaderMode('normal')}
             fontFamily={fontFamily}
             fontSize={fontSize}
+            isFocusMode={isFocusMode}
+            onToggleFocusMode={() => setIsFocusMode((prev) => !prev)}
           />
         </div>
       ) : (

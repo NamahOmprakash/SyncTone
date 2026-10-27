@@ -579,8 +579,26 @@ body {
 }
 
 /* ========================================================================= */
-/* FOCUS MODE: DISTRACTION-FREE SPOTLIGHT THEATRE                            */
+/* FOCUS MODE: DISTRACTION-FREE FULLSCREEN APPLE BOOKS / SPOTLIGHT THEATRE   */
 /* ========================================================================= */
+body.focus-fullscreen-mode aside,
+body.focus-fullscreen-mode nav[aria-label="Mobile Navigation"],
+body.focus-fullscreen-mode header {
+  display: none !important;
+}
+body.focus-fullscreen-mode .md\:pl-\[72px\] {
+  padding-left: 0 !important;
+}
+body.focus-fullscreen-mode main {
+  padding: 0 !important;
+  transform: none !important;
+  animation: none !important;
+}
+body.focus-fullscreen-mode footer {
+  left: 0 !important;
+  z-index: 60 !important;
+}
+
 .focus-mode-active .glass-header {
   opacity: 0.25;
   transition: opacity 0.3s ease;
@@ -588,16 +606,16 @@ body {
 .focus-mode-active .glass-header:hover {
   opacity: 1;
 }
-.focus-mode-active [role="button"]:not([aria-pressed="true"]) {
+.focus-mode-active article [role="button"]:not([aria-pressed="true"]) {
   opacity: 0.28;
   filter: blur(0.2px);
   transition: opacity 0.3s ease, filter 0.3s ease, transform 0.2s ease;
 }
-.focus-mode-active [role="button"]:not([aria-pressed="true"]):hover {
+.focus-mode-active article [role="button"]:not([aria-pressed="true"]):hover {
   opacity: 0.95;
   filter: none;
 }
-.focus-mode-active [role="button"][aria-pressed="true"] {
+.focus-mode-active article [role="button"][aria-pressed="true"] {
   opacity: 1 !important;
   transform: scale(1.015);
   box-shadow: 0 16px 36px -6px rgba(250, 204, 21, 0.25), 0 0 24px -2px rgba(250, 204, 21, 0.2) !important;

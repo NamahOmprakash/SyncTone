@@ -28,7 +28,23 @@ function paginateSegments(segments = [], charsPerPage = 850) {
   let currentChars = 0;
 
   for (const seg of segments) {
-    const textLen = (seg.text || '').length;
+    const { imgUrl, cleanText } = parseSegmentImage(seg);
+
+    // Standalone illustration: dedicated page
+    if (imgUrl && !cleanText) {
+      if (currentPage.length > 0) {
+        pages.push(currentPage);
+        currentPage = [];
+        currentChars = 0;
+      }
+      pages.push([seg]);
+      continue;
+    }
+
+    let textLen = (cleanText || seg.text || '').length;
+    if (imgUrl && cleanText) {
+      textLen += 450;
+    }
 
     // If page is not empty and adding this segment exceeds target character count, start new page
     if (currentPage.length > 0 && currentChars + textLen > charsPerPage && currentPage.length >= 2) {
@@ -56,7 +72,24 @@ function paginateSegments(segments = [], charsPerPage = 850) {
     const maxSegs = segments.length <= 3 ? 1 : 2;
 
     for (const seg of segments) {
-      const textLen = (seg.text || '').length;
+      const { imgUrl, cleanText } = parseSegmentImage(seg);
+
+      // Standalone illustration: dedicated page
+      if (imgUrl && !cleanText) {
+        if (cur.length > 0) {
+          subPages.push(cur);
+          cur = [];
+          chars = 0;
+        }
+        subPages.push([seg]);
+        continue;
+      }
+
+      let textLen = (cleanText || seg.text || '').length;
+      if (imgUrl && cleanText) {
+        textLen += 450;
+      }
+
       if (cur.length > 0 && (chars + textLen > maxChars || cur.length >= maxSegs)) {
         subPages.push(cur);
         cur = [seg];
@@ -227,6 +260,8 @@ export default function OpenGLPageReader({
   onSwitchToNormal,
   fontFamily = 'serif',
   fontSize = 18,
+  isFocusMode = false,
+  onToggleFocusMode,
 }) {
   const { isDark } = useTheme();
   const [currentSpreadIndex, setCurrentSpreadIndex] = useState(0);
@@ -238,6 +273,7 @@ export default function OpenGLPageReader({
   const canvasRef = useRef(null);
   const bookContainerRef = useRef(null);
   const autoFlipLockRef = useRef(false);
+  const lastAutoFlippedSegRef = useRef(-1);
 
   const isHarryPotter = useMemo(() => {
     return (currentNovel?.title || '').toLowerCase().includes('harry potter');
@@ -271,7 +307,12 @@ export default function OpenGLPageReader({
 
   // Auto-flip spread to track active spoken segment
   useEffect(() => {
-    if (activeSegmentId === -1 || pages.length === 0) return;
+    if (activeSegmentId === -1 || pages.length === 0) {
+      lastAutoFlippedSegRef.current = -1;
+      return;
+    }
+    if (activeSegmentId === lastAutoFlippedSegRef.current) return;
+    lastAutoFlippedSegRef.current = activeSegmentId;
 
     const targetPageIdx = pages.findIndex((page) =>
       page.some((s) => (s.segment_id !== undefined ? s.segment_id : s.order) === activeSegmentId)
@@ -304,43 +345,27 @@ export default function OpenGLPageReader({
 
   // Turn to Next Spread
   const handleNextPage = useCallback(() => {
-    if (currentSpreadIndex < totalSpreads - 1 && !isFlipping) {
-      setLastJumpPage(currentSpreadIndex * 2 + 1);
+    setCurrentSpreadIndex((prev) => {
+      if (prev >= totalSpreads - 1) return prev;
+      setLastJumpPage(prev * 2 + 1);
       setFlipDirection('next');
       setIsFlipping(true);
-      const nextSpread = Math.min(totalSpreads - 1, currentSpreadIndex + 1);
-      setTimeout(() => {
-        setCurrentSpreadIndex(nextSpread);
-        setIsFlipping(false);
-        const nextLeftPage = pages[nextSpread * 2];
-        if (nextLeftPage && nextLeftPage.length > 0 && onSegmentClick) {
-          const firstSeg = nextLeftPage[0];
-          const segId = firstSeg.segment_id !== undefined ? firstSeg.segment_id : firstSeg.order;
-          onSegmentClick(segId);
-        }
-      }, 300);
-    }
-  }, [currentSpreadIndex, totalSpreads, isFlipping, pages, onSegmentClick]);
+      setTimeout(() => setIsFlipping(false), 280);
+      return prev + 1;
+    });
+  }, [totalSpreads]);
 
   // Turn to Previous Spread
   const handlePrevPage = useCallback(() => {
-    if (currentSpreadIndex > 0 && !isFlipping) {
-      setLastJumpPage(currentSpreadIndex * 2 + 1);
+    setCurrentSpreadIndex((prev) => {
+      if (prev <= 0) return prev;
+      setLastJumpPage(prev * 2 + 1);
       setFlipDirection('prev');
       setIsFlipping(true);
-      const prevSpread = Math.max(0, currentSpreadIndex - 1);
-      setTimeout(() => {
-        setCurrentSpreadIndex(prevSpread);
-        setIsFlipping(false);
-        const prevLeftPage = pages[prevSpread * 2];
-        if (prevLeftPage && prevLeftPage.length > 0 && onSegmentClick) {
-          const firstSeg = prevLeftPage[0];
-          const segId = firstSeg.segment_id !== undefined ? firstSeg.segment_id : firstSeg.order;
-          onSegmentClick(segId);
-        }
-      }, 300);
-    }
-  }, [currentSpreadIndex, isFlipping, pages, onSegmentClick]);
+      setTimeout(() => setIsFlipping(false), 280);
+      return prev - 1;
+    });
+  }, []);
 
   // Apple Books Jump-Back (matching Screenshot 1 bottom-left ↩ pill)
   const handleJumpBack = useCallback(() => {
@@ -451,6 +476,27 @@ export default function OpenGLPageReader({
     const rawText = isDialogue
       ? (cleanText ? `"${cleanText.replace(/^["“”]|["“”]$/g, '')}"` : '')
       : cleanText;
+
+    // Standalone illustration segment (Apple Books full-page illustration)
+    if (imgUrl && !rawText) {
+      return (
+        <div
+          key={segId}
+          data-active-segment={isActive ? 'true' : undefined}
+          onClick={() => onSegmentClick && onSegmentClick(segId)}
+          className="my-auto py-2 flex items-center justify-center cursor-pointer"
+        >
+          <img
+            src={imgUrl}
+            alt="Book illustration"
+            className="max-h-[480px] sm:max-h-[540px] w-auto mx-auto rounded-lg shadow-md object-contain"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </div>
+      );
+    }
 
     const imageElement = imgUrl ? (
       <div className="my-3 flex justify-center">
@@ -606,9 +652,31 @@ export default function OpenGLPageReader({
   const isSpreadZero = currentSpreadIndex === 0;
   // On Spread 0: Only show cover artwork when explicitly toggled on by user
   const isCoverActiveOnSpreadZero = isSpreadZero && showCoverSpread;
+  const leftHasImage = leftPageSegments.some((s) => parseSegmentImage(s).imgUrl);
 
   return (
-    <div className="space-y-6 animate-fade-in select-none relative">
+    <div
+      className={
+        isFocusMode
+          ? 'fixed inset-0 z-50 bg-[#fcfaf6] dark:bg-[#050507] flex flex-col justify-between px-4 sm:px-10 pt-3 pb-24 overflow-y-auto animate-fade-in select-none'
+          : 'space-y-6 animate-fade-in select-none relative'
+      }
+    >
+      {/* Floating Exit Focus Button */}
+      {isFocusMode && onToggleFocusMode && (
+        <div className="fixed top-4 right-6 z-50">
+          <button
+            type="button"
+            onClick={onToggleFocusMode}
+            className="px-3.5 py-1.5 rounded-full bg-stone-900/10 hover:bg-stone-900/20 dark:bg-white/10 dark:hover:bg-white/20 text-stone-800 dark:text-white/90 text-xs font-semibold backdrop-blur-md border border-stone-300 dark:border-white/15 transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+            title="Exit Focus Mode (Esc)"
+          >
+            <span>Exit Focus</span>
+            <span className="text-[10px] font-mono opacity-60">Esc</span>
+          </button>
+        </div>
+      )}
+
       {/* Minimalist Floating Apple Books Left Chevron (Matching Screenshot 1 & 2) */}
       <button
         aria-label="Previous Page"
@@ -632,7 +700,7 @@ export default function OpenGLPageReader({
       </button>
 
       {/* 3D Apple Books Two-Page Spread Stage */}
-      <div className="relative max-w-6xl mx-auto perspective-1200 py-2 sm:py-4">
+      <div className="relative w-full perspective-1200 py-2 sm:py-4">
         {/* Apple Books Hardcover Canvas Container */}
         <div
           ref={bookContainerRef}
@@ -683,9 +751,9 @@ export default function OpenGLPageReader({
                     <h2 className="text-xs font-mono tracking-wider uppercase text-amber-700 dark:text-amber-400/80">
                       {currentChapter?.title || 'Chapter One'}
                     </h2>
-                    {isHarryPotter ? (
+                    {!leftHasImage && isHarryPotter ? (
                       <HogwartsCrest />
-                    ) : chapterOpeningImg ? (
+                    ) : !leftHasImage && chapterOpeningImg ? (
                       <div className="my-3 flex justify-center">
                         <img
                           src={chapterOpeningImg}

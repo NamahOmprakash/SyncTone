@@ -297,7 +297,7 @@ export default function App() {
         )}
 
         {/* Content Body Area */}
-        <main key={view} className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6 motion-view-route">
+        <main key={view} className="flex-1 w-full px-4 sm:px-8 py-6 motion-view-route">
           {/* Playback Resume Toast */}
           {view === 'reader' && playbackProgress.resumedAtMs !== null && (
             <div className="mb-4 p-3.5 rounded-2xl bg-[var(--accent)] text-white shadow-xl flex items-center justify-between text-xs animate-slideDown">

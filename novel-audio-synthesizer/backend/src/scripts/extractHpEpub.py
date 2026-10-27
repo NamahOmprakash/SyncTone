@@ -283,6 +283,7 @@ def extract_segments(raw_text):
             if narration_text:
                 segments.append({
                     "segment_id": seg_id,
+                    "order": seg_id,
                     "type": "narration",
                     "speaker_name": "Narrator",
                     "speaker_id": "narrator",
@@ -292,6 +293,8 @@ def extract_segments(raw_text):
                     "text": narration_text,
                     "attribution_confidence": 1.0,
                     "attribution_source": "narrator_default",
+                    "_char_start": last_idx,
+                    "_char_end": start,
                 })
                 seg_id += 1
 
@@ -417,6 +420,7 @@ def extract_segments(raw_text):
 
         segments.append({
             "segment_id": seg_id,
+            "order": seg_id,
             "type": "dialogue",
             "speaker_name": speaker,
             "speaker_id": speaker_slug,
@@ -426,6 +430,8 @@ def extract_segments(raw_text):
             "text": d_text,
             "attribution_confidence": confidence,
             "attribution_source": source,
+            "_char_start": start,
+            "_char_end": end,
         })
         seg_id += 1
         last_idx = end
@@ -436,6 +442,7 @@ def extract_segments(raw_text):
         if trailing_text:
             segments.append({
                 "segment_id": seg_id,
+                "order": seg_id,
                 "type": "narration",
                 "speaker_name": "Narrator",
                 "speaker_id": "narrator",
@@ -445,6 +452,8 @@ def extract_segments(raw_text):
                 "text": trailing_text,
                 "attribution_confidence": 1.0,
                 "attribution_source": "narrator_default",
+                "_char_start": last_idx,
+                "_char_end": len(protected),
             })
 
     return segments
@@ -479,6 +488,37 @@ def extract_cover_image(epub_zip, repo_root):
     return "/static/covers/hp1_cover.jpg"
 
 
+def extract_page_image(epub_zip, repo_root, img_filename):
+    """
+    Extracts an image from the EPUB zip (e.g. EPUB/image_0017_00.jpeg)
+    and saves it as hp1_<image_basename> in backend, output, and frontend covers dirs.
+    Returns the URL path /static/covers/hp1_<image_basename>.
+    """
+    base = os.path.basename(img_filename)
+    dest_name = f"hp1_{base}"
+    zip_entry = f"EPUB/{base}"
+    if zip_entry not in epub_zip.namelist():
+        candidates = [n for n in epub_zip.namelist() if n.endswith(base)]
+        if candidates:
+            zip_entry = candidates[0]
+        else:
+            print(f"Warning: image entry {zip_entry} not found in EPUB", file=sys.stderr)
+            return f"/static/covers/{dest_name}"
+
+    img_bytes = epub_zip.read(zip_entry)
+    target_paths = [
+        os.path.join(repo_root, "novel-audio-synthesizer/backend/output/covers", dest_name),
+        os.path.join(repo_root, "novel-audio-synthesizer/output/covers", dest_name),
+        os.path.join(repo_root, "novel-audio-synthesizer/frontend/public/covers", dest_name),
+    ]
+    for p in target_paths:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "wb") as f:
+            f.write(img_bytes)
+
+    return f"/static/covers/{dest_name}"
+
+
 def main():
     epub_path = os.getenv("HP_EPUB_PATH", DEFAULT_EPUB_PATH)
     if not os.path.exists(epub_path):
@@ -496,43 +536,155 @@ def main():
         chapters_data = []
         speaker_stats = Counter()
         total_segments = 0
+        total_images_extracted = 0
 
         for ch_num, start_p, end_p, title, drop_char in CHAPTERS_DEF:
-            page_texts = []
+            page_records = []
+            first_text_page = True
+
             for p in range(start_p, end_p + 1):
                 name = f"EPUB/page_{p}.html"
                 if name not in all_entries:
                     continue
                 raw_html = z.read(name).decode("utf-8")
+                soup = BeautifulSoup(raw_html, "html.parser")
+                page_imgs = []
+                for img in soup.find_all("img"):
+                    if "src" in img.attrs:
+                        img_url = extract_page_image(z, repo_root, img["src"])
+                        page_imgs.append(img_url)
+                        total_images_extracted += 1
+
                 clean = clean_page_text(raw_html, title)
                 if clean:
-                    page_texts.append(clean)
+                    if first_text_page:
+                        if clean[0].islower() and ch_num != 8:
+                            clean = drop_char + clean
+                        elif clean.startswith("OOM"):
+                            clean = drop_char + clean
+                        first_text_page = False
 
-            combined_text = " ".join(page_texts)
+                page_records.append({
+                    "page": p,
+                    "text": clean,
+                    "images": page_imgs,
+                })
 
-            # Restore dropped initial letter
+            # Build combined prose text and track character offset boundaries for each page
+            clean_pages = []
+            page_char_end = {}
+            char_pos = 0
+            for r in page_records:
+                cl = r["text"]
+                if cl:
+                    start_c = char_pos
+                    end_c = start_c + len(cl)
+                    page_char_end[r["page"]] = end_c
+                    clean_pages.append(cl)
+                    char_pos = end_c + 1
+
+            combined_text = " ".join(clean_pages)
+
             if combined_text:
-                if combined_text[0].islower() and ch_num != 8:
-                    combined_text = drop_char + combined_text
-                elif combined_text.startswith("OOM"):
-                    combined_text = drop_char + combined_text
-
                 # Trim trailing noise symbols at end of chapter if any
                 combined_text = re.sub(r'[\s~_|^+=*<>—«/\x7f[\]:.-]+$', '', combined_text).strip()
                 if not combined_text.endswith(('.', '!', '?', "'", '"', '’', '”')):
                     combined_text += '.'
 
-            segments = extract_segments(combined_text)
-            total_segments += len(segments)
+            # Build raw_text containing prose and [IMAGE:...] markers
+            raw_text_parts = []
+            for r in page_records:
+                if r["text"]:
+                    raw_text_parts.append(r["text"])
+                for img_url in r["images"]:
+                    raw_text_parts.append(f"[IMAGE:{img_url}]")
+            chapter_raw_text = "\n\n".join(raw_text_parts)
 
-            for seg in segments:
+            prose_segments = extract_segments(combined_text)
+
+            # Map image insertions to prose segment boundaries
+            insertions = {}
+            last_seg_idx = -1
+            for r in page_records:
+                p = r["page"]
+                cl = r["text"]
+                imgs = r["images"]
+                if not imgs:
+                    if cl:
+                        end_c = page_char_end.get(p, 0)
+                        for i, s in enumerate(prose_segments):
+                            if s.get("_char_end", 0) <= end_c or s.get("_char_start", 0) < end_c:
+                                last_seg_idx = max(last_seg_idx, i)
+                    continue
+
+                if cl:
+                    end_c = page_char_end.get(p, 0)
+                    target_idx = -1
+                    for i, s in enumerate(prose_segments):
+                        if s.get("_char_end", 0) <= end_c or s.get("_char_start", 0) < end_c:
+                            target_idx = max(target_idx, i)
+                    last_seg_idx = max(last_seg_idx, target_idx)
+                    insertions.setdefault(target_idx, []).extend(imgs)
+                else:
+                    target_idx = last_seg_idx
+                    insertions.setdefault(target_idx, []).extend(imgs)
+
+            # Assemble complete segment list with sequential segment_id and order
+            final_segments = []
+            seg_id = 1
+
+            # Images before the first prose segment
+            for img_url in insertions.get(-1, []):
+                final_segments.append({
+                    "segment_id": seg_id,
+                    "order": seg_id,
+                    "type": "image",
+                    "speaker_name": "Narrator",
+                    "speaker_id": "narrator",
+                    "character_id": "narrator",
+                    "voice_id": VOICE_MAP["Narrator"],
+                    "assigned_voice_id": VOICE_MAP["Narrator"],
+                    "image_url": img_url,
+                    "text": f"[IMAGE:{img_url}]",
+                    "attribution_confidence": 1.0,
+                    "attribution_source": "narrator_default",
+                })
+                seg_id += 1
+
+            for i, s in enumerate(prose_segments):
+                s_clean = {k: v for k, v in s.items() if not k.startswith("_")}
+                s_clean["segment_id"] = seg_id
+                s_clean["order"] = seg_id
+                final_segments.append(s_clean)
+                seg_id += 1
+
+                for img_url in insertions.get(i, []):
+                    final_segments.append({
+                        "segment_id": seg_id,
+                        "order": seg_id,
+                        "type": "image",
+                        "speaker_name": "Narrator",
+                        "speaker_id": "narrator",
+                        "character_id": "narrator",
+                        "voice_id": VOICE_MAP["Narrator"],
+                        "assigned_voice_id": VOICE_MAP["Narrator"],
+                        "image_url": img_url,
+                        "text": f"[IMAGE:{img_url}]",
+                        "attribution_confidence": 1.0,
+                        "attribution_source": "narrator_default",
+                    })
+                    seg_id += 1
+
+            total_segments += len(final_segments)
+
+            for seg in final_segments:
                 speaker_stats[seg["speaker_name"]] += 1
 
             chapters_data.append({
                 "chapter_number": ch_num,
                 "title": title,
-                "raw_text": combined_text,
-                "segments": segments,
+                "raw_text": chapter_raw_text,
+                "segments": final_segments,
             })
 
     output_payload = {
@@ -560,12 +712,14 @@ def main():
     print("EPUB Extraction & Processing Completed Successfully")
     print("=================================================================")
     print(f"Total Chapters Extracted: {len(chapters_data)}")
+    print(f"Total Chapter Images Extracted: {total_images_extracted}")
     print(f"Total Audio Segments: {total_segments}")
     print("\nChapter Breakdown:")
     for ch in chapters_data:
         dialogues = sum(1 for s in ch["segments"] if s["type"] == "dialogue")
         narrations = sum(1 for s in ch["segments"] if s["type"] == "narration")
-        print(f"  Chapter {ch['chapter_number']:02d}: {ch['title'][:32]:32s} | Segments: {len(ch['segments']):3d} (Narration: {narrations:3d}, Dialogue: {dialogues:3d})")
+        images = sum(1 for s in ch["segments"] if s["type"] == "image")
+        print(f"  Chapter {ch['chapter_number']:02d}: {ch['title'][:32]:32s} | Segments: {len(ch['segments']):3d} (Narration: {narrations:3d}, Dialogue: {dialogues:3d}, Images: {images:2d})")
 
     print("\nTop Attributed Characters (Segment Counts):")
     for name, count in speaker_stats.most_common(12):
