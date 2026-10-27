@@ -86,6 +86,7 @@ audio_cache/
 
 # Extracted Novel Text & EPUB Dialogue Datasets (Local Ingestion Only)
 **/hp1_extracted.json
+**/hp1_image_*.jpeg
 
 # Database Volumes & Local Data Mounts
 pg_data/
