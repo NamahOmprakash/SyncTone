@@ -91,13 +91,26 @@ export default function AudioPlayer({
 
   const handleSkip = useCallback(
     (seconds) => {
-      if (!audioRef?.current) return;
+      if (playbackMode === 'tts' && onSeekSegment) {
+        onSeekSegment(seconds < 0 ? -1 : 1);
+        return;
+      }
+      if (!audioRef?.current) {
+        if (onSeekSegment) {
+          onSeekSegment(seconds < 0 ? -1 : 1);
+        }
+        return;
+      }
+      if (totalDurationMs <= 0 && onSeekSegment) {
+        onSeekSegment(seconds < 0 ? -1 : 1);
+        return;
+      }
       audioRef.current.currentTime = Math.max(
         0,
         Math.min(totalDurationMs / 1000, audioRef.current.currentTime + seconds)
       );
     },
-    [audioRef, totalDurationMs]
+    [audioRef, totalDurationMs, playbackMode, onSeekSegment]
   );
 
   const handleSpeedChange = () => {

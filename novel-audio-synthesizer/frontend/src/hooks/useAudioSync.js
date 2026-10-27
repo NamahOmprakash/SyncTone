@@ -38,6 +38,7 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
   const lastActiveSegIdRef = useRef(-1);
   const lastClockUpdateRef = useRef(0);
   const speechCancelledRef = useRef(false);
+  const speechGenRef = useRef(0);
   const apiSpeakFailedRef = useRef(false);
   const activeUtteranceRef = useRef(null);
 
@@ -58,6 +59,7 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
 
   // Stop any active Web Speech or secondary audio
   const stopSpeech = useCallback(() => {
+    speechGenRef.current += 1;
     speechCancelledRef.current = true;
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       try {
@@ -66,12 +68,22 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
     }
     if (secondaryAudioRef.current) {
       try {
-        secondaryAudioRef.current.pause();
-        secondaryAudioRef.current.currentTime = 0;
+        const sec = secondaryAudioRef.current;
+        sec.onended = null;
+        sec.onerror = null;
+        sec.ontimeupdate = null;
+        sec.pause();
+        sec.removeAttribute('src');
+        sec.currentTime = 0;
+      } catch (_) {}
+    }
+    if (playbackMode === 'tts' && audioRef.current) {
+      try {
+        audioRef.current.pause();
       } catch (_) {}
     }
     activeUtteranceRef.current = null;
-  }, []);
+  }, [playbackMode]);
 
   // Forward declaration for speaking segment
   const speakActiveSegmentRef = useRef(null);
@@ -109,14 +121,14 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
 
   // Speak segment with Web Speech Synthesis (distinct British/English voices & pitch per character)
   const speakWithSpeechSynthesis = useCallback(
-    (entry, targetSegId) => {
+    (entry, targetSegId, myGen) => {
       if (typeof window === 'undefined' || !window.speechSynthesis) {
         advanceToNextSegment(targetSegId);
         return;
       }
 
       window.speechSynthesis.cancel();
-      speechCancelledRef.current = false;
+      if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
 
       const rawText = entry.text || '';
       if (!rawText.trim()) {
@@ -173,7 +185,7 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
 
       // Intra-segment word progress tracking via boundary events
       utterance.onboundary = (e) => {
-        if (speechCancelledRef.current) return;
+        if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
         if (typeof e.charIndex === 'number' && rawText.length > 0) {
           const prog = Math.min(1, Math.max(0, e.charIndex / rawText.length));
           setSegmentProgress(prog);
@@ -184,14 +196,14 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
       };
 
       utterance.onend = () => {
-        if (speechCancelledRef.current) return;
+        if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
         setSegmentProgress(1.0);
         setCurrentTimeMs(entry.end_ms || entry.start_ms || 0);
         advanceToNextSegment(targetSegId);
       };
 
       utterance.onerror = () => {
-        if (speechCancelledRef.current) return;
+        if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
         advanceToNextSegment(targetSegId);
       };
 
@@ -203,7 +215,14 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
   // Main speech dispatcher: attempts /api/voices/speak -> falls back to window.speechSynthesis
   const speakActiveSegment = useCallback(
     (targetSegId, startFraction = 0) => {
+      stopSpeech();
       speechCancelledRef.current = false;
+      const myGen = ++speechGenRef.current;
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+
       const entry = timeline.find(
         (t) => (t.segment_id !== undefined ? t.segment_id : t.order) === targetSegId
       );
@@ -217,10 +236,8 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
 
       // If user selected machine-tts directly in browser
       if (ttsEngine === 'machine-tts') {
-        if (typeof window !== 'undefined' && window.speechSynthesis) {
-          speakWithSpeechSynthesis(entry, targetSegId);
-          return;
-        }
+        speakWithSpeechSynthesis(entry, targetSegId, myGen);
+        return;
       }
 
       // Try /api/voices/speak with selected engine if not previously failed
@@ -238,13 +255,13 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
         secAudio.src = speakUrl;
 
         secAudio.onerror = () => {
-          // Backend endpoint not active; switch fallback permanently for this session
+          if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
           apiSpeakFailedRef.current = true;
-          speakWithSpeechSynthesis(entry, targetSegId);
+          speakWithSpeechSynthesis(entry, targetSegId, myGen);
         };
 
         secAudio.ontimeupdate = () => {
-          if (speechCancelledRef.current) return;
+          if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
           if (secAudio.duration > 0) {
             const prog = Math.min(1, Math.max(0, secAudio.currentTime / secAudio.duration));
             setSegmentProgress(prog);
@@ -255,23 +272,43 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
         };
 
         secAudio.onended = () => {
-          if (speechCancelledRef.current) return;
+          if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
           setSegmentProgress(1.0);
           advanceToNextSegment(targetSegId);
         };
 
-        secAudio.play().catch(() => {
+        secAudio.play().catch((err) => {
+          if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
+          if (
+            err &&
+            (err.name === 'AbortError' ||
+              String(err.message).toLowerCase().includes('interrupted') ||
+              String(err.name).includes('Abort'))
+          ) {
+            return;
+          }
           apiSpeakFailedRef.current = true;
-          speakWithSpeechSynthesis(entry, targetSegId);
+          speakWithSpeechSynthesis(entry, targetSegId, myGen);
         });
       } else {
-        speakWithSpeechSynthesis(entry, targetSegId);
+        speakWithSpeechSynthesis(entry, targetSegId, myGen);
       }
     },
-    [timeline, advanceToNextSegment, speakWithSpeechSynthesis, ttsEngine]
+    [timeline, advanceToNextSegment, speakWithSpeechSynthesis, ttsEngine, stopSpeech]
   );
 
   speakActiveSegmentRef.current = speakActiveSegment;
+
+  const changeTtsEngine = useCallback(
+    (newEngine) => {
+      stopSpeech();
+      setTtsEngine(newEngine);
+      if (isPlaying && playbackMode === 'tts' && activeSegmentId !== -1) {
+        speakActiveSegmentRef.current?.(activeSegmentId, segmentProgress);
+      }
+    },
+    [stopSpeech, isPlaying, playbackMode, activeSegmentId, segmentProgress]
+  );
 
   useEffect(() => {
     lastActiveSegIdRef.current = -1;
@@ -505,7 +542,8 @@ export function useAudioSync(timeline = [], onSegmentChange = null) {
     togglePlaybackMode,
     ttsReadAlongEnabled,
     ttsEngine,
-    setTtsEngine,
+    setTtsEngine: changeTtsEngine,
+    changeTtsEngine,
     seekToSegment,
     seekToTimeMs,
     play,

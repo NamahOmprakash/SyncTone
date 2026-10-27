@@ -27,14 +27,18 @@ const SegmentSchema = new Schema(
     },
     type: {
       type: String,
-      enum: ['narration', 'dialogue'],
-      required: [true, 'Segment type must be either narration or dialogue'],
+      enum: ['narration', 'dialogue', 'image'],
+      required: [true, 'Segment type must be either narration, dialogue, or image'],
     },
     text: {
       type: String,
       required: [true, 'Segment text content is required'],
       trim: true,
       alias: 'text_content',
+    },
+    image_url: {
+      type: String,
+      default: null,
     },
     character_id: {
       type: String,
@@ -93,7 +97,7 @@ const SegmentSchema = new Schema(
     },
     source: {
       type: String,
-      enum: ['regex_rule', 'dependency_tree', 'llm_fallback', 'narrator_default', 'manual', 'unresolved'],
+      enum: ['regex_rule', 'dependency_tree', 'llm_fallback', 'narrator_default', 'manual', 'unresolved', 'image'],
       default: 'narrator_default',
       alias: 'attribution_source',
     },
@@ -114,6 +118,8 @@ const TimelineEntrySchema = new Schema(
     character_id: { type: String, default: null },
     voice_id: { type: String, required: true },
     text: { type: String, default: '' },
+    type: { type: String, default: 'narration' },
+    image_url: { type: String, default: null },
   },
   { _id: false }
 );

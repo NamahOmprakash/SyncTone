@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { getSpeakerColor } from '../utils/speakerColors';
+import { parseSegmentImage } from '../utils/segmentUtils';
 import { useTheme } from '../context/ThemeContext';
 import { Button } from './primitives/Button';
 import OpenGLPageReader from './OpenGLPageReader';
@@ -171,25 +172,44 @@ export default function ReaderView({
     );
   }
 
-  // WTR-Lab Intra-segment text renderer with word highlight
+  // WTR-Lab Intra-segment text renderer with word highlight and inline EPUB illustrations
   const renderSegmentText = (seg, isActive) => {
+    const { imgUrl, cleanText } = parseSegmentImage(seg);
     const isDialogue = seg.type === 'dialogue';
     const displayText = isDialogue
-      ? `"${seg.text.replace(/^["“”]|["“”]$/g, '')}"`
-      : seg.text;
+      ? (cleanText ? `"${cleanText.replace(/^["“”]|["“”]$/g, '')}"` : '')
+      : cleanText;
+
+    const imageElement = imgUrl ? (
+      <div className="my-3 flex justify-center">
+        <img
+          src={imgUrl}
+          alt="Book illustration"
+          className="my-4 mx-auto max-h-72 rounded-xl border border-white/15 shadow-lg object-contain"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      </div>
+    ) : null;
 
     // Inactive segment: plain text
     if (!isActive) {
       return (
-        <p className={`relative z-10 leading-relaxed ${isDialogue ? 'italic theme-main font-serif' : 'theme-sub font-normal'}`}>
-          {displayText}
-        </p>
+        <>
+          {imageElement}
+          {displayText && (
+            <p className={`relative z-10 leading-relaxed ${isDialogue ? 'italic theme-main font-serif' : 'theme-sub font-normal'}`}>
+              {displayText}
+            </p>
+          )}
+        </>
       );
     }
 
     // Active segment with intra-segment word progress
     if (typeof segmentProgress === 'number' && segmentProgress > 0) {
-      const tokens = displayText.split(/(\s+)/);
+      const tokens = (displayText || '').split(/(\s+)/);
       const nonWhitespaceIndices = [];
       tokens.forEach((t, i) => {
         if (!/^\s+$/.test(t)) nonWhitespaceIndices.push(i);
@@ -203,33 +223,43 @@ export default function ReaderView({
       const activeTokenIdx = nonWhitespaceIndices[targetWordIdx] ?? -1;
 
       return (
-        <p className={`relative z-10 leading-relaxed p-2.5 rounded-xl bg-yellow-400/20 dark:bg-yellow-500/20 border-l-4 border-yellow-400 shadow-xs transition-colors duration-100 ${
-          isDialogue ? 'italic font-serif text-slate-900 dark:text-yellow-100 font-medium' : 'text-slate-900 dark:text-yellow-50'
-        }`}>
-          {tokens.map((token, idx) => {
-            if (idx === activeTokenIdx) {
-              return (
-                <span
-                  key={idx}
-                  className="bg-yellow-300 dark:bg-yellow-400 text-slate-950 font-bold px-1 py-0.5 rounded shadow-xs ring-1 ring-yellow-500 inline-block transition-transform duration-75"
-                >
-                  {token}
-                </span>
-              );
-            }
-            return <React.Fragment key={idx}>{token}</React.Fragment>;
-          })}
-        </p>
+        <>
+          {imageElement}
+          {displayText && (
+            <p className={`relative z-10 leading-relaxed p-2.5 rounded-xl bg-yellow-400/20 dark:bg-yellow-500/20 border-l-4 border-yellow-400 shadow-xs transition-colors duration-100 ${
+              isDialogue ? 'italic font-serif text-slate-900 dark:text-yellow-100 font-medium' : 'text-slate-900 dark:text-yellow-50'
+            }`}>
+              {tokens.map((token, idx) => {
+                if (idx === activeTokenIdx) {
+                  return (
+                    <span
+                      key={idx}
+                      className="bg-yellow-300 dark:bg-yellow-400 text-slate-950 font-bold px-1 py-0.5 rounded shadow-xs ring-1 ring-yellow-500 inline-block transition-transform duration-75"
+                    >
+                      {token}
+                    </span>
+                  );
+                }
+                return <React.Fragment key={idx}>{token}</React.Fragment>;
+              })}
+            </p>
+          )}
+        </>
       );
     }
 
     // Active segment at start or without progress prop (ensures exact text match in Vitest tests)
     return (
-      <p className={`relative z-10 leading-relaxed p-2 rounded-lg bg-yellow-400/15 dark:bg-yellow-500/15 border-b-2 border-yellow-400 ${
-        isDialogue ? 'italic theme-main font-serif font-medium' : 'theme-main font-normal'
-      }`}>
-        {displayText}
-      </p>
+      <>
+        {imageElement}
+        {displayText && (
+          <p className={`relative z-10 leading-relaxed p-2 rounded-lg bg-yellow-400/15 dark:bg-yellow-500/15 border-b-2 border-yellow-400 ${
+            isDialogue ? 'italic theme-main font-serif font-medium' : 'theme-main font-normal'
+          }`}>
+            {displayText}
+          </p>
+        )}
+      </>
     );
   };
 

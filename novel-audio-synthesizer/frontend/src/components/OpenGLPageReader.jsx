@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { getSpeakerColor } from '../utils/speakerColors';
+import { parseSegmentImage } from '../utils/segmentUtils';
+import NovelCover from './NovelCover';
 import {
   IconArrowLeft,
   IconBook,
@@ -40,6 +42,42 @@ function paginateSegments(segments = [], charsPerPage = 850) {
 
   if (currentPage.length > 0) {
     pages.push(currentPage);
+  }
+
+  // If character-based pagination produced only 1 page but chapter has >= 2 segments,
+  // split segments into smaller pages of at most 2-3 segments per page (or ~450 chars)
+  // so every multi-paragraph chapter has multiple pages and spreads that can turn!
+  if (pages.length === 1 && segments.length >= 2) {
+    const subPages = [];
+    let cur = [];
+    let chars = 0;
+    const maxChars = Math.min(charsPerPage, 450);
+    const maxSegs = segments.length <= 3 ? 1 : 2;
+
+    for (const seg of segments) {
+      const textLen = (seg.text || '').length;
+      if (cur.length > 0 && (chars + textLen > maxChars || cur.length >= maxSegs)) {
+        subPages.push(cur);
+        cur = [seg];
+        chars = textLen;
+      } else {
+        cur.push(seg);
+        chars += textLen;
+      }
+    }
+    if (cur.length > 0) {
+      subPages.push(cur);
+    }
+    if (subPages.length > 1) {
+      return subPages;
+    }
+    // Fallback for short segments: 1 per page if <= 3 segments, else 2 per page
+    const fallbackPages = [];
+    const step = segments.length <= 3 ? 1 : 2;
+    for (let i = 0; i < segments.length; i += step) {
+      fallbackPages.push(segments.slice(i, i + step));
+    }
+    return fallbackPages;
   }
 
   return pages;
@@ -199,6 +237,18 @@ export default function OpenGLPageReader({
   const bookContainerRef = useRef(null);
   const autoFlipLockRef = useRef(false);
 
+  const isHarryPotter = useMemo(() => {
+    return (currentNovel?.title || '').toLowerCase().includes('harry potter');
+  }, [currentNovel?.title]);
+
+  const chapterOpeningImg = useMemo(() => {
+    if (segments && segments.length > 0) {
+      const firstSegParsed = parseSegmentImage(segments[0]);
+      if (firstSegParsed.imgUrl) return firstSegParsed.imgUrl;
+    }
+    return currentChapter?.image_url || null;
+  }, [segments, currentChapter]);
+
   // Paginate prose into book pages
   const pages = useMemo(() => {
     const charsTarget = Math.max(500, Math.round(900 * (18 / Math.max(14, fontSize))));
@@ -256,12 +306,19 @@ export default function OpenGLPageReader({
       setLastJumpPage(currentSpreadIndex * 2 + 1);
       setFlipDirection('next');
       setIsFlipping(true);
+      const nextSpread = Math.min(totalSpreads - 1, currentSpreadIndex + 1);
       setTimeout(() => {
-        setCurrentSpreadIndex((prev) => Math.min(totalSpreads - 1, prev + 1));
+        setCurrentSpreadIndex(nextSpread);
         setIsFlipping(false);
+        const nextLeftPage = pages[nextSpread * 2];
+        if (nextLeftPage && nextLeftPage.length > 0 && onSegmentClick) {
+          const firstSeg = nextLeftPage[0];
+          const segId = firstSeg.segment_id !== undefined ? firstSeg.segment_id : firstSeg.order;
+          onSegmentClick(segId);
+        }
       }, 300);
     }
-  }, [currentSpreadIndex, totalSpreads, isFlipping]);
+  }, [currentSpreadIndex, totalSpreads, isFlipping, pages, onSegmentClick]);
 
   // Turn to Previous Spread
   const handlePrevPage = useCallback(() => {
@@ -269,12 +326,19 @@ export default function OpenGLPageReader({
       setLastJumpPage(currentSpreadIndex * 2 + 1);
       setFlipDirection('prev');
       setIsFlipping(true);
+      const prevSpread = Math.max(0, currentSpreadIndex - 1);
       setTimeout(() => {
-        setCurrentSpreadIndex((prev) => Math.max(0, prev - 1));
+        setCurrentSpreadIndex(prevSpread);
         setIsFlipping(false);
+        const prevLeftPage = pages[prevSpread * 2];
+        if (prevLeftPage && prevLeftPage.length > 0 && onSegmentClick) {
+          const firstSeg = prevLeftPage[0];
+          const segId = firstSeg.segment_id !== undefined ? firstSeg.segment_id : firstSeg.order;
+          onSegmentClick(segId);
+        }
       }, 300);
     }
-  }, [currentSpreadIndex, isFlipping]);
+  }, [currentSpreadIndex, isFlipping, pages, onSegmentClick]);
 
   // Apple Books Jump-Back (matching Screenshot 1 bottom-left ↩ pill)
   const handleJumpBack = useCallback(() => {
@@ -377,13 +441,27 @@ export default function OpenGLPageReader({
     };
   }, [isFlipping, flipDirection]);
 
-  // Render WTR-Lab TTS Yellow Highlight with intra-segment word tracking
+  // Render WTR-Lab TTS Yellow Highlight with intra-segment word tracking and inline EPUB illustrations
   const renderSegmentProse = (seg, isActive) => {
     const segId = seg.segment_id !== undefined ? seg.segment_id : seg.order;
+    const { imgUrl, cleanText } = parseSegmentImage(seg);
     const isDialogue = seg.type === 'dialogue';
     const rawText = isDialogue
-      ? `"${seg.text.replace(/^["“”]|["“”]$/g, '')}"`
-      : seg.text;
+      ? (cleanText ? `"${cleanText.replace(/^["“”]|["“”]$/g, '')}"` : '')
+      : cleanText;
+
+    const imageElement = imgUrl ? (
+      <div className="my-3 flex justify-center">
+        <img
+          src={imgUrl}
+          alt="Book illustration"
+          className="my-4 mx-auto max-h-72 rounded-xl border border-white/15 shadow-lg object-contain"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      </div>
+    ) : null;
 
     if (!isActive) {
       return (
@@ -413,61 +491,81 @@ export default function OpenGLPageReader({
               </span>
             )}
           </div>
-          <p className={`leading-[1.85] tracking-[0.01em] text-justify indent-6 ${isDialogue ? 'italic font-serif theme-main' : 'theme-sub'}`}>
-            {rawText}
-          </p>
+          {imageElement}
+          {rawText && (
+            <p className={`leading-[1.85] tracking-[0.01em] text-justify indent-6 ${isDialogue ? 'italic font-serif theme-main' : 'theme-sub'}`}>
+              {rawText}
+            </p>
+          )}
         </div>
       );
     }
 
-    // Active segment: render WTR-Lab word-by-word yellow highlight if segmentProgress > 0
-    let textContent;
-    if (typeof segmentProgress === 'number' && segmentProgress > 0) {
-      const tokens = rawText.split(/(\s+)/);
-      const nonWhitespaceIndices = [];
-      tokens.forEach((t, i) => {
-        if (!/^\s+$/.test(t)) nonWhitespaceIndices.push(i);
-      });
+    // Active segment: render WTR-Lab word-by-word inline highlight without a display box
+    let textContent = null;
+    if (rawText) {
+      if (typeof segmentProgress === 'number' && segmentProgress > 0) {
+        const tokens = rawText.split(/(\s+)/);
+        const nonWhitespaceIndices = [];
+        tokens.forEach((t, i) => {
+          if (!/^\s+$/.test(t)) nonWhitespaceIndices.push(i);
+        });
 
-      const totalWords = Math.max(1, nonWhitespaceIndices.length);
-      const targetWordIdx = Math.min(
-        totalWords - 1,
-        Math.max(0, Math.floor(segmentProgress * totalWords))
-      );
-      const activeTokenIdx = nonWhitespaceIndices[targetWordIdx] ?? -1;
+        const totalWords = Math.max(1, nonWhitespaceIndices.length);
+        const targetWordIdx = Math.min(
+          totalWords - 1,
+          Math.max(0, Math.floor(segmentProgress * totalWords))
+        );
+        const activeTokenIdx = nonWhitespaceIndices[targetWordIdx] ?? -1;
 
-      textContent = (
-        <p className={`leading-[1.85] tracking-[0.01em] text-justify indent-6 bg-yellow-400/20 dark:bg-yellow-500/20 p-2.5 rounded-xl border-l-4 border-yellow-400 select-text ${
-          isDialogue ? 'italic font-serif text-slate-900 dark:text-yellow-100 font-medium' : 'text-slate-900 dark:text-yellow-50'
-        }`}>
-          {tokens.map((token, idx) => {
-            if (idx === activeTokenIdx) {
-              return (
-                <span
-                  key={idx}
-                  className="bg-yellow-400 bg-[#FACC15] text-slate-950 font-bold px-1.5 py-0.5 rounded shadow-sm ring-1 ring-yellow-500 transition-all duration-75 inline-block"
-                >
-                  {token}
-                </span>
-              );
-            }
-            return <React.Fragment key={idx}>{token}</React.Fragment>;
-          })}
-        </p>
-      );
-    } else {
-      textContent = (
-        <p className={`leading-[1.85] tracking-[0.01em] text-justify indent-6 bg-yellow-400/20 dark:bg-yellow-500/20 p-2.5 rounded-xl border-l-4 border-yellow-400 font-medium select-text ${
-          isDialogue ? 'italic font-serif text-slate-900 dark:text-yellow-100' : 'text-slate-900 dark:text-yellow-50'
-        }`}>
-          {rawText}
-        </p>
-      );
+        textContent = (
+          <p
+            data-active-segment="true"
+            className={`leading-[1.85] tracking-[0.01em] text-justify indent-6 select-text ${
+            isDialogue ? 'italic font-serif theme-main' : 'theme-sub'
+          }`}>
+            <mark className="bg-yellow-300/25 text-amber-100 rounded-xs">
+              {tokens.map((token, idx) => {
+                if (idx === activeTokenIdx) {
+                  return (
+                    <span
+                      key={idx}
+                      data-active-word="true"
+                      style={{ display: 'inline', textIndent: '0px' }}
+                      className="inline bg-[#FACC15] bg-yellow-400 text-slate-950 font-bold font-semibold rounded-xs"
+                    >
+                      {token}
+                    </span>
+                  );
+                }
+                return <React.Fragment key={idx}>{token}</React.Fragment>;
+              })}
+            </mark>
+          </p>
+        );
+      } else {
+        textContent = (
+          <p
+            data-active-segment="true"
+            className={`leading-[1.85] tracking-[0.01em] text-justify indent-6 select-text ${
+            isDialogue ? 'italic font-serif theme-main' : 'theme-sub'
+          }`}>
+            <mark
+              data-active-word="true"
+              style={{ display: 'inline', textIndent: '0px' }}
+              className="inline bg-yellow-300/30 text-amber-100 rounded-xs"
+            >
+              {rawText}
+            </mark>
+          </p>
+        );
+      }
     }
 
     return (
       <div
         key={segId}
+        data-active-segment="true"
         onClick={() => onSegmentClick && onSegmentClick(segId)}
         role="button"
         tabIndex={0}
@@ -497,14 +595,15 @@ export default function OpenGLPageReader({
             <span>Reading</span>
           </span>
         </div>
+        {imageElement}
         {textContent}
       </div>
     );
   };
 
   const isSpreadZero = currentSpreadIndex === 0;
-  // On Spread 0: Show cover artwork if showCoverSpread is true, or if only 1 page of prose exists
-  const isCoverActiveOnSpreadZero = isSpreadZero && (showCoverSpread || pages.length <= 1);
+  // On Spread 0: Only show cover artwork when explicitly toggled on by user
+  const isCoverActiveOnSpreadZero = isSpreadZero && showCoverSpread;
 
   return (
     <div className="space-y-6 animate-fade-in select-none relative">
@@ -562,7 +661,7 @@ export default function OpenGLPageReader({
               {/* Left Page Running Head */}
               <div className="text-[11px] font-mono tracking-widest uppercase opacity-40 select-none pb-3 border-b border-white/5 flex items-center justify-between">
                 <span className="truncate max-w-[200px]">
-                  {currentNovel?.title || "Harry Potter and the Philosopher's Stone"}
+                  {currentNovel?.title || 'SyncTone Edition'}
                 </span>
                 <span className="hidden sm:inline">
                   {currentChapter?.title ? `Chapter ${currentChapter.chapter_number || 1}` : 'SyncTone Edition'}
@@ -571,17 +670,35 @@ export default function OpenGLPageReader({
 
               {/* Left Page Content */}
               <div className="flex-1 py-4 space-y-4 overflow-y-auto">
-                {/* On Spread 0, render Chapter Opening Header + Hogwarts Crest Ornament (Screenshot 2) */}
+                {/* On Spread 0, render Chapter Opening Header */}
                 {isSpreadZero && (
                   <div className="text-center space-y-2 mb-4 animate-fade-in">
                     <h1 className="text-sm sm:text-base font-serif font-bold tracking-widest uppercase text-amber-200/90">
-                      {currentNovel?.title || "Harry Potter and the Philosopher's Stone"}
+                      {currentNovel?.title || 'Chapter Opening'}
                     </h1>
                     <h2 className="text-xs font-mono tracking-wider uppercase text-amber-400/80">
-                      {currentChapter?.title || 'Chapter One • The Boy Who Lived'}
+                      {currentChapter?.title || 'Chapter One'}
                     </h2>
-                    {/* Hogwarts Heraldic Crest */}
-                    <HogwartsCrest />
+                    {isHarryPotter ? (
+                      <HogwartsCrest />
+                    ) : chapterOpeningImg ? (
+                      <div className="my-3 flex justify-center">
+                        <img
+                          src={chapterOpeningImg}
+                          alt="Chapter opening illustration"
+                          className="max-h-48 sm:max-h-56 rounded-xl border border-white/15 shadow-lg object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-3 my-4 opacity-50 select-none">
+                        <span className="h-px w-12 bg-gradient-to-r from-transparent to-amber-400/60" />
+                        <span className="text-amber-400 text-xs">❦</span>
+                        <span className="h-px w-12 bg-gradient-to-l from-transparent to-amber-400/60" />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -627,39 +744,54 @@ export default function OpenGLPageReader({
               {/* Right Page Content */}
               <div className="flex-1 py-4 space-y-4 overflow-y-auto">
                 {isCoverActiveOnSpreadZero ? (
-                  /* Cover Showcase Panel (Matching Screenshot 1 media_1793043930821_acff71f9.png) */
+                  /* Cover Showcase Panel (Matching Screenshot 1) */
                   <div className="flex-1 flex flex-col items-center justify-center py-4 px-2 text-center animate-fade-in">
-                    <div className="relative group max-w-[340px] sm:max-w-[380px] w-full rounded-2xl overflow-hidden shadow-2xl ring-2 ring-amber-500/30 transition-transform duration-300 hover:scale-[1.01]">
+                    <div className="relative group max-w-[340px] sm:max-w-[380px] w-full aspect-[2/3] max-h-[480px] rounded-2xl overflow-hidden shadow-2xl ring-2 ring-amber-500/30 transition-transform duration-300 hover:scale-[1.01]">
                       {/* MinaLima Ornate Gold Border Frame */}
                       <div className="absolute inset-0 border-4 border-amber-600/40 rounded-2xl pointer-events-none z-10" />
-                      <img
-                        src={currentNovel?.cover_object || '/covers/hp1_cover.jpg'}
-                        alt={currentNovel?.title || 'Book Cover Artwork'}
-                        className="w-full h-auto max-h-[480px] object-cover rounded-xl shadow-inner mx-auto"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          if (e.target.nextElementSibling) {
-                            e.target.nextElementSibling.style.display = 'flex';
-                          }
-                        }}
-                      />
-                      <div
-                        style={{ display: 'none' }}
-                        className="w-full h-80 rounded-xl bg-gradient-to-br from-amber-950/60 to-black border border-amber-500/20 flex flex-col items-center justify-center p-6 text-center"
-                      >
-                        <IconBook className="w-12 h-12 text-amber-400 mb-3" />
-                        <h4 className="text-base font-bold text-amber-200 font-serif">
-                          {currentNovel?.title || "Harry Potter and the Philosopher's Stone"}
-                        </h4>
-                        <p className="text-xs text-amber-300/70 mt-1 font-mono">Illustrated Audio Edition</p>
-                      </div>
+                      {currentNovel?.cover_object ? (
+                        <img
+                          src={currentNovel.cover_object}
+                          alt={currentNovel?.title || 'Book Cover Artwork'}
+                          className="w-full h-full object-cover rounded-xl shadow-inner mx-auto"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextElementSibling) {
+                              e.currentTarget.nextElementSibling.style.display = 'block';
+                            }
+                          }}
+                        />
+                      ) : isHarryPotter ? (
+                        <img
+                          src="/covers/hp1_cover.jpg"
+                          alt={currentNovel?.title || 'Harry Potter Cover'}
+                          className="w-full h-full object-cover rounded-xl shadow-inner mx-auto"
+                        />
+                      ) : (
+                        <NovelCover
+                          title={currentNovel?.title}
+                          author={currentNovel?.author_username}
+                          coverUrl={null}
+                          className="w-full h-full"
+                        />
+                      )}
+                      {currentNovel?.cover_object && (
+                        <div style={{ display: 'none' }} className="w-full h-full">
+                          <NovelCover
+                            title={currentNovel?.title}
+                            author={currentNovel?.author_username}
+                            coverUrl={null}
+                            className="w-full h-full"
+                          />
+                        </div>
+                      )}
                     </div>
                     <p className="mt-4 text-xs font-serif italic text-white/50 text-center tracking-wide">
-                      {currentNovel?.title || "Harry Potter and the Philosopher's Stone"} • Illustrated Edition
+                      {currentNovel?.title || 'SyncTone Edition'} • Illustrated Edition
                     </p>
                   </div>
                 ) : (
-                  /* Right Page Prose Segments (Matching Screenshot 2 media_1793043939425_1a90fadf.png) */
+                  /* Right Page Prose Segments */
                   rightPageSegments.length > 0 ? (
                     rightPageSegments.map((seg) => {
                       const segId = seg.segment_id !== undefined ? seg.segment_id : seg.order;
@@ -722,6 +854,30 @@ export default function OpenGLPageReader({
 
       {/* Floating Apple Books Dock Controls */}
       <div className="max-w-2xl mx-auto flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 rounded-2xl glass-dock border theme-border shadow-lg">
+        {/* Prev / Next Page Buttons */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handlePrevPage}
+            disabled={currentSpreadIndex === 0}
+            className="px-2.5 py-1.5 rounded-xl theme-card border hover:border-amber-400 text-xs font-semibold text-white/80 hover:text-white transition flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:pointer-events-none shadow-xs"
+            title="Previous Page (Left Arrow)"
+          >
+            <IconChevronLeft className="w-3.5 h-3.5" />
+            <span>Prev Page</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleNextPage}
+            disabled={currentSpreadIndex >= totalSpreads - 1}
+            className="px-2.5 py-1.5 rounded-xl theme-card border hover:border-amber-400 text-xs font-semibold text-white/80 hover:text-white transition flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:pointer-events-none shadow-xs"
+            title="Next Page (Right Arrow)"
+          >
+            <span>Next Page</span>
+            <IconChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
         {/* Spread Scrubber Slider */}
         <div className="flex-1 flex items-center gap-3 min-w-[180px]">
           <span className="text-xs font-mono font-bold theme-muted w-14 text-right">
@@ -741,13 +897,13 @@ export default function OpenGLPageReader({
           </span>
         </div>
 
-        {/* Spread 0 Cover Toggle (Allows switching between Screenshot 1 and Screenshot 2) */}
-        {isSpreadZero && pages.length > 1 && (
+        {/* Spread 0 Cover Toggle */}
+        {isSpreadZero && (
           <button
             type="button"
             onClick={() => setShowCoverSpread((prev) => !prev)}
             className="px-2.5 py-1.5 rounded-xl theme-card border hover:border-amber-400 text-xs font-semibold text-amber-300 transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Toggle between full Cover Artwork (Screenshot 1) and continuous two-page Prose (Screenshot 2)"
+            title="Toggle between full Cover Artwork and continuous two-page Prose"
           >
             <IconBook className="w-3.5 h-3.5" />
             <span>{showCoverSpread ? 'Show Prose Spread' : 'Show Cover Spread'}</span>

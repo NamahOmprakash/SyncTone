@@ -32,6 +32,7 @@ export default function AddNovelModal({
   const [isDragging, setIsDragging] = useState(false);
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null); // { name, size, format, chapterCount }
+  const [coverObject, setCoverObject] = useState(null);
   const [parsedChapters, setParsedChapters] = useState([]); // [{ chapter_number, title, raw_text }]
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -191,6 +192,7 @@ export default function AddNovelModal({
         setSynopsis(resolvedSynopsis);
       }
 
+      setCoverObject(parsedResult?.cover_object || null);
       setParsedChapters(chapters);
       setUploadedFile({
         name: file.name,
@@ -242,6 +244,7 @@ export default function AddNovelModal({
 
   const handleRemoveFile = () => {
     setUploadedFile(null);
+    setCoverObject(null);
     setParsedChapters([]);
     setPreviewOpen(false);
     if (fileInputRef.current) {
@@ -285,10 +288,14 @@ export default function AddNovelModal({
         synopsis: synopsis.trim(),
         channel,
         global_tone: globalTone.trim(),
+        cover_object: coverObject || null,
         chapters: parsedChapters,
       });
 
       if (res?.novel) {
+        if (!res.novel.cover_object && coverObject) {
+          res.novel.cover_object = coverObject;
+        }
         let firstChapter = res?.chapters?.[0] || null;
 
         // If backend did not create chapters in batch, upload them sequentially

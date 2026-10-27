@@ -77,17 +77,35 @@ function parseChapter(rawText, title = 'Untitled Chapter', chapterId = 'ch-1') {
   let segmentIdCounter = 1;
 
   for (const paragraph of paragraphs) {
+    const imgMatch = paragraph.match(/\[IMAGE:(\/static\/covers\/[^\]]+)\]/i);
+    if (imgMatch) {
+      segments.push({
+        segment_id: segmentIdCounter++,
+        type: 'image',
+        speaker_name: 'Illustration',
+        speaker_id: 'image',
+        assigned_voice_id: 'af_heart',
+        text: paragraph.trim(),
+        image_url: imgMatch[1],
+        attribution_confidence: 1.0,
+        attribution_source: 'image',
+      });
+      continue;
+    }
+
     const dialogueMatches = [];
     let match;
     const regex = new RegExp(DIALOGUE_PATTERN.source, 'g');
 
     while ((match = regex.exec(paragraph)) !== null) {
-      const dialogueText = match[1] !== undefined ? match[1] : match[2];
-      dialogueMatches.push({
-        text: dialogueText,
-        start: match.index,
-        end: match.index + match[0].length,
-      });
+      const dialogueText = (match[1] !== undefined ? match[1] : match[2] || '').trim();
+      if (dialogueText.length > 0) {
+        dialogueMatches.push({
+          text: dialogueText,
+          start: match.index,
+          end: match.index + match[0].length,
+        });
+      }
     }
 
     if (dialogueMatches.length === 0) {

@@ -101,6 +101,7 @@ router.post('/novels/parse-file', async (req, res) => {
     return res.json({
       title: finalTitle,
       synopsis: parsed.synopsis || '',
+      cover_object: parsed.cover_object || null,
       chapters: parsed.chapters || [],
     });
   } catch (err) {
@@ -243,8 +244,9 @@ router.post('/novels', optionalAuth, async (req, res) => {
 
           let currentMs = 0;
           const mappedSegments = (parsedData.segments || []).map((s, segIdx) => {
+            const isImage = s.type === 'image' || (s.text && s.text.startsWith('[IMAGE:'));
             const words = (s.text || '').trim().split(/\s+/).length;
-            const durationMs = Math.max(800, Math.round((words / 2.8) * 1000));
+            const durationMs = isImage ? 1000 : Math.max(800, Math.round((words / 2.8) * 1000));
             const start_ms = currentMs;
             const end_ms = start_ms + durationMs;
             currentMs = end_ms + 250;
@@ -254,11 +256,12 @@ router.post('/novels', optionalAuth, async (req, res) => {
             return {
               order: segIdx + 1,
               segment_id: segIdx + 1,
-              type: s.type,
+              type: isImage ? 'image' : s.type,
               text: s.text,
-              character_id: s.speaker_id || (s.type === 'narration' ? 'narrator' : 'unknown'),
-              speaker_id: s.speaker_id || (s.type === 'narration' ? 'narrator' : 'unknown'),
-              speaker_name: s.speaker_name || (s.type === 'narration' ? 'Narrator' : 'Unknown'),
+              image_url: s.image_url || (isImage && s.text ? (s.text.match(/\[IMAGE:([^\]]+)\]/) || [])[1] : null),
+              character_id: isImage ? 'image' : (s.speaker_id || (s.type === 'narration' ? 'narrator' : 'unknown')),
+              speaker_id: isImage ? 'image' : (s.speaker_id || (s.type === 'narration' ? 'narrator' : 'unknown')),
+              speaker_name: isImage ? 'Illustration' : (s.speaker_name || (s.type === 'narration' ? 'Narrator' : 'Unknown')),
               voice_id: voiceId,
               assigned_voice_id: voiceId,
               start_ms,
@@ -277,6 +280,8 @@ router.post('/novels', optionalAuth, async (req, res) => {
             character_id: s.character_id,
             voice_id: s.voice_id,
             text: s.text,
+            type: s.type,
+            image_url: s.image_url || null,
           }));
 
           // Insert into PostgreSQL chapters with status = 'completed'
