@@ -240,6 +240,19 @@ export default function App() {
     setShowAuthModal(true);
   };
 
+  const handleNovelDeleted = (deletedId) => {
+    if (selectedNovelId === deletedId) {
+      setSelectedNovelId(null);
+    }
+    if (currentNovel?.id === deletedId) {
+      setCurrentNovel(null);
+      setCurrentChapter(null);
+      setChapterSegments(EMPTY_ARRAY);
+      setChapterManifest(null);
+    }
+    handleNavigate('catalog');
+  };
+
   // Trigger re-synthesis of chapter
   const handleSynthesizeCurrentChapter = async () => {
     if (!currentChapter?.id) return;
@@ -348,6 +361,7 @@ export default function App() {
               onOpenAddNovel={() => setShowAddNovelModal(true)}
               onOpenSettings={() => setShowSettings(true)}
               onOpenAuth={handleOpenAuth}
+              onNovelDeleted={handleNovelDeleted}
             />
           )}
 
@@ -361,6 +375,7 @@ export default function App() {
                 setCurrentNovel(novel);
                 setShowUploadChapterModal(true);
               }}
+              onNovelDeleted={handleNovelDeleted}
             />
           )}
 

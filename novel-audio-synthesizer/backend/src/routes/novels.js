@@ -490,4 +490,99 @@ router.get('/novels/:id', async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/novels/:id
+ * Permanently deletes a novel, cascading across PostgreSQL tables
+ * (chapters, characters, character_aliases, novel_profile_job_targets,
+ * chapter_synthesis_job_targets, playback_history, playback_positions,
+ * and synthesis_jobs via triggers) and purging MongoDB chapter documents
+ * and local cover/audio files.
+ *
+ * Enabled for local development management.
+ */
+router.delete('/novels/:id', optionalAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || !UUID_REGEX.test(id)) {
+      return res.status(400).json({ error: 'Invalid novel UUID format.' });
+    }
+
+    const client = await pool.connect();
+    let deletedNovel = null;
+    let deletedChapterIds = [];
+    try {
+      await client.query('BEGIN');
+
+      // 1. Check if novel exists
+      const checkRes = await client.query(
+        'SELECT id, title, cover_object, added_by FROM novels WHERE id = $1',
+        [id]
+      );
+      if (checkRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Novel not found.' });
+      }
+
+      deletedNovel = checkRes.rows[0];
+
+      // 2. Collect chapter IDs for MongoDB and file purge
+      const chRows = await client.query(
+        'SELECT id FROM chapters WHERE novel_id = $1',
+        [id]
+      );
+      deletedChapterIds = chRows.rows.map((r) => r.id);
+
+      // 3. Delete from PostgreSQL novels (cascades to chapters, characters, targets, playback_history, positions)
+      await client.query('DELETE FROM novels WHERE id = $1', [id]);
+
+      await client.query('COMMIT');
+    } catch (dbErr) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw dbErr;
+    } finally {
+      client.release();
+    }
+
+    // 4. Purge corresponding documents from MongoDB Chapter collection
+    try {
+      await Chapter.deleteMany({
+        $or: [
+          { novel_id: id },
+          { pg_chapter_id: { $in: deletedChapterIds } },
+        ],
+      });
+    } catch (mErr) {
+      console.warn('[Delete Novel] MongoDB purge warning:', mErr.message);
+    }
+
+    // 5. Best-effort cleanup of local cover image files
+    if (deletedNovel.cover_object && typeof deletedNovel.cover_object === 'string') {
+      if (deletedNovel.cover_object.startsWith('/static/covers/')) {
+        const coverFilename = path.basename(deletedNovel.cover_object);
+        const possibleCoverPaths = [
+          path.resolve(__dirname, '../../output/covers', coverFilename),
+          path.resolve(__dirname, '../../../output/covers', coverFilename),
+        ];
+        for (const p of possibleCoverPaths) {
+          if (fs.existsSync(p)) {
+            try {
+              fs.unlinkSync(p);
+            } catch (_) {}
+          }
+        }
+      }
+    }
+
+    return res.json({
+      message: 'Novel deleted successfully',
+      deleted_id: id,
+      title: deletedNovel.title,
+    });
+  } catch (err) {
+    console.error('[Delete Novel Error]:', err.message);
+    return res.status(500).json({ error: 'Failed to delete novel.' });
+  }
+});
+
 module.exports = router;

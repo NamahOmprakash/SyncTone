@@ -13,6 +13,7 @@ import {
   IconRefresh,
   IconBook,
   IconSoundwave,
+  IconTrash,
 } from './icons';
 
 function formatDuration(ms) {
@@ -23,13 +24,33 @@ function formatDuration(ms) {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenUploadChapter }) {
+export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenUploadChapter, onNovelDeleted }) {
   const { isWriterOrAdmin } = useAuth();
   const [data, setData] = useState(null);
   const [activeTab, setActiveTab] = useState('chapters'); // 'chapters' | 'characters'
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [inLibrary, setInLibrary] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  const handleDeleteNovel = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.novels.delete(novelId);
+      setShowDeleteModal(false);
+      if (onNovelDeleted) {
+        onNovelDeleted(novelId);
+      } else {
+        onBack();
+      }
+    } catch (err) {
+      setDeleteError(err.message || 'Failed to delete novel');
+      setIsDeleting(false);
+    }
+  };
 
   const fetchDetails = async () => {
     setIsLoading(true);
@@ -209,6 +230,16 @@ export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenU
               >
                 {inLibrary ? '✓ In Library' : '+ Add to Library'}
               </button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                className="px-4 py-3 theme-card hover:bg-rose-500/10 hover:border-rose-500/40 text-rose-400 rounded-xl text-xs sm:text-sm font-semibold border min-h-[44px] transition flex items-center gap-1.5 cursor-pointer ml-auto"
+                title="Delete Novel (Local Dev)"
+                data-testid="delete-novel-btn"
+              >
+                <IconTrash className="w-4 h-4 text-rose-400" />
+                <span>Delete Novel (Dev)</span>
+              </button>
             </div>
 
             {/* Two-Column Metadata Alignment (2-of-3 cols Synopsis, 1-of-3 col Cast Box) */}
@@ -376,6 +407,72 @@ export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenU
           </div>
         )}
       </section>
+
+      {/* Delete Novel Confirmation Modal (Local Dev) */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn"
+          onClick={() => !isDeleting && setShowDeleteModal(false)}
+          data-testid="confirm-delete-novel-modal"
+        >
+          <div
+            className="w-full max-w-md theme-card border rounded-2xl shadow-2xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/15 text-rose-400 flex-shrink-0">
+                <IconTrash className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold theme-heading">Delete Novel (Local Dev)</h3>
+                <p className="text-xs theme-muted">Permanently remove this novel</p>
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm theme-sub leading-relaxed">
+              Are you sure you want to delete <strong className="theme-heading">&ldquo;{novel.title}&rdquo;</strong>?
+              This will permanently remove the novel, all {chapters.length} chapters, character voice portfolio, and audio cache from your local database.
+            </p>
+
+            {deleteError && (
+              <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 theme-surface hover:bg-[var(--bg-hover)] border rounded-xl text-xs font-semibold theme-sub transition cursor-pointer"
+                data-testid="cancel-delete-novel-btn"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteNovel}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                data-testid="confirm-delete-novel-btn"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <IconTrash className="w-3.5 h-3.5" />
+                    <span>Delete Novel</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

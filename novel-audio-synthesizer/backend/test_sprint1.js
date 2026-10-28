@@ -315,6 +315,57 @@ async function runTests() {
     console.log('  ✔ GET /api/novels/:id verified details and handled unknown ID with 404');
   }
 
+  // 4.5.1 DELETE /api/novels/:id (Local dev deletion & cascade verification)
+  console.log('  ▶ Testing DELETE /api/novels/:id (cascade deletion for local dev)...');
+  const tempNovelRes = await axios.post(
+    `${BASE_URL}/novels`,
+    {
+      title: 'Novel to Delete',
+      synopsis: 'Temporary novel for deletion testing',
+      channel: 'community',
+      added_by: writerUser.id,
+      chapters: [
+        {
+          chapter_number: 1,
+          title: 'Chapter 1 to Delete',
+          raw_text: 'Temporary prose that will be deleted.',
+        },
+      ],
+    },
+    { headers: { Cookie: writerTokenCookie } }
+  );
+  const tempNovelId = tempNovelRes.data.novel.id;
+  const tempChapterId = tempNovelRes.data.chapters[0].id;
+
+  // Verify it exists in Mongo
+  const mongoBefore = await Chapter.findOne({ pg_chapter_id: tempChapterId });
+  if (!mongoBefore) throw new Error('Expected temp chapter in MongoDB before deletion');
+
+  // Perform DELETE
+  const deleteNovelRes = await axios.delete(`${BASE_URL}/novels/${tempNovelId}`);
+  if (deleteNovelRes.status !== 200 || deleteNovelRes.data.deleted_id !== tempNovelId) {
+    throw new Error('DELETE /api/novels/:id failed');
+  }
+
+  // Verify PostgreSQL cascading delete
+  const pgAfter = await pool.query('SELECT id FROM novels WHERE id = $1', [tempNovelId]);
+  if (pgAfter.rows.length !== 0) throw new Error('Novel was not deleted from PostgreSQL');
+  const chAfter = await pool.query('SELECT id FROM chapters WHERE id = $1', [tempChapterId]);
+  if (chAfter.rows.length !== 0) throw new Error('Chapters were not cascaded in PostgreSQL');
+
+  // Verify MongoDB purge
+  const mongoAfter = await Chapter.findOne({ pg_chapter_id: tempChapterId });
+  if (mongoAfter) throw new Error('Chapter was not purged from MongoDB');
+
+  // Verify 404 on deleting non-existent novel
+  try {
+    await axios.delete(`${BASE_URL}/novels/${tempNovelId}`);
+    throw new Error('Expected second DELETE to return 404');
+  } catch (delErr) {
+    if (delErr.response?.status !== 404) throw new Error(`Expected 404, got ${delErr.response?.status}`);
+  }
+  console.log('  ✔ DELETE /api/novels/:id verified cascading deletion in PG, purge in Mongo, and 404 handling');
+
   // 4.6 Atomic novel creation failure rollback test (Audit Fix 1)
   console.log('  ▶ Testing atomic novel creation transaction rollback on synthesis job failure...');
   const testOrphanNovelId = uuidv4();

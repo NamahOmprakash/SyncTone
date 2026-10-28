@@ -98,6 +98,7 @@ export const api = {
     list: (channel) => api.get(`/novels${channel ? `?channel=${encodeURIComponent(channel)}` : ''}`),
     get: (id) => api.get(`/novels/${id}`),
     create: (novelData) => api.post('/novels', novelData),
+    delete: (id) => api.delete(`/novels/${id}`),
     uploadChapter: (novelId, chapterData) => api.post(`/novels/${novelId}/chapters`, chapterData),
     parseFile: (payload) => {
       if (typeof FormData !== 'undefined' && payload instanceof FormData) {
