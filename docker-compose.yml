@@ -14,7 +14,8 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./migrations/0001_initial_schema.sql:/docker-entrypoint-initdb.d/02_schema.sql:ro
     networks:
       - synctone-net
     healthcheck:
@@ -97,6 +98,8 @@ services:
       SWIFT_CONTAINER_COVERS: ${SWIFT_CONTAINER_COVERS:-novel-covers}
     ports:
       - "${PORT:-4000}:4000"
+    volumes:
+      - shared_output:/app/output
     networks:
       - synctone-net
 
@@ -129,6 +132,7 @@ services:
       WORKER_ID: ${WORKER_ID:-synctone-worker-1}
       WORKER_POLL_INTERVAL_SEC: ${WORKER_POLL_INTERVAL_SEC:-3}
     volumes:
+      - shared_output:/app/output
       - pcm_cache:/app/output/pcm_cache
     networks:
       - synctone-net
@@ -146,7 +150,7 @@ services:
       - app
       - full
     ports:
-      - "5173:5173"
+      - "5173:80"
     networks:
       - synctone-net
 
@@ -158,6 +162,8 @@ volumes:
   swift_data:
     driver: local
   pcm_cache:
+    driver: local
+  shared_output:
     driver: local
 
 networks:

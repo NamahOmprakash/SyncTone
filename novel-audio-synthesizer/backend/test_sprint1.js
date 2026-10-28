@@ -17,6 +17,11 @@ const TEST_PORT = 4999;
 const BASE_URL = `http://127.0.0.1:${TEST_PORT}/api`;
 
 let server;
+const cleanupState = {
+  writerId: null,
+  readerId: null,
+  novelId: null,
+};
 
 async function runTests() {
   console.log('================================================================');
@@ -111,6 +116,7 @@ async function runTests() {
   });
   if (registerWriterRes.status !== 201) throw new Error(`Registration failed: ${registerWriterRes.status}`);
   const writerUser = registerWriterRes.data.user;
+  cleanupState.writerId = writerUser.id;
   if (!writerUser.id || writerUser.role !== 'writer') throw new Error('Invalid writer payload');
   console.log(`  ✔ POST /api/auth/register created writer (${writerUser.username}, role: ${writerUser.role})`);
 
@@ -122,6 +128,7 @@ async function runTests() {
     role: 'reader',
   });
   const readerUser = registerReaderRes.data.user;
+  cleanupState.readerId = readerUser.id;
   console.log(`  ✔ POST /api/auth/register created reader (${readerUser.username}, role: ${readerUser.role})`);
 
   // 3.3 Duplicate registration check
@@ -262,6 +269,7 @@ async function runTests() {
   );
   if (createNovelRes.status !== 201) throw new Error('Failed to create novel');
   const createdNovel = createNovelRes.data.novel;
+  cleanupState.novelId = createdNovel.id;
   const profileJob = createNovelRes.data.job;
   if (!profileJob || profileJob.job_type !== 'profile_novel') {
     throw new Error('profile_novel job was not enqueued in synthesis_jobs');
@@ -270,7 +278,12 @@ async function runTests() {
     `  ✔ POST /api/novels created novel '${createdNovel.title}' and enqueued profile_novel job (${profileJob.id})`
   );
 
-  // Insert narrator character for relationship join
+  // Insert narrator character for relationship join (ensuring am_adam voice exists)
+  await pool.query(`
+    INSERT INTO voices (id, label, gender, age_band, language, reserved_narrator)
+    VALUES ('am_adam', 'Adam (Narrator Default)', 'male', 'adult', 'en-us', true)
+    ON CONFLICT (id) DO NOTHING;
+  `);
   await pool.query(
     `
     INSERT INTO characters (novel_id, canonical_name, voice_id, is_narrator)
@@ -313,14 +326,19 @@ async function runTests() {
        VALUES ($1, $2, 'Atomic Rollback Test Novel', 'Must rollback', 'verified');`,
       [testOrphanNovelId, writerUser.id]
     );
-    // Violate check constraint on synthesis_jobs: profile_novel must have chapter_id IS NULL
+    // Violate target subtype trigger: assign synthesize_chapter target to profile_novel job
+    const badJobRes = await testClient.query(
+      `INSERT INTO synthesis_jobs (requested_by, job_type)
+       VALUES ($1, 'profile_novel') RETURNING id;`,
+      [writerUser.id]
+    );
     await testClient.query(
-      `INSERT INTO synthesis_jobs (novel_id, chapter_id, requested_by, job_type)
-       VALUES ($1, '00000000-0000-0000-0000-000000000000', $2, 'profile_novel');`,
-      [testOrphanNovelId, writerUser.id]
+      `INSERT INTO chapter_synthesis_job_targets (job_id, chapter_id)
+       VALUES ($1, '00000000-0000-0000-0000-000000000000');`,
+      [badJobRes.rows[0].id]
     );
     await testClient.query('COMMIT');
-    throw new Error('Expected invalid synthesis job to fail transaction');
+    throw new Error('Expected invalid synthesis job target to fail transaction');
   } catch (err) {
     await testClient.query('ROLLBACK').catch(() => {});
   } finally {
@@ -376,10 +394,11 @@ async function runTests() {
   // Cross-store verification
   const pgChapterCheck = await pool.query('SELECT * FROM chapters WHERE id = $1', [ingestedChapterId]);
   if (pgChapterCheck.rows.length === 0) throw new Error('PostgreSQL chapter record missing');
-  const pgJobCheck = await pool.query('SELECT * FROM synthesis_jobs WHERE chapter_id = $1', [
-    ingestedChapterId,
-  ]);
-  if (pgJobCheck.rows.length === 0) throw new Error('PostgreSQL synthesis_jobs record missing');
+  const pgJobCheck = await pool.query(
+    'SELECT j.*, cs.chapter_id FROM synthesis_jobs j JOIN chapter_synthesis_job_targets cs ON j.id = cs.job_id WHERE cs.chapter_id = $1',
+    [ingestedChapterId]
+  );
+  if (pgJobCheck.rows.length === 0) throw new Error('PostgreSQL synthesis_jobs / chapter target record missing');
   const mongoDocCheck = await Chapter.findOne({ pg_chapter_id: ingestedChapterId });
   if (!mongoDocCheck) throw new Error('MongoDB chapter document missing');
   if (mongoDocCheck.raw_text !== chapterText) throw new Error('MongoDB raw text mismatch');
@@ -393,6 +412,7 @@ async function runTests() {
       title: 'Duplicate Chapter 1',
       text: 'Duplicate chapter prose',
       chapter_number: 1, // Violates UNIQUE(novel_id, chapter_number)
+      requested_by: writerUser.id,
     });
     throw new Error('Expected duplicate chapter number to fail');
   } catch (err) {
@@ -474,7 +494,10 @@ async function runTests() {
     position_ms: 6500,
   });
   const histCheck = await pool.query(
-    'SELECT * FROM playback_history WHERE user_id = $1 AND novel_id = $2',
+    `SELECT h.id, h.user_id, h.novel_id, p.chapter_id, p.position_ms
+     FROM playback_history h
+     JOIN playback_positions p ON h.id = p.history_id
+     WHERE h.user_id = $1 AND h.novel_id = $2`,
     [writerUser.id, createdNovel.id]
   );
   if (histCheck.rows.length !== 1 || histCheck.rows[0].position_ms !== 6500) {
@@ -482,9 +505,138 @@ async function runTests() {
   }
   console.log('  ✔ Playback history atomic upsert & idempotence verified (position_ms: 6500)');
 
-  // Cleanup test fixtures
+  // ==============================================================================
+  // Task 7: Security Audit & Role-Based Access Control Regression Verification
+  // ==============================================================================
+  console.log('\n▶ [Task 7] Running Security Audit & RBAC Regression Checks...');
+
+  // 7.1 Prevent public registration from self-assigning admin privileges (Role Escalation)
+  try {
+    await axios.post(`${BASE_URL}/auth/register`, {
+      username: `admin_attacker_${uniqueId}`,
+      email: `admin_attacker_${uniqueId}@example.com`,
+      password: 'AttackerPassword123!',
+      role: 'admin',
+    });
+    throw new Error('Expected admin registration to be rejected');
+  } catch (err) {
+    if (err.response?.status !== 403) {
+      throw new Error(`Expected 403 Forbidden for admin registration, got ${err.response?.status}`);
+    }
+    console.log('  ✔ Role Escalation Check: Public admin registration rejected with 403 Forbidden');
+  }
+
+  // 7.2 Anonymous access to POST /api/voices/assign must be rejected with 401
+  try {
+    await axios.post(`${BASE_URL}/voices/assign`, {
+      character_id: 'Sherlock Holmes',
+      new_voice_id: 'am_adam',
+      chapter_id: ingestedChapterId,
+    });
+    throw new Error('Expected anonymous voice assignment to fail');
+  } catch (err) {
+    if (err.response?.status !== 401) {
+      throw new Error(`Expected 401 Unauthorized for anonymous voice assignment, got ${err.response?.status}`);
+    }
+    console.log('  ✔ Security Check: Anonymous voice assignment rejected with 401 Unauthorized');
+  }
+
+  // 7.3 Reader access to POST /api/voices/assign must be rejected with 403
+  try {
+    await axios.post(
+      `${BASE_URL}/voices/assign`,
+      {
+        character_id: 'Sherlock Holmes',
+        new_voice_id: 'am_adam',
+        chapter_id: ingestedChapterId,
+      },
+      { headers: { Cookie: readerTokenCookie } }
+    );
+    throw new Error('Expected reader voice assignment to fail');
+  } catch (err) {
+    if (err.response?.status !== 403) {
+      throw new Error(`Expected 403 Forbidden for reader voice assignment, got ${err.response?.status}`);
+    }
+    console.log('  ✔ RBAC Check: Reader voice assignment rejected with 403 Forbidden');
+  }
+
+  // 7.4 Writer access to POST /api/voices/assign succeeds with 200
+  const assignWriterRes = await axios.post(
+    `${BASE_URL}/voices/assign`,
+    {
+      character_id: 'Dr. John Watson',
+      new_voice_id: 'bm_george',
+      chapter_id: ingestedChapterId,
+    },
+    { headers: { Cookie: writerTokenCookie } }
+  );
+  if (assignWriterRes.status !== 200) {
+    throw new Error(`Expected 200 for writer voice assignment, got ${assignWriterRes.status}`);
+  }
+  console.log('  ✔ RBAC Check: Writer voice assignment succeeded with 200 OK');
+
+  // 7.5 Anonymous access to POST /api/novels/:id/chapters must be rejected with 401
+  try {
+    await axios.post(`${BASE_URL}/novels/${createdNovel.id}/chapters`, {
+      title: 'Anonymous Chapter Ingestion',
+      text: 'Sample unauthorized text from an anonymous source.',
+    });
+    throw new Error('Expected anonymous chapter ingestion to fail');
+  } catch (err) {
+    if (err.response?.status !== 401) {
+      throw new Error(`Expected 401 Unauthorized for anonymous chapter ingestion, got ${err.response?.status}`);
+    }
+    console.log('  ✔ Security Check: Anonymous chapter ingestion rejected with 401 Unauthorized');
+  }
+
+  // 7.6 Reader access to POST /api/novels/:id/chapters must be rejected with 403
+  try {
+    await axios.post(
+      `${BASE_URL}/novels/${createdNovel.id}/chapters`,
+      {
+        title: 'Reader Chapter Ingestion',
+        text: 'Sample unauthorized text from a reader session.',
+      },
+      { headers: { Cookie: readerTokenCookie } }
+    );
+    throw new Error('Expected reader chapter ingestion to fail');
+  } catch (err) {
+    if (err.response?.status !== 403) {
+      throw new Error(`Expected 403 Forbidden for reader chapter ingestion, got ${err.response?.status}`);
+    }
+    console.log('  ✔ RBAC Check: Reader chapter ingestion rejected with 403 Forbidden');
+  }
+
+  // 7.7 Reader requested_by to POST /api/novels/:id/chapters must be rejected with 403
+  try {
+    await axios.post(`${BASE_URL}/novels/${createdNovel.id}/chapters`, {
+      title: 'Reader Requested Chapter Ingestion',
+      text: 'Sample unauthorized text from a reader requested_by.',
+      requested_by: readerUser.id,
+    });
+    throw new Error('Expected reader requested_by chapter ingestion to fail');
+  } catch (err) {
+    if (err.response?.status !== 403) {
+      throw new Error(`Expected 403 Forbidden for reader requested_by chapter ingestion, got ${err.response?.status}`);
+    }
+    console.log('  ✔ RBAC Check: Reader requested_by chapter ingestion rejected with 403 Forbidden');
+  }
+  // 7.8 Verify /api/health and /api/chapters/:id/progress endpoints
+  const healthRes = await axios.get(`${BASE_URL}/health`);
+  if (healthRes.status !== 200 || healthRes.data.status !== 'healthy') {
+    throw new Error('Expected /api/health to return healthy');
+  }
+  const progRes = await axios.get(`${BASE_URL}/chapters/${ingestedChapterId}/progress`);
+  if (progRes.status !== 200 || progRes.data.chapter_id !== ingestedChapterId) {
+    throw new Error('Expected /api/chapters/:id/progress to return progress state');
+  }
+  console.log('  ✔ Phase 3 Check: /api/health & /api/chapters/:id/progress verified');
+
   await Chapter.deleteMany({ novel_id: createdNovel.id });
   await pool.query('DELETE FROM users WHERE id IN ($1, $2)', [writerUser.id, readerUser.id]);
+  cleanupState.novelId = null;
+  cleanupState.writerId = null;
+  cleanupState.readerId = null;
   console.log('  ✔ Test database fixtures cleanly removed');
 
   console.log('\n================================================================');
@@ -501,6 +653,15 @@ runTests()
     process.exitCode = 1;
   })
   .finally(async () => {
+    try {
+      if (cleanupState.novelId) {
+        await Chapter.deleteMany({ novel_id: cleanupState.novelId }).catch(() => {});
+      }
+      const userIds = [cleanupState.writerId, cleanupState.readerId].filter(Boolean);
+      if (userIds.length > 0) {
+        await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [userIds]).catch(() => {});
+      }
+    } catch (_) {}
     if (server) server.close();
     await pool.end();
     await mongoose.disconnect();

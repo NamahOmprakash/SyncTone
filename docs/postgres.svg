@@ -1,0 +1,589 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1980.0 1810.0" width="1980.0" height="1810.0" style="background:#1F1F1F">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace; }
+</style>
+<defs>
+</defs>
+<rect width="100%" height="100%" fill="#1F1F1F"/>
+
+
+<polyline class="er-relationship" data-entity1="USERS" data-entity2="NOVELS" points="555,134 592,134 592,220 630,220" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="USERS" data-entity2="PLAYBACK_HISTORY" points="555,85 575,85 575,18 1560,18 1560,65 1590,65" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="USERS" data-entity2="SYNTHESIS_JOBS" points="555,185 592,185 592,1260 1590,1260" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="NOVELS" data-entity2="CHAPTERS" points="940,210 990,210 990,280 1040,280" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="NOVELS" data-entity2="CHARACTERS" points="940,280 990,280 990,680 1040,680" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="NOVELS" data-entity2="PLAYBACK_HISTORY" points="940,120 1590,120" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="NOVELS" data-entity2="NOVEL_PROFILE_JOB_TARGETS" points="940,380 965,380 965,1660 1140,1660" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="CHARACTERS" data-entity2="CHARACTER_ALIASES" points="1360,820 1475,820 1475,970 1590,970" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="VOICES" data-entity2="CHARACTERS" points="940,780 1040,780" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="CHAPTERS" data-entity2="MONGO_CHAPTER_DOC" points="1360,420 1475,420 1475,650 1590,650" fill="none" stroke="#10B981" stroke-width="1.5" stroke-dasharray="6 4" />
+<polyline class="er-relationship" data-entity1="CHAPTERS" data-entity2="PLAYBACK_POSITIONS" points="1360,330 1590,330" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="CHAPTERS" data-entity2="CHAPTER_SYNTHESIS_JOB_TARGETS" points="1360,480 1410,480 1410,1740 1590,1740" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="PLAYBACK_HISTORY" data-entity2="PLAYBACK_POSITIONS" points="1765,224 1765,260" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="SYNTHESIS_JOBS" data-entity2="NOVEL_PROFILE_JOB_TARGETS" points="1590,1520 1320,1520 1320,1615" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+<polyline class="er-relationship" data-entity1="SYNTHESIS_JOBS" data-entity2="CHAPTER_SYNTHESIS_JOB_TARGETS" points="1765,1575 1765,1615" fill="none" stroke="#8C8C8C" stroke-width="1.2" />
+
+<g class="relationship-labels">
+  <rect x="558" y="168" width="68" height="16" rx="2" fill="#1F1F1F" stroke="#474747" stroke-width="0.7" />
+  <text x="592" y="179" text-anchor="middle" font-size="9" fill="#9E9E9E">adds (1:N)</text>
+
+  <rect x="1030" y="10" width="96" height="16" rx="2" fill="#1F1F1F" stroke="#474747" stroke-width="0.7" />
+  <text x="1078" y="21" text-anchor="middle" font-size="9" fill="#9E9E9E">maintains (1:N)</text>
+
+  <rect x="1030" y="1252" width="94" height="16" rx="2" fill="#1F1F1F" stroke="#474747" stroke-width="0.7" />
+  <text x="1077" y="1263" text-anchor="middle" font-size="9" fill="#9E9E9E">requests (1:N)</text>
+
+  <rect x="948" y="236" width="84" height="16" rx="2" fill="#1F1F1F" stroke="#474747" stroke-width="0.7" />
+  <text x="990" y="247" text-anchor="middle" font-size="9" fill="#9E9E9E">contains (1:N)</text>
+
+  <rect x="952" y="540" width="76" height="16" rx="2" fill="#1F1F1F" stroke="#474747" stroke-width="0.7" />
+  <text x="990" y="551" text-anchor="middle" font-size="9" fill="#9E9E9E">casts (1:N)</text>
+
+  <rect x="1220" y="112" width="110" height="16" rx="2" fill="#1F1F1F" stroke="#474747" stroke-width="0.7" />
+  <text x="1275" y="123" text-anchor="middle" font-size="9" fill="#9E9E9E">tracks novel (1:N)</text>
+
+  <rect x="945" y="772" width="90" height="16" rx="2" fill="#1F1F1F" stroke="#474747" stroke-width="0.7" />
+  <text x="990" y="783" text-anchor="middle" font-size="9" fill="#9E9E9E">assigned (1:N)</text>
+
+  <rect x="1426" y="886" width="98" height="16" rx="2" fill="#1F1F1F" stroke="#474747" stroke-width="0.7" />
+  <text x="1475" y="897" text-anchor="middle" font-size="9" fill="#9E9E9E">known as (1:N)</text>
+
+  <rect x="1405" y="530" width="140" height="16" rx="2" fill="#064E3B" stroke="#10B981" stroke-width="0.7" />
+  <text x="1475" y="541" text-anchor="middle" font-size="9" fill="#A7F3D0">pg_chapter_id (1:1)</text>
+
+  <rect x="1420" y="322" width="112" height="16" rx="2" fill="#1F1F1F" stroke="#474747" stroke-width="0.7" />
+  <text x="1476" y="333" text-anchor="middle" font-size="9" fill="#9E9E9E">active chapter (1:N)</text>
+
+  <rect x="1400" y="1512" width="118" height="16" rx="2" fill="#1F1F1F" stroke="#474747" stroke-width="0.7" />
+  <text x="1459" y="1523" text-anchor="middle" font-size="9" fill="#C4B5FD">subtype (1:0..1)</text>
+</g>
+
+<g class="entity" data-id="SEGMENT_AUDIO_CACHE" data-label="SEGMENT_AUDIO_CACHE">
+  <rect x="30" y="40" width="248" height="264" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="30" y="40" width="248" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="154.0" y="57" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">SEGMENT_AUDIO_CACHE</text>
+  <line x1="30" y1="74" x2="278" y2="74" stroke="#474747" stroke-width="0.75" />
+  <rect x="36" y="78" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="47.5" y="85" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="65" y="85" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(64)</text>
+  <text x="270" y="85" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">text_hash</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <rect x="36" y="100" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="47.5" y="107" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="65" y="107" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(64)</text>
+  <text x="270" y="107" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">voice_hash</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <text x="38" y="129" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(512)</text>
+  <text x="270" y="129" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">local_pcm_path</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <rect x="36" y="144" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="53.0" y="151" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="76" y="151" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="270" y="151" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">n_samples</tspan><tspan fill="#60A5FA" font-size="9"> [> 0]</tspan></text>
+  <rect x="36" y="166" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="53.0" y="173" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="76" y="173" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="270" y="173" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">sample_rate</tspan><tspan fill="#60A5FA" font-size="9"> [24000]</tspan></text>
+  <rect x="36" y="188" width="34" height="14" rx="2" ry="2" fill="#334155" />
+  <text x="53.0" y="195" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#CBD5E1">IDX</text>
+  <text x="76" y="195" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="270" y="195" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">last_used_at</tspan><tspan fill="#60A5FA" font-size="9"> [LRU idx]</tspan></text>
+  <line x1="30" y1="211" x2="278" y2="211" stroke="#383838" stroke-width="1" />
+  <rect x="31" y="212" width="246" height="88" fill="#1B1B1B" />
+  <text x="38" y="223" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="38" y="237" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• PK (text_hash, voice_hash)</text>
+  <text x="38" y="253" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK (n_samples &gt; 0)</text>
+  <text x="38" y="269" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK (sample_rate &gt; 0)</text>
+  <text x="38" y="285" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• IDX idx_segment_audio_cache_lru</text>
+</g>
+<g class="entity" data-id="USERS" data-label="USERS">
+  <rect x="295" y="40" width="260" height="270" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="295" y="40" width="260" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="425.0" y="57" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">USERS</text>
+  <line x1="295" y1="74" x2="555" y2="74" stroke="#474747" stroke-width="0.75" />
+  <rect x="301" y="78" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="312.5" y="85" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="330" y="85" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="547" y="85" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">id</tspan><tspan fill="#60A5FA" font-size="9"> [gen_random_uuid()]</tspan></text>
+  <rect x="301" y="100" width="23" height="14" rx="2" ry="2" fill="#701A75" />
+  <text x="312.5" y="107" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#F0ABFC">UK</text>
+  <text x="330" y="107" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(50)</text>
+  <text x="547" y="107" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">username</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <rect x="301" y="122" width="23" height="14" rx="2" ry="2" fill="#701A75" />
+  <text x="312.5" y="129" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#F0ABFC">UK</text>
+  <text x="330" y="129" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(255)</text>
+  <text x="547" y="129" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">email</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <text x="303" y="151" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(255)</text>
+  <text x="547" y="151" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">password_hash</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <rect x="301" y="166" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="318.0" y="173" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="341" y="173" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(20)</text>
+  <text x="547" y="173" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">role</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT reader]</tspan></text>
+  <text x="303" y="195" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="547" y="195" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">created_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <text x="303" y="217" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="547" y="217" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">updated_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <line x1="295" y1="233" x2="555" y2="233" stroke="#383838" stroke-width="1" />
+  <rect x="296" y="234" width="258" height="72" fill="#1B1B1B" />
+  <text x="303" y="245" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="303" y="259" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• UK uq_users_username (username)</text>
+  <text x="303" y="275" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• UK uq_users_email (email)</text>
+  <text x="303" y="291" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK role IN ('reader','writer','admin')</text>
+</g>
+<g class="entity" data-id="NOVELS" data-label="NOVELS">
+  <rect x="630" y="80" width="310" height="374" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="630" y="80" width="310" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="785.0" y="97" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">NOVELS</text>
+  <line x1="630" y1="114" x2="940" y2="114" stroke="#474747" stroke-width="0.75" />
+  <rect x="636" y="118" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="647.5" y="125" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="665" y="125" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="932" y="125" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">id</tspan><tspan fill="#60A5FA" font-size="9"> [gen_random_uuid()]</tspan></text>
+  <rect x="636" y="140" width="23" height="14" rx="2" ry="2" fill="#14532D" />
+  <text x="647.5" y="147" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#86EFAC">FK</text>
+  <text x="665" y="147" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="932" y="147" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">added_by</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; users(id)]</tspan></text>
+  <text x="638" y="169" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(255)</text>
+  <text x="932" y="169" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">title</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <text x="638" y="191" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">text</text>
+  <text x="932" y="191" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">synopsis</tspan><tspan fill="#60A5FA" font-size="9"> [NULL]</tspan></text>
+  <rect x="636" y="206" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="653.0" y="213" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="676" y="213" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(20)</text>
+  <text x="932" y="213" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">channel</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT verified]</tspan></text>
+  <rect x="636" y="228" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="653.0" y="235" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="676" y="235" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(20)</text>
+  <text x="932" y="235" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">status</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT draft]</tspan></text>
+  <text x="638" y="257" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(100)</text>
+  <text x="932" y="257" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">global_tone</tspan><tspan fill="#60A5FA" font-size="9"> [NULL]</tspan></text>
+  <rect x="636" y="272" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="653.0" y="279" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="676" y="279" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(20)</text>
+  <text x="932" y="279" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">portfolio_source</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT ai]</tspan></text>
+  <text x="638" y="301" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(255)</text>
+  <text x="932" y="301" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">cover_object</tspan><tspan fill="#60A5FA" font-size="9"> [Swift key]</tspan></text>
+  <text x="638" y="323" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="932" y="323" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">created_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <text x="638" y="345" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="932" y="345" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">updated_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <line x1="630" y1="361" x2="940" y2="361" stroke="#383838" stroke-width="1" />
+  <rect x="631" y="362" width="308" height="88" fill="#1B1B1B" />
+  <text x="638" y="373" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="638" y="387" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK added_by -&gt; users(id) ON DELETE CASCADE</text>
+  <text x="638" y="403" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK channel IN ('verified','community')</text>
+  <text x="638" y="419" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK status IN ('draft','profiling','published','archived')</text>
+  <text x="638" y="435" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK portfolio_source IN ('manual','ai')</text>
+</g>
+<g class="entity" data-id="VOICES" data-label="VOICES">
+  <rect x="630" y="660" width="310" height="286" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="630" y="660" width="310" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="785.0" y="677" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">VOICES</text>
+  <line x1="630" y1="694" x2="940" y2="694" stroke="#474747" stroke-width="0.75" />
+  <rect x="636" y="698" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="647.5" y="705" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="665" y="705" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(64)</text>
+  <text x="932" y="705" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">id</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <text x="638" y="727" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(100)</text>
+  <text x="932" y="727" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">label</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <rect x="636" y="742" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="653.0" y="749" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="676" y="749" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(10)</text>
+  <text x="932" y="749" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">gender</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <rect x="636" y="764" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="653.0" y="771" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="676" y="771" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(10)</text>
+  <text x="932" y="771" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">age_band</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT adult]</tspan></text>
+  <rect x="636" y="786" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="653.0" y="793" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="676" y="793" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(10)</text>
+  <text x="932" y="793" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">language</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT en-us]</tspan></text>
+  <text x="638" y="815" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">boolean</text>
+  <text x="932" y="815" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">reserved_narrator</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT false]</tspan></text>
+  <text x="638" y="837" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="932" y="837" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">created_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <line x1="630" y1="853" x2="940" y2="853" stroke="#383838" stroke-width="1" />
+  <rect x="631" y="854" width="308" height="88" fill="#1B1B1B" />
+  <text x="638" y="865" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="638" y="879" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK gender IN ('male','female')</text>
+  <text x="638" y="895" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK age_band IN ('child','young','adult','elder')</text>
+  <text x="638" y="911" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK language IN ('en-us','en-gb')</text>
+  <text x="638" y="927" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• SEED: 20 voices (12 Kokoro + 8 Edge Neural)</text>
+</g>
+<g class="entity" data-id="CHAPTERS" data-label="CHAPTERS">
+  <rect x="1040" y="140" width="320" height="384" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="1040" y="140" width="320" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="1200.0" y="157" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">CHAPTERS</text>
+  <line x1="1040" y1="174" x2="1360" y2="174" stroke="#474747" stroke-width="0.75" />
+  <rect x="1046" y="178" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="1057.5" y="185" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="1075" y="185" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1352" y="185" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">id</tspan><tspan fill="#60A5FA" font-size="9"> [gen_random_uuid()]</tspan></text>
+  <rect x="1046" y="200" width="23" height="14" rx="2" ry="2" fill="#14532D" />
+  <text x="1057.5" y="207" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#86EFAC">FK</text>
+  <text x="1075" y="207" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1352" y="207" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">novel_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; novels(id)]</tspan></text>
+  <rect x="1046" y="222" width="23" height="14" rx="2" ry="2" fill="#701A75" />
+  <text x="1057.5" y="229" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#F0ABFC">UK</text>
+  <text x="1075" y="229" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="1352" y="229" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">chapter_number</tspan><tspan fill="#60A5FA" font-size="9"> [&gt;= 1]</tspan></text>
+  <text x="1048" y="251" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(255)</text>
+  <text x="1352" y="251" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">title</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <rect x="1046" y="266" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1063.0" y="273" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1086" y="273" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(20)</text>
+  <text x="1352" y="273" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">status</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT draft]</tspan></text>
+  <rect x="1046" y="288" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1063.0" y="295" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1086" y="295" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="1352" y="295" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">audio_version</tspan><tspan fill="#60A5FA" font-size="9"> [&gt;= 1]</tspan></text>
+  <text x="1048" y="317" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(512)</text>
+  <text x="1352" y="317" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">swift_audio_object</tspan><tspan fill="#60A5FA" font-size="9"> [NULL]</tspan></text>
+  <rect x="1046" y="332" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1063.0" y="339" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1086" y="339" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="1352" y="339" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">total_duration_ms</tspan><tspan fill="#60A5FA" font-size="9"> [&gt;= 0]</tspan></text>
+  <text x="1048" y="361" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="1352" y="361" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">created_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <text x="1048" y="383" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="1352" y="383" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">updated_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <line x1="1040" y1="399" x2="1360" y2="399" stroke="#383838" stroke-width="1" />
+  <rect x="1041" y="400" width="318" height="120" fill="#1B1B1B" />
+  <text x="1048" y="411" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="1048" y="425" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK novel_id -&gt; novels(id) ON DELETE CASCADE</text>
+  <text x="1048" y="441" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• UK (novel_id, chapter_number)</text>
+  <text x="1048" y="457" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK chapter_number &gt;= 1 AND audio_version &gt;= 1</text>
+  <text x="1048" y="473" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK total_duration_ms &gt;= 0</text>
+  <text x="1048" y="489" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK status IN ('draft','parsed','synthesizing',</text>
+  <text x="1048" y="505" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">      'completed','outdated','failed')</text>
+</g>
+<g class="entity" data-id="CHARACTERS" data-label="CHARACTERS">
+  <rect x="1040" y="580" width="320" height="488" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="1040" y="580" width="320" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="1200.0" y="597" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">CHARACTERS</text>
+  <line x1="1040" y1="614" x2="1360" y2="614" stroke="#474747" stroke-width="0.75" />
+  <rect x="1046" y="618" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="1057.5" y="625" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="1075" y="625" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1352" y="625" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">id</tspan><tspan fill="#60A5FA" font-size="9"> [gen_random_uuid()]</tspan></text>
+  <rect x="1046" y="640" width="23" height="14" rx="2" ry="2" fill="#14532D" />
+  <text x="1057.5" y="647" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#86EFAC">FK</text>
+  <text x="1075" y="647" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1352" y="647" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">novel_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; novels(id)]</tspan></text>
+  <rect x="1046" y="662" width="23" height="14" rx="2" ry="2" fill="#701A75" />
+  <text x="1057.5" y="669" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#F0ABFC">UK</text>
+  <text x="1075" y="669" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(100)</text>
+  <text x="1352" y="669" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">canonical_name</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <rect x="1046" y="684" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1063.0" y="691" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1086" y="691" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(10)</text>
+  <text x="1352" y="691" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">gender</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT unknown]</tspan></text>
+  <rect x="1046" y="706" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1063.0" y="713" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1086" y="713" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(10)</text>
+  <text x="1352" y="713" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">age_band</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT adult]</tspan></text>
+  <text x="1048" y="735" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(100)</text>
+  <text x="1352" y="735" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">temperament</tspan><tspan fill="#60A5FA" font-size="9"> [NULL]</tspan></text>
+  <text x="1048" y="757" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">text</text>
+  <text x="1352" y="757" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">sample_quote</tspan><tspan fill="#60A5FA" font-size="9"> [Grounded quote]</tspan></text>
+  <rect x="1046" y="772" width="23" height="14" rx="2" ry="2" fill="#14532D" />
+  <text x="1057.5" y="779" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#86EFAC">FK</text>
+  <text x="1075" y="779" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(64)</text>
+  <text x="1352" y="779" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">voice_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; voices(id)]</tspan></text>
+  <rect x="1046" y="794" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1063.0" y="801" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1086" y="801" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">real</text>
+  <text x="1352" y="801" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">speed_multiplier</tspan><tspan fill="#60A5FA" font-size="9"> [0.5..2.0]</tspan></text>
+  <rect x="1046" y="816" width="34" height="14" rx="2" ry="2" fill="#831843" />
+  <text x="1063.0" y="823" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#F9A8D4">PUK</text>
+  <text x="1086" y="823" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">boolean</text>
+  <text x="1352" y="823" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">is_narrator</tspan><tspan fill="#60A5FA" font-size="9"> [1 per novel]</tspan></text>
+  <text x="1048" y="845" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">boolean</text>
+  <text x="1352" y="845" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">needs_review</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT false]</tspan></text>
+  <rect x="1046" y="860" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1063.0" y="867" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1086" y="867" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(20)</text>
+  <text x="1352" y="867" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">source</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT ai]</tspan></text>
+  <text x="1048" y="889" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="1352" y="889" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">created_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <text x="1048" y="911" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="1352" y="911" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">updated_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <line x1="1040" y1="927" x2="1360" y2="927" stroke="#383838" stroke-width="1" />
+  <rect x="1041" y="928" width="318" height="136" fill="#1B1B1B" />
+  <text x="1048" y="939" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="1048" y="953" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK novel_id -&gt; novels(id) ON DELETE CASCADE</text>
+  <text x="1048" y="969" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK voice_id -&gt; voices(id) ON DELETE SET NULL</text>
+  <text x="1048" y="985" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• UK (novel_id, canonical_name)</text>
+  <text x="1048" y="1001" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• PARTIAL UK (novel_id) WHERE is_narrator = true</text>
+  <text x="1048" y="1017" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK speed_multiplier BETWEEN 0.5 AND 2.0</text>
+  <text x="1048" y="1033" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK gender IN ('male','female','unknown')</text>
+  <text x="1048" y="1049" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK source IN ('manual','ai')</text>
+</g>
+<g class="entity" data-id="PLAYBACK_HISTORY" data-label="PLAYBACK_HISTORY">
+  <rect x="1590" y="20" width="350" height="204" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="1590" y="20" width="350" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="1765.0" y="37" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">PLAYBACK_HISTORY</text>
+  <line x1="1590" y1="54" x2="1940" y2="54" stroke="#474747" stroke-width="0.75" />
+  <rect x="1596" y="58" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="1607.5" y="65" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="1625" y="65" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="65" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">id</tspan><tspan fill="#60A5FA" font-size="9"> [gen_random_uuid()]</tspan></text>
+  <rect x="1596" y="80" width="34" height="14" rx="2" ry="2" fill="#581C87" />
+  <text x="1613.0" y="87" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#E9D5FF">FK/UK</text>
+  <text x="1636" y="87" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="87" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">user_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; users(id)]</tspan></text>
+  <rect x="1596" y="102" width="34" height="14" rx="2" ry="2" fill="#581C87" />
+  <text x="1613.0" y="109" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#E9D5FF">FK/UK</text>
+  <text x="1636" y="109" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="109" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">novel_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; novels(id)]</tspan></text>
+  <text x="1598" y="131" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="1932" y="131" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">created_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <line x1="1590" y1="147" x2="1940" y2="147" stroke="#383838" stroke-width="1" />
+  <rect x="1591" y="148" width="348" height="72" fill="#1B1B1B" />
+  <text x="1598" y="159" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="1598" y="173" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK user_id -&gt; users(id) ON DELETE CASCADE</text>
+  <text x="1598" y="189" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK novel_id -&gt; novels(id) ON DELETE CASCADE</text>
+  <text x="1598" y="205" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• UK uq_playback_history_user_novel (user_id, novel_id)</text>
+</g>
+<g class="entity" data-id="PLAYBACK_POSITIONS" data-label="PLAYBACK_POSITIONS">
+  <rect x="1590" y="260" width="350" height="242" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="1590" y="260" width="350" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="1765.0" y="277" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">PLAYBACK_POSITIONS</text>
+  <line x1="1590" y1="294" x2="1940" y2="294" stroke="#474747" stroke-width="0.75" />
+  <rect x="1596" y="298" width="34" height="14" rx="2" ry="2" fill="#312E81" />
+  <text x="1613.0" y="305" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#C4B5FD">PK/FK</text>
+  <text x="1636" y="305" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="305" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">history_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; playback_history]</tspan></text>
+  <rect x="1596" y="320" width="23" height="14" rx="2" ry="2" fill="#14532D" />
+  <text x="1607.5" y="327" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#86EFAC">FK</text>
+  <text x="1625" y="327" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="327" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">chapter_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; chapters(id)]</tspan></text>
+  <rect x="1596" y="342" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1613.0" y="349" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1636" y="349" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="1932" y="349" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">segment_order</tspan><tspan fill="#60A5FA" font-size="9"> [&gt;= 0]</tspan></text>
+  <rect x="1596" y="364" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1613.0" y="371" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1636" y="371" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="1932" y="371" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">position_ms</tspan><tspan fill="#60A5FA" font-size="9"> [&gt;= 0]</tspan></text>
+  <text x="1598" y="393" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="1932" y="393" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">updated_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <line x1="1590" y1="409" x2="1940" y2="409" stroke="#383838" stroke-width="1" />
+  <rect x="1591" y="410" width="348" height="88" fill="#1B1B1B" />
+  <text x="1598" y="421" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="1598" y="435" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• PK/FK history_id -&gt; playback_history(id) CASCADE</text>
+  <text x="1598" y="451" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK chapter_id -&gt; chapters(id) ON DELETE CASCADE</text>
+  <text x="1598" y="467" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK segment_order &gt;= 0 AND position_ms &gt;= 0</text>
+  <text x="1598" y="483" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• TRG fn_enforce_playback_position_novel_match</text>
+</g>
+<g class="entity" data-id="MONGO_CHAPTER_DOC" data-label="MONGO_CHAPTER_DOC">
+  <rect x="1590" y="540" width="350" height="330" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="1590" y="540" width="350" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="1765.0" y="557" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">MONGO_CHAPTER_DOC</text>
+  <line x1="1590" y1="574" x2="1940" y2="574" stroke="#474747" stroke-width="0.75" />
+  <rect x="1596" y="578" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="1607.5" y="585" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="1625" y="585" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">ObjectId</text>
+  <text x="1932" y="585" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">_id</tspan><tspan fill="#60A5FA" font-size="9"> [MongoDB PK]</tspan></text>
+  <rect x="1596" y="600" width="23" height="14" rx="2" ry="2" fill="#701A75" />
+  <text x="1607.5" y="607" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#F0ABFC">UK</text>
+  <text x="1625" y="607" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">string</text>
+  <text x="1932" y="607" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">pg_chapter_id</tspan><tspan fill="#60A5FA" font-size="9"> [1:1 CHAPTERS.id]</tspan></text>
+  <rect x="1596" y="622" width="23" height="14" rx="2" ry="2" fill="#701A75" />
+  <text x="1607.5" y="629" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#F0ABFC">UK</text>
+  <text x="1625" y="629" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">string</text>
+  <text x="1932" y="629" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">novel_id</tspan><tspan fill="#60A5FA" font-size="9"> [Indexed FK]</tspan></text>
+  <rect x="1596" y="644" width="23" height="14" rx="2" ry="2" fill="#701A75" />
+  <text x="1607.5" y="651" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#F0ABFC">UK</text>
+  <text x="1625" y="651" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="1932" y="651" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">chapter_number</tspan><tspan fill="#60A5FA" font-size="9"> [&gt;= 1]</tspan></text>
+  <text x="1598" y="673" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">string</text>
+  <text x="1932" y="673" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">title</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <text x="1598" y="695" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">string</text>
+  <text x="1932" y="695" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">raw_text</tspan><tspan fill="#60A5FA" font-size="9"> [Full prose]</tspan></text>
+  <rect x="1596" y="710" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1613.0" y="717" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1636" y="717" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="1932" y="717" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">audio_version</tspan><tspan fill="#60A5FA" font-size="9"> [&gt;= 1]</tspan></text>
+  <rect x="1596" y="732" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1613.0" y="739" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1636" y="739" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">array</text>
+  <text x="1932" y="739" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">segments</tspan><tspan fill="#60A5FA" font-size="9"> [Subdocuments[]]</tspan></text>
+  <rect x="1596" y="754" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1613.0" y="761" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1636" y="761" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">object</text>
+  <text x="1932" y="761" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">manifest</tspan><tspan fill="#60A5FA" font-size="9"> [timeline[] + url]</tspan></text>
+  <line x1="1590" y1="777" x2="1940" y2="777" stroke="#383838" stroke-width="1" />
+  <rect x="1591" y="778" width="348" height="88" fill="#1B1B1B" />
+  <text x="1598" y="789" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="1598" y="803" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• UK (pg_chapter_id) [1:1 Link to PG chapters.id]</text>
+  <text x="1598" y="819" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• UK (novel_id, chapter_number)</text>
+  <text x="1598" y="835" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK segments[].confidence BETWEEN 0.0 AND 1.0</text>
+  <text x="1598" y="851" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK timeline[].end_ms &gt;= timeline[].start_ms</text>
+</g>
+<g class="entity" data-id="CHARACTER_ALIASES" data-label="CHARACTER_ALIASES">
+  <rect x="1590" y="905" width="350" height="182" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="1590" y="905" width="350" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="1765.0" y="922" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">CHARACTER_ALIASES</text>
+  <line x1="1590" y1="939" x2="1940" y2="939" stroke="#474747" stroke-width="0.75" />
+  <rect x="1596" y="943" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="1607.5" y="950" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="1625" y="950" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="950" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">id</tspan><tspan fill="#60A5FA" font-size="9"> [gen_random_uuid()]</tspan></text>
+  <rect x="1596" y="965" width="34" height="14" rx="2" ry="2" fill="#581C87" />
+  <text x="1613.0" y="972" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#E9D5FF">FK/UK</text>
+  <text x="1636" y="972" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="972" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">character_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; characters(id)]</tspan></text>
+  <rect x="1596" y="987" width="23" height="14" rx="2" ry="2" fill="#701A75" />
+  <text x="1607.5" y="994" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#F0ABFC">UK</text>
+  <text x="1625" y="994" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(100)</text>
+  <text x="1932" y="994" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">alias</tspan><tspan fill="#60A5FA" font-size="9"> [NOT NULL]</tspan></text>
+  <line x1="1590" y1="1010" x2="1940" y2="1010" stroke="#383838" stroke-width="1" />
+  <rect x="1591" y="1011" width="348" height="72" fill="#1B1B1B" />
+  <text x="1598" y="1022" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="1598" y="1036" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK character_id -&gt; characters(id) ON DELETE CASCADE</text>
+  <text x="1598" y="1052" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• UK uq_character_aliases_character_alias (character_id, alias)</text>
+  <text x="1598" y="1068" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• TRG fn_check_character_alias_novel_uniqueness (4NF)</text>
+</g>
+<g class="entity" data-id="SYNTHESIS_JOBS" data-label="SYNTHESIS_JOBS">
+  <rect x="1590" y="1125" width="350" height="450" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="1590" y="1125" width="350" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="1765.0" y="1142" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">SYNTHESIS_JOBS</text>
+  <line x1="1590" y1="1159" x2="1940" y2="1159" stroke="#474747" stroke-width="0.75" />
+  <rect x="1596" y="1163" width="23" height="14" rx="2" ry="2" fill="#1E3A8A" />
+  <text x="1607.5" y="1170" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#93C5FD">PK</text>
+  <text x="1625" y="1170" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="1170" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">id</tspan><tspan fill="#60A5FA" font-size="9"> [gen_random_uuid()]</tspan></text>
+  <rect x="1596" y="1185" width="23" height="14" rx="2" ry="2" fill="#14532D" />
+  <text x="1607.5" y="1192" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#86EFAC">FK</text>
+  <text x="1625" y="1192" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="1192" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">requested_by</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; users(id) NULL]</tspan></text>
+  <rect x="1596" y="1207" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1613.0" y="1214" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1636" y="1214" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(30)</text>
+  <text x="1932" y="1214" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">job_type</tspan><tspan fill="#60A5FA" font-size="9"> [profile | synth]</tspan></text>
+  <rect x="1596" y="1229" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1613.0" y="1236" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1636" y="1236" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(20)</text>
+  <text x="1932" y="1236" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">status</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT queued]</tspan></text>
+  <rect x="1596" y="1251" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1613.0" y="1258" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1636" y="1258" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">real</text>
+  <text x="1932" y="1258" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">progress_pct</tspan><tspan fill="#60A5FA" font-size="9"> [0.0..100.0]</tspan></text>
+  <rect x="1596" y="1273" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1613.0" y="1280" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1636" y="1280" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="1932" y="1280" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">attempts</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT 0]</tspan></text>
+  <rect x="1596" y="1295" width="34" height="14" rx="2" ry="2" fill="#78350F" />
+  <text x="1613.0" y="1302" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#FCD34D">CHK</text>
+  <text x="1636" y="1302" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">int</text>
+  <text x="1932" y="1302" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">max_attempts</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT 3]</tspan></text>
+  <text x="1598" y="1324" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="1932" y="1324" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">run_after</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <text x="1598" y="1346" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">varchar(100)</text>
+  <text x="1932" y="1346" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">worker_id</tspan><tspan fill="#60A5FA" font-size="9"> [NULL]</tspan></text>
+  <text x="1598" y="1368" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="1932" y="1368" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">locked_at</tspan><tspan fill="#60A5FA" font-size="9"> [NULL]</tspan></text>
+  <text x="1598" y="1390" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">text</text>
+  <text x="1932" y="1390" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">error_message</tspan><tspan fill="#60A5FA" font-size="9"> [NULL]</tspan></text>
+  <text x="1598" y="1412" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="1932" y="1412" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">created_at</tspan><tspan fill="#60A5FA" font-size="9"> [DEFAULT now()]</tspan></text>
+  <text x="1598" y="1434" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">timestamptz</text>
+  <text x="1932" y="1434" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">completed_at</tspan><tspan fill="#60A5FA" font-size="9"> [NULL]</tspan></text>
+  <line x1="1590" y1="1450" x2="1940" y2="1450" stroke="#383838" stroke-width="1" />
+  <rect x="1591" y="1451" width="348" height="120" fill="#1B1B1B" />
+  <text x="1598" y="1462" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="1598" y="1476" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK requested_by -&gt; users(id) ON DELETE SET NULL</text>
+  <text x="1598" y="1492" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK job_type IN ('profile_novel','synthesize_chapter')</text>
+  <text x="1598" y="1508" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK status IN ('queued','processing','completed','failed')</text>
+  <text x="1598" y="1524" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK progress_pct BETWEEN 0.0 AND 100.0</text>
+  <text x="1598" y="1540" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• CHK attempts &gt;= 0 AND max_attempts &gt;= 1</text>
+  <text x="1598" y="1556" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• DEFERRABLE TRG fn_enforce_synthesis_job_target</text>
+</g>
+<g class="entity" data-id="NOVEL_PROFILE_JOB_TARGETS" data-label="NOVEL_PROFILE_JOB_TARGETS">
+  <rect x="1140" y="1615" width="360" height="160" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="1140" y="1615" width="360" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="1320.0" y="1632" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">NOVEL_PROFILE_JOB_TARGETS</text>
+  <line x1="1140" y1="1649" x2="1500" y2="1649" stroke="#474747" stroke-width="0.75" />
+  <rect x="1146" y="1653" width="34" height="14" rx="2" ry="2" fill="#312E81" />
+  <text x="1163.0" y="1660" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#C4B5FD">PK/FK</text>
+  <text x="1186" y="1660" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1492" y="1660" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">job_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; synthesis_jobs(id)]</tspan></text>
+  <rect x="1146" y="1675" width="23" height="14" rx="2" ry="2" fill="#14532D" />
+  <text x="1157.5" y="1682" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#86EFAC">FK</text>
+  <text x="1175" y="1682" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1492" y="1682" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">novel_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; novels(id)]</tspan></text>
+  <line x1="1140" y1="1698" x2="1500" y2="1698" stroke="#383838" stroke-width="1" />
+  <rect x="1141" y="1699" width="358" height="72" fill="#1B1B1B" />
+  <text x="1148" y="1710" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="1148" y="1724" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• PK/FK job_id -&gt; synthesis_jobs(id) ON DELETE CASCADE</text>
+  <text x="1148" y="1740" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK novel_id -&gt; novels(id) ON DELETE CASCADE</text>
+  <text x="1148" y="1756" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• TRG enforces job_type = 'profile_novel' (Disjoint 4NF)</text>
+</g>
+<g class="entity" data-id="CHAPTER_SYNTHESIS_JOB_TARGETS" data-label="CHAPTER_SYNTHESIS_JOB_TARGETS">
+  <rect x="1590" y="1615" width="350" height="160" rx="3" ry="3" fill="#242424" stroke="#474747" stroke-width="1" />
+  <rect x="1590" y="1615" width="350" height="34" rx="3" ry="3" fill="#2A2A2A" stroke="#474747" stroke-width="1" />
+  <text x="1765.0" y="1632" text-anchor="middle" font-size="12" font-weight="700" fill="#CCCCCC" dy="4.55">CHAPTER_SYNTHESIS_JOB_TARGETS</text>
+  <line x1="1590" y1="1649" x2="1940" y2="1649" stroke="#474747" stroke-width="0.75" />
+  <rect x="1596" y="1653" width="34" height="14" rx="2" ry="2" fill="#312E81" />
+  <text x="1613.0" y="1660" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#C4B5FD">PK/FK</text>
+  <text x="1636" y="1660" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="1660" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">job_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; synthesis_jobs(id)]</tspan></text>
+  <rect x="1596" y="1675" width="23" height="14" rx="2" ry="2" fill="#14532D" />
+  <text x="1607.5" y="1682" text-anchor="middle" dy="0.35em" font-size="8.5" font-weight="600" fill="#86EFAC">FK</text>
+  <text x="1625" y="1682" class="mono" dy="0.35em" font-size="10.5" font-weight="400" fill="#7A7A7A">uuid</text>
+  <text x="1932" y="1682" class="mono" text-anchor="end" dy="0.35em" font-size="10.5" font-weight="400"><tspan fill="#CCCCCC">chapter_id</tspan><tspan fill="#60A5FA" font-size="9"> [-&gt; chapters(id)]</tspan></text>
+  <line x1="1590" y1="1698" x2="1940" y2="1698" stroke="#383838" stroke-width="1" />
+  <rect x="1591" y="1699" width="348" height="72" fill="#1B1B1B" />
+  <text x="1598" y="1710" font-size="9" font-weight="700" fill="#F59E0B">CONSTRAINTS &amp; RULES:</text>
+  <text x="1598" y="1724" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• PK/FK job_id -&gt; synthesis_jobs(id) ON DELETE CASCADE</text>
+  <text x="1598" y="1740" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• FK chapter_id -&gt; chapters(id) ON DELETE CASCADE</text>
+  <text x="1598" y="1756" class="mono" font-size="8.8" font-weight="400" fill="#9E9E9E">• TRG enforces job_type = 'synthesize_chapter' (Disjoint 4NF)</text>
+</g>
+
+<g class="constraints-legend" data-id="CONSTRAINTS_SUMMARY">
+  <rect x="30" y="340" width="540" height="630" rx="4" ry="4" fill="#1B1B1B" stroke="#0078D4" stroke-width="1.2" />
+  <rect x="30" y="340" width="540" height="34" rx="4" ry="4" fill="#0F2942" stroke="#0078D4" stroke-width="1" />
+  <text x="300" y="361" text-anchor="middle" font-size="12" font-weight="700" fill="#60A5FA">POSTGRESQL 16 (STRICT 4NF) — MASTER CONSTRAINTS &amp; TRIGGERS</text>
+
+  <text x="46" y="395" font-size="10.5" font-weight="700" fill="#FCD34D">1. BADGE LEGEND</text>
+  <text x="46" y="413" class="mono" font-size="9.5" fill="#CCCCCC">• [PK] Primary Key   • [FK] Foreign Key   • [PK/FK] Subtype 1:0..1 Key   • [UK] Unique Constraint</text>
+  <text x="46" y="429" class="mono" font-size="9.5" fill="#CCCCCC">• [PUK] Partial Unique Index (WHERE clause)   • [CHK] Domain CHECK   • [IDX] Performance Index</text>
+
+  <line x1="42" y1="442" x2="558" y2="442" stroke="#333333" stroke-width="1" />
+  <text x="46" y="460" font-size="10.5" font-weight="700" fill="#86EFAC">2. REFERENTIAL INTEGRITY &amp; CASCADE ACTIONS</text>
+  <text x="46" y="478" class="mono" font-size="9.2" fill="#9E9E9E">• users(id) -&gt; novels, playback_history                           [ON DELETE CASCADE]</text>
+  <text x="46" y="494" class="mono" font-size="9.2" fill="#9E9E9E">• users(id) -&gt; synthesis_jobs(requested_by)                       [ON DELETE SET NULL]</text>
+  <text x="46" y="510" class="mono" font-size="9.2" fill="#9E9E9E">• novels(id) -&gt; chapters, characters, playback_history, targets   [ON DELETE CASCADE]</text>
+  <text x="46" y="526" class="mono" font-size="9.2" fill="#9E9E9E">• voices(id) -&gt; characters(voice_id)                              [ON DELETE SET NULL]</text>
+  <text x="46" y="542" class="mono" font-size="9.2" fill="#9E9E9E">• characters(id) -&gt; character_aliases(character_id)               [ON DELETE CASCADE]</text>
+  <text x="46" y="558" class="mono" font-size="9.2" fill="#9E9E9E">• chapters(id) -&gt; playback_positions, chapter_synth_job_targets   [ON DELETE CASCADE]</text>
+  <text x="46" y="574" class="mono" font-size="9.2" fill="#9E9E9E">• playback_history(id) -&gt; playback_positions(history_id)          [ON DELETE CASCADE]</text>
+
+  <line x1="42" y1="588" x2="558" y2="588" stroke="#333333" stroke-width="1" />
+  <text x="46" y="606" font-size="10.5" font-weight="700" fill="#F0ABFC">3. CANDIDATE KEYS, COMPOSITE UNIQUE &amp; PARTIAL UNIQUE INDEXES</text>
+  <text x="46" y="624" class="mono" font-size="9.2" fill="#9E9E9E">• uq_users_username: UNIQUE (username) | uq_users_email: UNIQUE (email)</text>
+  <text x="46" y="640" class="mono" font-size="9.2" fill="#9E9E9E">• uq_chapters_novel_chapter_number: UNIQUE (novel_id, chapter_number)</text>
+  <text x="46" y="656" class="mono" font-size="9.2" fill="#9E9E9E">• uq_characters_novel_canonical_name: UNIQUE (novel_id, canonical_name)</text>
+  <text x="46" y="672" class="mono" font-size="9.2" fill="#9E9E9E">• uq_characters_narrator_per_novel: UNIQUE (novel_id) WHERE is_narrator = true</text>
+  <text x="46" y="688" class="mono" font-size="9.2" fill="#9E9E9E">• uq_character_aliases_character_alias: UNIQUE (character_id, alias)</text>
+  <text x="46" y="704" class="mono" font-size="9.2" fill="#9E9E9E">• uq_playback_history_user_novel: UNIQUE (user_id, novel_id)</text>
+
+  <line x1="42" y1="718" x2="558" y2="718" stroke="#333333" stroke-width="1" />
+  <text x="46" y="736" font-size="10.5" font-weight="700" fill="#C4B5FD">4. STRICT 3NF / 4NF DATABASE TRIGGERS &amp; DEFERRED CONSTRAINTS</text>
+  <text x="46" y="754" class="mono" font-size="9.2" fill="#9E9E9E">• trg_character_alias_novel_uniqueness (BEFORE INSERT/UPDATE on character_aliases):</text>
+  <text x="46" y="769" class="mono" font-size="8.8" fill="#7A7A7A">  Acquires pg_advisory_xact_lock(hashtext(novel_id)) &amp; prevents alias collision in same novel.</text>
+  <text x="46" y="787" class="mono" font-size="9.2" fill="#9E9E9E">• trg_enforce_synthesis_job_target (DEFERRABLE INITIALLY DEFERRED on synthesis_jobs):</text>
+  <text x="46" y="802" class="mono" font-size="8.8" fill="#7A7A7A">  Guarantees every synthesis_job has exactly 1 matching target row at transaction COMMIT.</text>
+  <text x="46" y="820" class="mono" font-size="9.2" fill="#9E9E9E">• trg_cleanup_orphaned_synthesis_job (AFTER DELETE on target tables):</text>
+  <text x="46" y="835" class="mono" font-size="8.8" fill="#7A7A7A">  Cascades parent novel/chapter deletions up to remove orphaned synthesis_jobs rows.</text>
+  <text x="46" y="853" class="mono" font-size="9.2" fill="#9E9E9E">• trg_enforce_playback_position_novel_match (BEFORE INSERT/UPDATE on playback_positions):</text>
+  <text x="46" y="868" class="mono" font-size="8.8" fill="#7A7A7A">  Verifies chapters.novel_id matches parent playback_history.novel_id.</text>
+
+  <line x1="42" y1="882" x2="558" y2="882" stroke="#333333" stroke-width="1" />
+  <text x="46" y="900" font-size="10.5" font-weight="700" fill="#38BDF8">5. BACKWARD-COMPATIBLE SQL VIEWS</text>
+  <text x="46" y="918" class="mono" font-size="9.2" fill="#9E9E9E">• v_character_aliases (joins character_aliases + characters.novel_id)</text>
+  <text x="46" y="934" class="mono" font-size="9.2" fill="#9E9E9E">• v_synthesis_jobs (joins synthesis_jobs + novel/chapter target subtype tables)</text>
+  <text x="46" y="950" class="mono" font-size="9.2" fill="#9E9E9E">• v_playback_history &amp; reading_progress (joins playback_history + playback_positions)</text>
+</g>
+</svg>

@@ -8,10 +8,14 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 # Load environment variables from project root .env if present
-root_env = Path(__file__).resolve().parents[4] / ".env"
-if root_env.exists():
-    load_dotenv(dotenv_path=root_env)
-else:
+env_loaded = False
+for parent in Path(__file__).resolve().parents:
+    candidate = parent / ".env"
+    if candidate.exists():
+        load_dotenv(dotenv_path=candidate)
+        env_loaded = True
+        break
+if not env_loaded:
     load_dotenv()
 
 DEFAULT_DB_URL = "postgresql://synctone_user:synctone_pass@localhost:5432/synctone"

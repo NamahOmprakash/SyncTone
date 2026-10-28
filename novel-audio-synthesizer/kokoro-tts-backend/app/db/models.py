@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     DateTime,
     UniqueConstraint,
     CheckConstraint,
@@ -103,7 +104,7 @@ class Voice(Base):
 
     __table_args__ = (
         CheckConstraint("gender IN ('male', 'female')", name="chk_voices_gender"),
-        CheckConstraint("age_band IN ('child', 'young', 'adult', 'elder')", name="chk_voices_age_band"),
+        CheckConstraint("age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')", name="chk_voices_age_band"),
     )
 
     # Relationships
@@ -173,8 +174,7 @@ class Novel(Base):
     uploader: Mapped["User"] = relationship("User", back_populates="novels")
     chapters: Mapped[List["Chapter"]] = relationship("Chapter", back_populates="novel", cascade="all, delete-orphan")
     characters: Mapped[List["Character"]] = relationship("Character", back_populates="novel", cascade="all, delete-orphan")
-    aliases: Mapped[List["CharacterAlias"]] = relationship("CharacterAlias", back_populates="novel", cascade="all, delete-orphan")
-    synthesis_jobs: Mapped[List["SynthesisJob"]] = relationship("SynthesisJob", back_populates="novel", cascade="all, delete-orphan")
+    profile_job_targets: Mapped[List["NovelProfileJobTarget"]] = relationship("NovelProfileJobTarget", back_populates="novel", cascade="all, delete-orphan")
     playback_history: Mapped[List["PlaybackHistory"]] = relationship("PlaybackHistory", back_populates="novel", cascade="all, delete-orphan")
 
 
@@ -241,8 +241,8 @@ class Chapter(Base):
 
     # Relationships
     novel: Mapped["Novel"] = relationship("Novel", back_populates="chapters")
-    synthesis_jobs: Mapped[List["SynthesisJob"]] = relationship("SynthesisJob", back_populates="chapter", cascade="all, delete-orphan")
-    playback_history: Mapped[List["PlaybackHistory"]] = relationship("PlaybackHistory", back_populates="chapter", cascade="all, delete-orphan")
+    synthesis_job_targets: Mapped[List["ChapterSynthesisJobTarget"]] = relationship("ChapterSynthesisJobTarget", back_populates="chapter", cascade="all, delete-orphan")
+    playback_positions: Mapped[List["PlaybackPosition"]] = relationship("PlaybackPosition", back_populates="chapter", cascade="all, delete-orphan")
 
 
 # ==============================================================================
@@ -324,7 +324,7 @@ class Character(Base):
     __table_args__ = (
         UniqueConstraint("novel_id", "canonical_name", name="uq_characters_novel_canonical_name"),
         CheckConstraint("gender IN ('male', 'female', 'unknown')", name="chk_characters_gender"),
-        CheckConstraint("age_band IN ('child', 'young', 'adult', 'elder')", name="chk_characters_age_band"),
+        CheckConstraint("age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')", name="chk_characters_age_band"),
         CheckConstraint("source IN ('manual', 'ai')", name="chk_characters_source"),
         CheckConstraint("speed_multiplier >= 0.5 AND speed_multiplier <= 2.0", name="chk_characters_speed_multiplier"),
         # Partial unique index: at most one narrator per novel
@@ -343,10 +343,10 @@ class Character(Base):
 
 
 # ==============================================================================
-# 6. Character Aliases Table (Normalization for Attribution Resolution)
+# 6. Character Aliases Table (Normalization for Attribution Resolution - 4NF)
 # ==============================================================================
 class CharacterAlias(Base):
-    """Maps name variations (e.g., 'Harry', 'Potter', 'Mr Potter') to canonical character."""
+    """Maps name variations (e.g., 'Harry', 'Potter', 'Mr Potter') to canonical character (Strict 4NF)."""
     __tablename__ = "character_aliases"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -355,34 +355,31 @@ class CharacterAlias(Base):
         default=uuid.uuid4,
         server_default=func.gen_random_uuid(),
     )
-    novel_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("novels.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
     character_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("characters.id", ondelete="CASCADE"),
+        ForeignKey("characters.id", ondelete="CASCADE", name="fk_character_aliases_character"),
         nullable=False,
         index=True,
     )
     alias: Mapped[str] = mapped_column(String(100), nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("novel_id", "alias", name="uq_character_aliases_novel_alias"),
+        UniqueConstraint("character_id", "alias", name="uq_character_aliases_character_alias"),
     )
 
     # Relationships
-    novel: Mapped["Novel"] = relationship("Novel", back_populates="aliases")
     character: Mapped["Character"] = relationship("Character", back_populates="aliases")
+
+    @property
+    def novel_id(self) -> Optional[uuid.UUID]:
+        return self.character.novel_id if self.character else None
 
 
 # ==============================================================================
 # 7. Synthesis Jobs Table (PostgreSQL Task Queue with SKIP LOCKED)
 # ==============================================================================
 class SynthesisJob(Base):
-    """Task queue broker table for asynchronous AI profiling and TTS chapter synthesis."""
+    """Task queue broker table for asynchronous AI profiling and TTS chapter synthesis (Strict BCNF/3NF)."""
     __tablename__ = "synthesis_jobs"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -390,18 +387,6 @@ class SynthesisJob(Base):
         primary_key=True,
         default=uuid.uuid4,
         server_default=func.gen_random_uuid(),
-    )
-    novel_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("novels.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    chapter_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("chapters.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
     )
     requested_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
@@ -450,21 +435,74 @@ class SynthesisJob(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        CheckConstraint("job_type IN ('profile_novel', 'synthesize_chapter')", name="chk_jobs_job_type"),
+        CheckConstraint("job_type IN ('profile_novel', 'synthesize_chapter')", name="chk_synthesis_jobs_job_type"),
         CheckConstraint("status IN ('queued', 'processing', 'completed', 'failed')", name="chk_jobs_status"),
-        CheckConstraint(
-            "(job_type = 'profile_novel' AND chapter_id IS NULL) OR "
-            "(job_type = 'synthesize_chapter' AND chapter_id IS NOT NULL)",
-            name="chk_jobs_type_chapter_match",
-        ),
         # Composite index powering high-concurrency FOR UPDATE SKIP LOCKED job claims
         Index("idx_synthesis_jobs_claim", "status", "run_after", "attempts"),
     )
 
     # Relationships
-    novel: Mapped["Novel"] = relationship("Novel", back_populates="synthesis_jobs")
-    chapter: Mapped[Optional["Chapter"]] = relationship("Chapter", back_populates="synthesis_jobs")
     requester: Mapped[Optional["User"]] = relationship("User", back_populates="synthesis_jobs")
+    novel_target: Mapped[Optional["NovelProfileJobTarget"]] = relationship(
+        "NovelProfileJobTarget", back_populates="job", uselist=False, cascade="all, delete-orphan"
+    )
+    chapter_target: Mapped[Optional["ChapterSynthesisJobTarget"]] = relationship(
+        "ChapterSynthesisJobTarget", back_populates="job", uselist=False, cascade="all, delete-orphan"
+    )
+
+    @property
+    def novel_id(self) -> Optional[uuid.UUID]:
+        if self.novel_target:
+            return self.novel_target.novel_id
+        if self.chapter_target and self.chapter_target.chapter:
+            return self.chapter_target.chapter.novel_id
+        return None
+
+    @property
+    def chapter_id(self) -> Optional[uuid.UUID]:
+        if self.chapter_target:
+            return self.chapter_target.chapter_id
+        return None
+
+
+class NovelProfileJobTarget(Base):
+    """Job target relation for novel profiling jobs (Strict BCNF/3NF)."""
+    __tablename__ = "novel_profile_job_targets"
+
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("synthesis_jobs.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    novel_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("novels.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    job: Mapped["SynthesisJob"] = relationship("SynthesisJob", back_populates="novel_target")
+    novel: Mapped["Novel"] = relationship("Novel", back_populates="profile_job_targets")
+
+
+class ChapterSynthesisJobTarget(Base):
+    """Job target relation for chapter TTS synthesis jobs (Strict BCNF/3NF)."""
+    __tablename__ = "chapter_synthesis_job_targets"
+
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("synthesis_jobs.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    chapter_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("chapters.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    job: Mapped["SynthesisJob"] = relationship("SynthesisJob", back_populates="chapter_target")
+    chapter: Mapped["Chapter"] = relationship("Chapter", back_populates="synthesis_job_targets")
 
 
 # ==============================================================================
@@ -496,10 +534,10 @@ class SegmentAudioCache(Base):
 
 
 # ==============================================================================
-# 9. Playback History Table (User Resume Progress)
+# 9. Playback History Table (User Resume Progress Bookmark - 4NF)
 # ==============================================================================
 class PlaybackHistory(Base):
-    """Persistent playback state and reading progress tracked per user per novel."""
+    """Persistent playback state bookmark tracked per user per novel (Strict 4NF)."""
     __tablename__ = "playback_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -519,6 +557,50 @@ class PlaybackHistory(Base):
         ForeignKey("novels.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    @property
+    def updated_at(self) -> Optional[datetime]:
+        return self.position.updated_at if self.position else None
+
+    __table_args__ = (
+        # Unique constraint on (user_id, novel_id) guarantees clean atomic upserts
+        UniqueConstraint("user_id", "novel_id", name="uq_playback_history_user_novel"),
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="playback_history")
+    novel: Mapped["Novel"] = relationship("Novel", back_populates="playback_history")
+    position: Mapped[Optional["PlaybackPosition"]] = relationship(
+        "PlaybackPosition", back_populates="history", uselist=False, cascade="all, delete-orphan"
+    )
+
+    @property
+    def chapter_id(self) -> Optional[uuid.UUID]:
+        return self.position.chapter_id if self.position else None
+
+    @property
+    def segment_order(self) -> int:
+        return self.position.segment_order if self.position else 0
+
+    @property
+    def position_ms(self) -> int:
+        return self.position.position_ms if self.position else 0
+
+
+class PlaybackPosition(Base):
+    """Fine-grained playback position offset scoped to a bookmark (Strict 4NF)."""
+    __tablename__ = "playback_positions"
+
+    history_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("playback_history.id", ondelete="CASCADE"),
+        primary_key=True,
     )
     chapter_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -545,12 +627,6 @@ class PlaybackHistory(Base):
         nullable=False,
     )
 
-    __table_args__ = (
-        # Unique constraint on (user_id, novel_id) guarantees clean atomic upserts
-        UniqueConstraint("user_id", "novel_id", name="uq_playback_history_user_novel"),
-    )
-
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="playback_history")
-    novel: Mapped["Novel"] = relationship("Novel", back_populates="playback_history")
-    chapter: Mapped["Chapter"] = relationship("Chapter", back_populates="playback_history")
+    history: Mapped["PlaybackHistory"] = relationship("PlaybackHistory", back_populates="position")
+    chapter: Mapped["Chapter"] = relationship("Chapter", back_populates="playback_positions")

@@ -4,6 +4,7 @@ Maps characters to distinct TTS voices from a predefined palette
 using keyword heuristics and deterministic hash fallback.
 """
 
+import re
 import zlib
 import json
 from pathlib import Path
@@ -124,10 +125,11 @@ class VoiceProfiler:
             self._save()
             return voice_id
 
-        # 3. Keyword scan
+        # 3. Keyword scan (sorted by length descending with word-boundary matching)
         combined = f"{name} {context_snippet}".lower()
-        for keyword, archetype in KEYWORD_MAP.items():
-            if keyword in combined:
+        sorted_keywords = sorted(KEYWORD_MAP.items(), key=lambda kv: len(kv[0]), reverse=True)
+        for keyword, archetype in sorted_keywords:
+            if re.search(rf"\b{re.escape(keyword)}\b", combined, re.IGNORECASE):
                 voice_id = VOICE_PALETTE[archetype]
                 self._registry[char_id] = voice_id
                 self._save()

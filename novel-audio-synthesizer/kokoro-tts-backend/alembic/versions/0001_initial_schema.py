@@ -51,7 +51,7 @@ def upgrade() -> None:
         sa.Column("language", sa.String(length=10), server_default="en-us", nullable=False),
         sa.Column("reserved_narrator", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.CheckConstraint("age_band IN ('child', 'young', 'adult', 'elder')", name="chk_voices_age_band"),
+        sa.CheckConstraint("age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')", name="chk_voices_age_band"),
         sa.CheckConstraint("gender IN ('male', 'female')", name="chk_voices_gender"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -119,7 +119,7 @@ def upgrade() -> None:
         sa.Column("source", sa.String(length=20), server_default="ai", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.CheckConstraint("age_band IN ('child', 'young', 'adult', 'elder')", name="chk_characters_age_band"),
+        sa.CheckConstraint("age_band IN ('child', 'young', 'teen', 'adult', 'elder', 'elderly')", name="chk_characters_age_band"),
         sa.CheckConstraint("gender IN ('male', 'female', 'unknown')", name="chk_characters_gender"),
         sa.CheckConstraint("source IN ('manual', 'ai')", name="chk_characters_source"),
         sa.CheckConstraint("speed_multiplier >= 0.5 AND speed_multiplier <= 2.0", name="chk_characters_speed_multiplier"),
@@ -225,7 +225,7 @@ def upgrade() -> None:
     # 10. Compatibility View: reading_progress -> playback_history
     op.execute("CREATE OR REPLACE VIEW reading_progress AS SELECT * FROM playback_history;")
 
-    # 11. Seed Default Kokoro-82M Voice Catalog
+    # 11. Seed Default Voice Catalog (Edge Neural + Kokoro Fallback)
     op.execute("""
         INSERT INTO voices (id, label, gender, age_band, language, reserved_narrator) VALUES
         ('am_adam', 'Adam (Narrator Default)', 'male', 'adult', 'en-us', true),
@@ -235,9 +235,19 @@ def upgrade() -> None:
         ('af_sarah', 'Sarah (Mature)', 'female', 'elder', 'en-us', false),
         ('am_michael', 'Michael (Strong & Resonant)', 'male', 'adult', 'en-us', false),
         ('am_george', 'George (Deep & Mature)', 'male', 'elder', 'en-us', false),
+        ('am_onyx', 'Onyx (Deep Male)', 'male', 'adult', 'en-us', false),
+        ('af_sky', 'Sky (Calm Female)', 'female', 'adult', 'en-us', false),
         ('bm_george', 'George (British Received)', 'male', 'adult', 'en-gb', false),
         ('bf_emma', 'Emma (British Refined)', 'female', 'young', 'en-gb', false),
-        ('bm_daniel', 'Daniel (British Expressive)', 'male', 'young', 'en-gb', false)
+        ('bm_daniel', 'Daniel (British Expressive)', 'male', 'young', 'en-gb', false),
+        ('en-GB-RyanNeural', 'Ryan Neural (British Narrator)', 'male', 'adult', 'en-gb', true),
+        ('en-GB-ThomasNeural', 'Thomas Neural (Harry Potter)', 'male', 'young', 'en-gb', false),
+        ('en-GB-LibbyNeural', 'Libby Neural (Hermione Granger)', 'female', 'young', 'en-gb', false),
+        ('en-GB-AlfieNeural', 'Alfie Neural (Ron Weasley)', 'male', 'young', 'en-gb', false),
+        ('en-GB-ArthurNeural', 'Arthur Neural (Albus Dumbledore)', 'male', 'elder', 'en-gb', false),
+        ('en-GB-NoahNeural', 'Noah Neural (Severus Snape)', 'male', 'adult', 'en-gb', false),
+        ('en-GB-SoniaNeural', 'Sonia Neural (Prof. McGonagall)', 'female', 'adult', 'en-gb', false),
+        ('en-GB-OliverNeural', 'Oliver Neural (Draco Malfoy)', 'male', 'young', 'en-gb', false)
         ON CONFLICT (id) DO NOTHING;
     """)
 

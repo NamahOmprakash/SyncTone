@@ -8,9 +8,10 @@ WORKDIR /app
 # Install build dependencies if needed
 RUN apk add --no-cache ffmpeg curl
 
-# Install npm dependencies
+# Install npm dependencies & generate Prisma Client
 COPY package*.json ./
-RUN npm ci --omit=dev
+COPY prisma ./prisma
+RUN npm install && npx prisma generate
 
 # Copy application source
 COPY src ./src

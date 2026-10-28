@@ -54,18 +54,17 @@ class TTSEngine:
             )
 
         try:
-            # Import kokoro-tts (PyTorch-based)
-            from kokoro import KokoroTTS
-
-            self._model = KokoroTTS(
-                model_path=str(model_file),
-                voices_path=str(voices_file),
-            )
+            try:
+                from kokoro_onnx import Kokoro
+                self._model = Kokoro(str(model_file), str(voices_file))
+            except ImportError:
+                from kokoro import KPipeline
+                self._model = KPipeline(lang_code='a')
             self._initialized = True
             logger.info("Kokoro TTS engine initialized successfully")
         except ImportError:
             raise ImportError(
-                "kokoro-tts not installed. Run: pip install kokoro-tts"
+                "kokoro or kokoro-onnx not installed. Run: pip install kokoro or pip install kokoro-onnx"
             )
         except Exception as e:
             raise RuntimeError(f"Failed to initialize Kokoro TTS: {e}")
@@ -94,13 +93,21 @@ class TTSEngine:
             return silence, 100
 
         try:
-            # Generate audio using kokoro-tts
-            # The exact API may vary — this matches the common kokoro-tts interface
-            samples, sr = self._model.create(
-                text=text,
-                voice=voice_id,
-                speed=speed,
-            )
+            if hasattr(self._model, 'create'):
+                samples, sr = self._model.create(
+                    text=text,
+                    voice=voice_id,
+                    speed=speed,
+                )
+            elif callable(self._model):
+                generator = self._model(text, voice=voice_id, speed=speed)
+                all_samples = []
+                sr = self._sample_rate
+                for _, _, audio in generator:
+                    all_samples.append(audio)
+                samples = np.concatenate(all_samples) if all_samples else np.zeros(0, dtype=np.float32)
+            else:
+                raise RuntimeError("Unsupported Kokoro model interface")
 
             # Ensure float32
             if samples.dtype != np.float32:

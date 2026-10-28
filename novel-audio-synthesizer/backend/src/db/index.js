@@ -1,6 +1,7 @@
 const { Pool } = require('pg');
 const mongoose = require('mongoose');
 const { config } = require('../config');
+const { prisma, getPrismaClient } = require('./prisma');
 
 const pool = new Pool({
   connectionString: config.databaseUrl,
@@ -23,7 +24,11 @@ async function connectPostgres() {
   try {
     const client = await pool.connect();
     client.release();
-    console.log('[DB] Connected to PostgreSQL 16');
+    const prismaClient = getPrismaClient();
+    if (prismaClient) {
+      await prismaClient.$connect().catch(() => {});
+    }
+    console.log('[DB] Connected to PostgreSQL 16 (pg pool + Prisma ORM)');
   } catch (err) {
     console.warn('[DB] PostgreSQL connection warning:', err.message);
   }
@@ -31,6 +36,8 @@ async function connectPostgres() {
 
 module.exports = {
   pool,
+  prisma,
+  getPrismaClient,
   connectMongo,
   connectPostgres,
 };

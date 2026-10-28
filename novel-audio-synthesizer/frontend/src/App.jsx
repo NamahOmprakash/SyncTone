@@ -1,228 +1,501 @@
 import React, { useState, useEffect } from 'react';
-import { useChapterData } from './hooks/useChapterData';
+import { useAuth } from './hooks/useAuth';
 import { useAudioSync } from './hooks/useAudioSync';
+import { usePlaybackProgress } from './hooks/usePlaybackProgress';
+import { useSynthesisProgress } from './hooks/useSynthesisProgress';
+import { api } from './services/api';
+
+import SidebarNav from './components/SidebarNav';
+import TopHeader from './components/TopHeader';
+import NovelCatalog from './components/NovelCatalog';
+import NovelDetails from './components/NovelDetails';
 import ReaderView from './components/ReaderView';
 import AudioPlayer from './components/AudioPlayer';
 import CharacterRoster from './components/CharacterRoster';
+import SynthesisProgressBar from './components/SynthesisProgressBar';
+import AuthModal from './components/AuthModal';
+import AddNovelModal from './components/AddNovelModal';
+import UploadChapterModal from './components/UploadChapterModal';
 import SettingsModal from './components/SettingsModal';
+import { IconClock, IconX } from './components/icons';
+import { executeViewTransition } from './tokens/motion';
+
+const EMPTY_ARRAY = [];
 
 export default function App() {
-  const [stage, setStage] = useState('upload'); // 'upload' | 'parsed' | 'playing'
-  const [textInput, setTextInput] = useState('');
-  const [titleInput, setTitleInput] = useState('');
-  const [modelStatus, setModelStatus] = useState(null);
+  const { user, role, isAuthenticated, isWriterOrAdmin } = useAuth();
+
+  // Navigation View: 'catalog' | 'details' | 'reader' | 'settings' | 'upload'
+  const [view, setView] = useState('catalog');
+  const [selectedNovelId, setSelectedNovelId] = useState(null);
+  const [currentNovel, setCurrentNovel] = useState(null);
+  const [currentChapter, setCurrentChapter] = useState(null);
+
+  // Chapter prose and manifest data
+  const [chapterSegments, setChapterSegments] = useState(EMPTY_ARRAY);
+  const [chapterManifest, setChapterManifest] = useState(null);
+  const [isLoadingChapter, setIsLoadingChapter] = useState(false);
+  const [chapterError, setChapterError] = useState(null);
+
+  // Modals
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
+  const [showAddNovelModal, setShowAddNovelModal] = useState(false);
+  const [showUploadChapterModal, setShowUploadChapterModal] = useState(false);
   const [showRoster, setShowRoster] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [modelStatus, setModelStatus] = useState(null);
 
-  const [chapterState, chapterActions] = useChapterData();
-  const audioSync = useAudioSync(chapterState.manifest?.timeline ?? []);
+  // Audio Synchronization Hook (60fps loop with binary search)
+  const audioSync = useAudioSync(chapterManifest?.timeline ?? EMPTY_ARRAY);
 
-  // Check model availability on mount
+  // 4NF Playback Progress Hook (auto-resume & throttled persistence)
+  const playbackProgress = usePlaybackProgress({
+    novelId: currentNovel?.id,
+    chapterId: currentChapter?.id,
+    user,
+    audioSync,
+    timeline: chapterManifest?.timeline ?? EMPTY_ARRAY,
+  });
+
+  // Real-time WebSocket Synthesis Progress Hook
+  const synthesisProgress = useSynthesisProgress(currentChapter?.id);
+
+  // Fetch TTS / LLM model engine status when settings is opened
   useEffect(() => {
-    chapterActions.checkModels().then(setModelStatus);
-  }, [chapterActions]);
+    if (showSettings && !modelStatus) {
+      api.get('/status/models')
+        .then((res) => setModelStatus(res))
+        .catch(() => {});
+    }
+  }, [showSettings, modelStatus]);
 
-  const handleUploadAndParse = async () => {
-    if (!textInput.trim()) return;
+  // Helper for safe scroll without jsdom not-implemented warning
+  const safeScrollToTop = (behavior = 'instant') => {
+    try {
+      if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+        window.scrollTo({ top: 0, behavior });
+      }
+    } catch (_) {}
+  };
 
-    const chapterId = await chapterActions.uploadText(
-      textInput,
-      titleInput || 'Untitled Chapter',
-    );
-    if (!chapterId) return;
+  // Centralized navigation handler with View Transitions & History state sync
+  const handleNavigate = (targetView, novelId = null) => {
+    executeViewTransition(() => {
+      if (targetView === 'catalog') {
+        setSelectedNovelId(null);
+      } else if (targetView === 'details') {
+        const id = novelId || selectedNovelId || currentNovel?.id;
+        if (id) setSelectedNovelId(id);
+      }
+      setView(targetView);
+      setShowRoster(false);
 
-    const parsed = await chapterActions.parseChapter(chapterId);
-    if (parsed) {
-      setStage('parsed');
+      try {
+        if (typeof window !== 'undefined' && window.history) {
+          const stateNovelId = novelId || (targetView === 'details' ? (selectedNovelId || currentNovel?.id) : null);
+          window.history.pushState({ view: targetView, novelId: stateNovelId }, '', window.location.pathname);
+        }
+      } catch (_) {}
+
+      safeScrollToTop('instant');
+    });
+  };
+
+  // Listen to browser Back/Forward navigation (popstate)
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (event.state && event.state.view) {
+        executeViewTransition(() => {
+          setView(event.state.view);
+          if (event.state.novelId) {
+            setSelectedNovelId(event.state.novelId);
+          }
+          setShowRoster(false);
+        });
+      } else {
+        executeViewTransition(() => {
+          setView('catalog');
+          setSelectedNovelId(null);
+          setShowRoster(false);
+        });
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Fetch model status on mount
+  useEffect(() => {
+    api.status.models().then(setModelStatus).catch(() => {});
+  }, []);
+
+  // Open novel details with view transition
+  const handleSelectNovel = (novelId) => {
+    setShowRoster(false);
+    handleNavigate('details', novelId);
+  };
+
+  // Open chapter in Reader with view transition
+  const handleSelectChapter = async (novel, chapter) => {
+    executeViewTransition(() => {
+      setCurrentNovel(novel);
+      if (novel?.id) {
+        setSelectedNovelId(novel.id);
+      }
+      setCurrentChapter(chapter);
+      setView('reader');
+      setIsLoadingChapter(true);
+      setChapterError(null);
+      setChapterSegments(EMPTY_ARRAY);
+      setChapterManifest(null);
+
+      try {
+        if (typeof window !== 'undefined' && window.history) {
+          window.history.pushState(
+            { view: 'reader', novelId: novel?.id, chapterId: chapter?.id },
+            '',
+            window.location.pathname
+          );
+        }
+      } catch (_) {}
+
+      safeScrollToTop('instant');
+    });
+
+    try {
+      // 1. Fetch chapter details & segments
+      const details = await api.chapters.get(chapter.id);
+      let segments = details.segments || [];
+      if (segments.length === 0 && (details.status === 'draft' || chapter?.status === 'draft' || !details.status)) {
+        try {
+          const parsedRes = await api.chapters.parse(chapter.id);
+          if (parsedRes?.segments) {
+            segments = parsedRes.segments;
+          }
+        } catch (_) {}
+      }
+      setChapterSegments(segments);
+
+      // 2. Determine manifest and audio stream URL
+      let manifest = details.manifest || null;
+      if (!manifest) {
+        try {
+          manifest = await api.chapters.getManifest(chapter.id);
+        } catch (_) {}
+      }
+
+      if (manifest) {
+        const streamUrl =
+          manifest.audio_url ||
+          manifest.audio_stream_url ||
+          `/api/stream/${chapter.id}`;
+        const enrichedTimeline = (manifest.timeline || []).map((t, idx) => {
+          const seg =
+            segments.find(
+              (s) =>
+                (s.segment_id !== undefined ? s.segment_id : s.order) ===
+                (t.segment_id !== undefined ? t.segment_id : t.order)
+            ) || segments[idx];
+          return {
+            ...t,
+            text: t.text || seg?.text || '',
+            speaker_name: t.speaker_name || seg?.speaker_name || '',
+            voice_id: t.voice_id || seg?.voice_id || 'en-GB-RyanNeural',
+            character_id: t.character_id || seg?.character_id || 'narrator',
+            type: t.type || seg?.type || 'narration',
+          };
+        });
+        setChapterManifest({
+          ...manifest,
+          audio_stream_url: streamUrl,
+          timeline: enrichedTimeline,
+        });
+      } else {
+        setChapterManifest({
+          audio_stream_url: `/api/stream/${chapter.id}`,
+          total_duration_ms: chapter.total_duration_ms || 0,
+          timeline: segments.map((s, idx) => ({
+            order: s.order || idx + 1,
+            segment_id: s.segment_id !== undefined ? s.segment_id : idx + 1,
+            start_ms: s.start_ms || 0,
+            end_ms: s.end_ms || 0,
+            character_id: s.character_id,
+            voice_id: s.voice_id || 'en-GB-RyanNeural',
+            text: s.text || '',
+            speaker_name: s.speaker_name || '',
+            type: s.type || 'narration',
+          })),
+        });
+      }
+    } catch (err) {
+      setChapterError(err.message || 'Failed to load chapter audio and segments.');
+    } finally {
+      setIsLoadingChapter(false);
     }
   };
 
-  const handleSynthesize = async () => {
-    if (!chapterState.chapterId) return;
-    const manifest = await chapterActions.synthesizeChapter(chapterState.chapterId);
-    if (manifest) {
-      setStage('playing');
-    }
+  const handleOpenAuth = (mode = 'login') => {
+    setAuthMode(typeof mode === 'string' ? mode : 'login');
+    setShowAuthModal(true);
   };
 
-  const handleReset = () => {
-    chapterActions.reset();
-    setTextInput('');
-    setTitleInput('');
-    setStage('upload');
+  // Trigger re-synthesis of chapter
+  const handleSynthesizeCurrentChapter = async () => {
+    if (!currentChapter?.id) return;
+    try {
+      if (chapterSegments.length === 0) {
+        const parsedRes = await api.chapters.parse(currentChapter.id);
+        if (parsedRes?.segments) {
+          setChapterSegments(parsedRes.segments);
+        }
+      }
+      const synthRes = await api.chapters.synthesize(currentChapter.id);
+      const manifest = synthRes?.manifest || synthRes;
+      if (manifest && (manifest.timeline || manifest.audio_url || manifest.total_duration_ms)) {
+        setChapterManifest({
+          ...manifest,
+          audio_stream_url: `${manifest.audio_url || `/api/stream/${currentChapter.id}`}?t=${Date.now()}`,
+        });
+      }
+      try {
+        const refreshed = await api.chapters.get(currentChapter.id);
+        if (refreshed?.segments) {
+          setChapterSegments(refreshed.segments);
+        }
+      } catch (_) {}
+    } catch (err) {
+      setChapterError(err.message || 'Failed to trigger chapter synthesis.');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-800">
-            📖 Novel Audio Synthesizer
-          </h1>
-          <div className="flex gap-2">
-            {stage !== 'upload' && (
-              <button
-                onClick={() => setShowRoster(!showRoster)}
-                className="px-3 py-1.5 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition"
-              >
-                👥 Characters
-              </button>
-            )}
-            <button
-              onClick={() => setShowSettings(true)}
-              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-            >
-              ⚙️
-            </button>
-            {stage !== 'upload' && (
-              <button
-                onClick={handleReset}
-                className="px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition"
-              >
-                ↩ New
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-main)] flex flex-col font-sans transition-colors duration-200">
+      {/* Editorial 72px Navigation Rail (Desktop) & Bottom Bar (Mobile) */}
+      <SidebarNav
+        currentView={view}
+        onNavigate={(targetView) => handleNavigate(targetView)}
+        onOpenSettings={() => setShowSettings(true)}
+        onOpenAuth={handleOpenAuth}
+        onOpenAddNovel={() => setShowAddNovelModal(true)}
+      />
 
-      <main className="max-w-4xl mx-auto px-4 py-6">
-        {/* Error display */}
-        {chapterState.error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            ❌ {chapterState.error}
-          </div>
+      {/* Main Viewport Container (Offset by 72px desktop rail) */}
+      <div className="flex-1 md:pl-[72px] flex flex-col min-h-screen">
+        {/* Top Sticky Header (Breadcrumbs, Search & Cast Controls for Details/Reader) */}
+        {view !== 'catalog' && (
+          <TopHeader
+            view={view}
+            currentNovel={currentNovel}
+            currentChapter={currentChapter}
+            onNavigate={(targetView) => handleNavigate(targetView)}
+            showRoster={showRoster}
+            onToggleRoster={() => setShowRoster((prev) => !prev)}
+            onOpenSettings={() => setShowSettings(true)}
+            onOpenAuth={handleOpenAuth}
+          />
         )}
 
-        {/* Loading indicator */}
-        {chapterState.isLoading && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm flex items-center gap-2">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            {chapterState.progress}
-          </div>
-        )}
-
-        {/* Engine status indicator */}
-        {modelStatus && (
-          <div className="mb-4 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs flex items-center justify-between">
-            <div className="flex items-center gap-1.5 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Primary Engine: Edge Neural TTS (British Harry Potter Cast)
-            </div>
-            <span className="text-emerald-600">Kokoro-82M Fallback</span>
-          </div>
-        )}
-
-        {/* Stage 1: Upload */}
-        {stage === 'upload' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Chapter Title
-              </label>
-              <input
-                type="text"
-                value={titleInput}
-                onChange={(e) => setTitleInput(e.target.value)}
-                placeholder="Enter chapter title..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Chapter Text
-              </label>
-              <textarea
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                placeholder={"Paste your chapter text here...\n\nThe parser will detect dialogue (quoted text) and narration, and attribute speakers automatically."}
-                rows={12}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-serif leading-relaxed"
-              />
-            </div>
-            <button
-              onClick={handleUploadAndParse}
-              disabled={chapterState.isLoading || !textInput.trim()}
-              className="w-full py-2.5 px-4 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Parse & Attribute Chapter
-            </button>
-          </div>
-        )}
-
-        {/* Stage 2 & 3: Parsed / Playing */}
-        {(stage === 'parsed' || stage === 'playing') && chapterState.parsed && (
-          <div className="space-y-6 pb-24">
-            {/* Action bar */}
-            <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  {chapterState.parsed.title}
-                </h2>
-                <p className="text-sm text-gray-500">
-                  {chapterState.parsed.segments.length} segments •{' '}
-                  {chapterState.parsed.segments.filter((s) => s.type === 'dialogue').length}{' '}
-                  dialogue lines
-                </p>
+        {/* Content Body Area */}
+        <main key={view} className="flex-1 w-full px-4 sm:px-8 py-6 motion-view-route">
+          {/* Playback Resume Toast */}
+          {view === 'reader' && playbackProgress.resumedAtMs !== null && (
+            <div className="mb-4 p-3.5 rounded-2xl bg-[var(--accent)] text-white shadow-xl flex items-center justify-between text-xs animate-slideDown">
+              <div className="flex items-center gap-2.5">
+                <IconClock className="w-4 h-4" />
+                <span>
+                  Resumed playback from previous session at{' '}
+                  <strong>
+                    {Math.floor(playbackProgress.resumedAtMs / 60000)}:
+                    {Math.floor((playbackProgress.resumedAtMs % 60000) / 1000)
+                      .toString()
+                      .padStart(2, '0')}
+                  </strong>
+                  .
+                </span>
               </div>
-              {stage === 'parsed' && (
-                <button
-                  onClick={handleSynthesize}
-                  disabled={chapterState.isLoading}
-                  className="py-2 px-5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition flex items-center gap-2"
-                >
-                  🔊 Synthesize Audio
-                </button>
-              )}
+              <button
+                onClick={playbackProgress.dismissResumeBanner}
+                className="hover:opacity-80 p-1"
+                aria-label="Dismiss resume notification"
+              >
+                <IconX className="w-4 h-4" />
+              </button>
             </div>
+          )}
 
-            {/* Reader view with active segment highlighting */}
-            <ReaderView
-              segments={chapterState.parsed.segments}
-              activeSegmentId={audioSync.activeSegmentId}
-              onSegmentClick={(segmentId) => {
-                if (stage === 'playing') {
-                  audioSync.seekToSegment(segmentId);
-                }
+          {/* Live Synthesis Progress Banner */}
+          {view === 'reader' && synthesisProgress.status !== 'idle' && (
+            <div className="mb-6">
+              <SynthesisProgressBar
+                status={synthesisProgress.status}
+                percentComplete={synthesisProgress.percentComplete}
+                currentSegment={synthesisProgress.currentSegment}
+                totalSegments={synthesisProgress.totalSegments}
+                message={synthesisProgress.message}
+                error={synthesisProgress.error}
+                isConnected={synthesisProgress.isConnected}
+                onDismiss={synthesisProgress.reset}
+              />
+            </div>
+          )}
+
+          {/* VIEW 1: NOVEL CATALOG */}
+          {view === 'catalog' && (
+            <NovelCatalog
+              onSelectNovel={handleSelectNovel}
+              onSelectChapter={handleSelectChapter}
+              onOpenAddNovel={() => setShowAddNovelModal(true)}
+              onOpenSettings={() => setShowSettings(true)}
+              onOpenAuth={handleOpenAuth}
+            />
+          )}
+
+          {/* VIEW 2: NOVEL DETAILS */}
+          {view === 'details' && (selectedNovelId || currentNovel?.id) && (
+            <NovelDetails
+              novelId={selectedNovelId || currentNovel?.id}
+              onBack={() => handleNavigate('catalog')}
+              onSelectChapter={handleSelectChapter}
+              onOpenUploadChapter={(novel) => {
+                setCurrentNovel(novel);
+                setShowUploadChapterModal(true);
               }}
             />
-          </div>
+          )}
+
+          {/* VIEW 3: 60FPS SYNCHRONIZED READER */}
+          {view === 'reader' && (
+            <div className="space-y-6">
+              {/* Chapter Error State */}
+              {chapterError && (
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+                  {chapterError}
+                </div>
+              )}
+
+              {/* Chapter Loading Skeleton */}
+              {isLoadingChapter ? (
+                <div className="rounded-2xl theme-surface border p-12 text-center theme-muted text-sm animate-pulse space-y-3 max-w-3xl mx-auto">
+                  <div className="w-8 h-8 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin mx-auto" />
+                  <p>Loading chapter prose and synchronized timeline...</p>
+                </div>
+              ) : (
+                <ReaderView
+                  segments={chapterSegments}
+                  activeSegmentId={audioSync.activeSegmentId}
+                  segmentProgress={audioSync.segmentProgress}
+                  isPlaying={audioSync.isPlaying}
+                  onSegmentClick={(segmentId) => {
+                    audioSync.seekToSegment(segmentId);
+                  }}
+                  currentNovel={currentNovel}
+                  currentChapter={currentChapter}
+                  onBack={() => {
+                    if (selectedNovelId || currentNovel?.id) {
+                      handleNavigate('details', selectedNovelId || currentNovel?.id);
+                    } else {
+                      handleNavigate('catalog');
+                    }
+                  }}
+                />
+              )}
+            </div>
+          )}
+        </main>
+
+        {/* Docked Sticky Bottom Audio Player */}
+        {view === 'reader' && chapterManifest && (
+          <AudioPlayer
+            audioRef={audioSync.audioRef}
+            audioUrl={chapterManifest.audio_stream_url}
+            isPlaying={audioSync.isPlaying}
+            currentTimeMs={audioSync.currentTimeMs}
+            totalDurationMs={chapterManifest.total_duration_ms || currentChapter?.total_duration_ms || 0}
+            onToggle={audioSync.toggle}
+            onSetPlaybackRate={audioSync.setPlaybackRate}
+            onSeek={audioSync.seekToTimeMs}
+            onPlay={audioSync.handlePlay}
+            onPause={audioSync.handlePause}
+            onEnded={audioSync.handleEnded}
+            onLoadedMetadata={audioSync.handleLoadedMetadata}
+            currentNovel={currentNovel}
+            currentChapter={currentChapter}
+            playbackMode={audioSync.playbackMode}
+            onTogglePlaybackMode={audioSync.togglePlaybackMode}
+            ttsEngine={audioSync.ttsEngine}
+            onChangeTtsEngine={audioSync.setTtsEngine}
+            onSeekSegment={(dir) => {
+              const currentIdx = chapterSegments.findIndex(
+                (s) => (s.segment_id ?? s.order) === audioSync.activeSegmentId
+              );
+              const targetIdx = Math.max(0, Math.min(chapterSegments.length - 1, (currentIdx >= 0 ? currentIdx : 0) + dir));
+              const targetSeg = chapterSegments[targetIdx];
+              if (targetSeg) {
+                audioSync.seekToSegment(targetSeg.segment_id ?? targetSeg.order);
+              }
+            }}
+          />
         )}
-      </main>
 
-      {/* Audio player bar (visible when playing) */}
-      {stage === 'playing' && chapterState.manifest && (
-        <AudioPlayer
-          audioRef={audioSync.audioRef}
-          audioUrl={chapterState.manifest.audio_stream_url}
-          isPlaying={audioSync.isPlaying}
-          currentTimeMs={audioSync.currentTimeMs}
-          totalDurationMs={chapterState.manifest.total_duration_ms}
-          onToggle={audioSync.toggle}
-          onSetPlaybackRate={audioSync.setPlaybackRate}
-        />
-      )}
+        {/* Character Cast Roster Drawer */}
+        {showRoster && view === 'reader' && (
+          <CharacterRoster
+            chapterId={currentChapter?.id || ''}
+            segments={chapterSegments}
+            onClose={() => setShowRoster(false)}
+            onVoiceChange={(charId, newVoiceId) => {
+              setChapterSegments((prev) =>
+                prev.map((s) =>
+                  s.character_id === charId || s.speaker_id === charId
+                    ? { ...s, assigned_voice_id: newVoiceId, voice_id: newVoiceId }
+                    : s
+                )
+              );
+            }}
+          />
+        )}
 
-      {/* Character roster sidebar */}
-      {showRoster && chapterState.parsed && (
-        <CharacterRoster
-          chapterId={chapterState.chapterId || ''}
-          segments={chapterState.parsed.segments}
-          onClose={() => setShowRoster(false)}
+        {/* Auth Modal (Login / Register) */}
+        <AuthModal
+          isOpen={showAuthModal}
+          initialMode={authMode}
+          onClose={() => setShowAuthModal(false)}
         />
-      )}
 
-      {/* Settings modal */}
-      {showSettings && (
-        <SettingsModal
-          modelStatus={modelStatus}
-          onClose={() => setShowSettings(false)}
+        {/* Add Novel Modal (Writer / Admin Role Gated) */}
+        <AddNovelModal
+          isOpen={showAddNovelModal}
+          onClose={() => setShowAddNovelModal(false)}
+          onOpenAuth={handleOpenAuth}
+          onSelectChapter={handleSelectChapter}
+          onNovelCreated={(newNovel, firstChapter) => {
+            if (firstChapter) {
+              handleSelectChapter(newNovel, firstChapter);
+            } else {
+              handleNavigate('details', newNovel.id);
+            }
+          }}
         />
-      )}
+
+        {/* Upload Chapter Modal */}
+        <UploadChapterModal
+          isOpen={showUploadChapterModal}
+          novel={currentNovel}
+          onClose={() => setShowUploadChapterModal(false)}
+          onChapterUploaded={(newChapter) => {
+            handleSelectChapter(currentNovel, newChapter);
+          }}
+        />
+
+        {/* Neural Engine Settings Modal */}
+        {showSettings && (
+          <SettingsModal
+            modelStatus={modelStatus}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
+      </div>
     </div>
   );
 }

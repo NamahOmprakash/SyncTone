@@ -1,36 +1,59 @@
 const path = require('path');
 const fs = require('fs');
 
-// Robust .env resolution: checks root .env, then backend .env, then current working directory
-const ROOT_DIR = path.resolve(__dirname, '../../..');
+// Robust .env resolution: checks repo root, parent dir, and backend dir
 const BACKEND_DIR = path.resolve(__dirname, '../..');
-const ROOT_ENV = path.resolve(ROOT_DIR, '.env');
-const BACKEND_ENV = path.resolve(BACKEND_DIR, '.env');
+const PARENT_DIR = path.resolve(BACKEND_DIR, '..');
+const REPO_ROOT = path.resolve(PARENT_DIR, '..');
+const ROOT_DIR = REPO_ROOT;
 
-if (fs.existsSync(ROOT_ENV)) {
-  require('dotenv').config({ path: ROOT_ENV });
-} else if (fs.existsSync(BACKEND_ENV)) {
-  require('dotenv').config({ path: BACKEND_ENV });
-} else {
-  require('dotenv').config();
+const envCandidates = [
+  path.resolve(REPO_ROOT, '.env'),
+  path.resolve(PARENT_DIR, '.env'),
+  path.resolve(BACKEND_DIR, '.env'),
+];
+for (const envPath of envCandidates) {
+  if (fs.existsSync(envPath)) {
+    require('dotenv').config({ path: envPath });
+    break;
+  }
+}
+require('dotenv').config();
+
+function findFirstExistingDir(candidates, fallback) {
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return fallback;
 }
 
 // Storage Directories: safely resolves output, chapters, and models both locally and in Docker container
-const outputDir = fs.existsSync(path.resolve(BACKEND_DIR, 'output'))
-  ? path.resolve(BACKEND_DIR, 'output')
-  : fs.existsSync(path.resolve(ROOT_DIR, 'novel-audio-synthesizer/output'))
-  ? path.resolve(ROOT_DIR, 'novel-audio-synthesizer/output')
-  : path.resolve(ROOT_DIR, 'output');
+const outputDir = findFirstExistingDir(
+  [
+    path.resolve(REPO_ROOT, 'output'),
+    path.resolve(PARENT_DIR, 'output'),
+    path.resolve(BACKEND_DIR, 'output'),
+  ],
+  path.resolve(PARENT_DIR, 'output')
+);
 
-const chaptersDir = fs.existsSync(path.resolve(BACKEND_DIR, 'chapters'))
-  ? path.resolve(BACKEND_DIR, 'chapters')
-  : fs.existsSync(path.resolve(ROOT_DIR, 'novel-audio-synthesizer/chapters'))
-  ? path.resolve(ROOT_DIR, 'novel-audio-synthesizer/chapters')
-  : path.resolve(ROOT_DIR, 'chapters');
+const chaptersDir = findFirstExistingDir(
+  [
+    path.resolve(REPO_ROOT, 'chapters'),
+    path.resolve(PARENT_DIR, 'chapters'),
+    path.resolve(BACKEND_DIR, 'chapters'),
+  ],
+  path.resolve(PARENT_DIR, 'chapters')
+);
 
-const modelsDir = fs.existsSync(path.resolve(BACKEND_DIR, '../kokoro-tts-backend/models_cache'))
-  ? path.resolve(BACKEND_DIR, '../kokoro-tts-backend/models_cache')
-  : path.resolve(ROOT_DIR, 'novel-audio-synthesizer/kokoro-tts-backend/models_cache');
+const modelsDir = findFirstExistingDir(
+  [
+    path.resolve(PARENT_DIR, 'kokoro-tts-backend/models_cache'),
+    path.resolve(REPO_ROOT, 'novel-audio-synthesizer/kokoro-tts-backend/models_cache'),
+    path.resolve(BACKEND_DIR, 'models_cache'),
+  ],
+  path.resolve(PARENT_DIR, 'kokoro-tts-backend/models_cache')
+);
 
 const config = {
   port: parseInt(process.env.PORT || '4000', 10),

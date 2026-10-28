@@ -1,4 +1,4 @@
-const DIALOGUE_PATTERN = /["\u201c]([^"\u201d]+)["\u201d]/g;
+const DIALOGUE_PATTERN = /(?:["\u201c]([^"\u201d]+)["\u201d]|\u2018((?:[^\u2018\u2019]|(?<=[a-zA-Z])\u2019(?=[a-zA-Z])){2,})\u2019)/g;
 
 const SPEECH_VERBS = [
   'said', 'replied', 'shouted', 'whispered', 'muttered', 'exclaimed', 'asked',
@@ -15,28 +15,32 @@ const SPEECH_VERBS = [
 ].join('|');
 
 const SPEECH_TAG_AFTER = new RegExp(
-  `["\\u201d]\\s*[,.]?\\s+(\\w[\\w\\s]{0,30})\\s+(?:${SPEECH_VERBS})`,
+  `["\\u201d\\u2019]\\s*[,.]?\\s+(\\w[\\w\\s]{0,30})\\s+(?:${SPEECH_VERBS})`,
   'i'
 );
 
 const SPEECH_TAG_AFTER_INVERTED = new RegExp(
-  `["\\u201d]\\s*[,.]?\\s*(?:${SPEECH_VERBS})\\s+(\\w[\\w\\s]{0,30})`,
+  `["\\u201d\\u2019]\\s*[,.]?\\s*(?:${SPEECH_VERBS})\\s+(\\w[\\w\\s]{0,30})`,
   'i'
 );
 
 const SPEECH_TAG_BEFORE = new RegExp(
-  `(\\w[\\w\\s]{0,30})\\s+(?:${SPEECH_VERBS})\\s*[,:]?\\s*["\\u201c]`,
+  `(\\w[\\w\\s]{0,30})\\s+(?:${SPEECH_VERBS})\\s*[,:]?\\s*["\\u201c\\u2018]`,
   'i'
 );
 
 function cleanSpeakerName(raw) {
   const noiseWords = new Set(['the', 'a', 'an', 'then', 'and', 'but', 'as', 'when', 'while', 'to']);
+  const pronouns = new Set(['he', 'she', 'they', 'it']);
   const words = raw.trim().split(/\s+/);
   while (words.length > 0 && noiseWords.has(words[0].toLowerCase())) {
     words.shift();
   }
   const name = words.join(' ').trim().replace(/[.,!?;:]+$/, '');
   if (!name || words.length > 3) return '';
+  if (pronouns.has(name.toLowerCase())) {
+    return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  }
   if (name[0] === name[0].toLowerCase()) return '';
   return name;
 }
@@ -73,16 +77,35 @@ function parseChapter(rawText, title = 'Untitled Chapter', chapterId = 'ch-1') {
   let segmentIdCounter = 1;
 
   for (const paragraph of paragraphs) {
+    const imgMatch = paragraph.match(/\[IMAGE:(\/static\/covers\/[^\]]+)\]/i);
+    if (imgMatch) {
+      segments.push({
+        segment_id: segmentIdCounter++,
+        type: 'image',
+        speaker_name: 'Illustration',
+        speaker_id: 'image',
+        assigned_voice_id: 'af_heart',
+        text: paragraph.trim(),
+        image_url: imgMatch[1],
+        attribution_confidence: 1.0,
+        attribution_source: 'image',
+      });
+      continue;
+    }
+
     const dialogueMatches = [];
     let match;
     const regex = new RegExp(DIALOGUE_PATTERN.source, 'g');
 
     while ((match = regex.exec(paragraph)) !== null) {
-      dialogueMatches.push({
-        text: match[1],
-        start: match.index,
-        end: match.index + match[0].length,
-      });
+      const dialogueText = (match[1] !== undefined ? match[1] : match[2] || '').trim();
+      if (dialogueText.length > 0) {
+        dialogueMatches.push({
+          text: dialogueText,
+          start: match.index,
+          end: match.index + match[0].length,
+        });
+      }
     }
 
     if (dialogueMatches.length === 0) {

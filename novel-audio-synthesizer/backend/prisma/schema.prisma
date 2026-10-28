@@ -1,0 +1,232 @@
+// ==============================================================================
+// SyncTone — Prisma ORM Schema (PostgreSQL 16 Relational Core — Strict 4NF)
+// ==============================================================================
+// Layered directly over the 12 normalized (Strict 4NF) PostgreSQL 16 tables
+// defined in Alembic migrations `0001_initial_schema.py` -> `0003_enforce_4nf.py`.
+// ==============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. Users Table (Authentication & RBAC)
+model User {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username      String   @unique @db.VarChar(50)
+  email         String   @unique @db.VarChar(255)
+  password_hash String   @db.VarChar(255)
+  role          String   @default("reader") @db.VarChar(20)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  novels           Novel[]
+  synthesis_jobs   SynthesisJob[]
+  playback_history PlaybackHistory[]
+
+  @@index([username], map: "ix_users_username")
+  @@index([email], map: "ix_users_email")
+  @@map("users")
+}
+
+// 2. Voices Table (Unified Edge Neural + Kokoro-82M Voice Catalog)
+model Voice {
+  id                String   @id @db.VarChar(64)
+  label             String   @db.VarChar(100)
+  gender            String   @db.VarChar(10)
+  age_band          String   @default("adult") @db.VarChar(10)
+  language          String   @default("en-us") @db.VarChar(10)
+  reserved_narrator Boolean  @default(false)
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  characters Character[]
+
+  @@map("voices")
+}
+
+// 3. Novels Table (Catalog & Portfolio Metadata)
+model Novel {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  added_by         String   @db.Uuid
+  title            String   @db.VarChar(255)
+  synopsis         String?  @db.Text
+  channel          String   @default("verified") @db.VarChar(20)
+  status           String   @default("draft") @db.VarChar(20)
+  global_tone      String?  @db.VarChar(100)
+  portfolio_source String   @default("ai") @db.VarChar(20)
+  cover_object     String?  @db.VarChar(255)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  author                User                    @relation(fields: [added_by], references: [id], onDelete: Cascade)
+  chapters              Chapter[]
+  characters            Character[]
+  profile_job_targets   NovelProfileJobTarget[]
+  playback_history      PlaybackHistory[]
+
+  @@index([added_by], map: "ix_novels_added_by")
+  @@map("novels")
+}
+
+// 4. Chapters Table (Relational Metadata & Swift Audio Reference)
+// Linked 1:1 to MongoDB `chapters` document collection via `pg_chapter_id = id`
+model Chapter {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  novel_id           String   @db.Uuid
+  chapter_number     Int
+  title              String   @default("") @db.VarChar(255)
+  status             String   @default("draft") @db.VarChar(20)
+  audio_version      Int      @default(1)
+  swift_audio_object String?  @db.VarChar(512)
+  total_duration_ms  Int      @default(0)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  novel                 Novel                       @relation(fields: [novel_id], references: [id], onDelete: Cascade)
+  synthesis_job_targets ChapterSynthesisJobTarget[]
+  playback_positions    PlaybackPosition[]
+
+  @@unique([novel_id, chapter_number], map: "uq_chapters_novel_chapter_number")
+  @@index([novel_id], map: "ix_chapters_novel_id")
+  @@map("chapters")
+}
+
+// 5. Characters Table (Grounded Character Cast Portfolio)
+model Character {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  novel_id         String   @db.Uuid
+  canonical_name   String   @db.VarChar(100)
+  gender           String   @default("unknown") @db.VarChar(10)
+  age_band         String   @default("adult") @db.VarChar(10)
+  temperament      String?  @db.VarChar(100)
+  sample_quote     String?  @db.Text
+  voice_id         String?  @db.VarChar(64)
+  speed_multiplier Float    @default(1.0) @db.Real
+  is_narrator      Boolean  @default(false)
+  needs_review     Boolean  @default(false)
+  source           String   @default("ai") @db.VarChar(20)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  novel   Novel            @relation(fields: [novel_id], references: [id], onDelete: Cascade)
+  voice   Voice?           @relation(fields: [voice_id], references: [id], onDelete: SetNull)
+  aliases CharacterAlias[]
+
+  @@unique([novel_id, canonical_name], map: "uq_characters_novel_canonical_name")
+  @@index([novel_id], map: "ix_characters_novel_id")
+  @@index([voice_id], map: "ix_characters_voice_id")
+  @@map("characters")
+}
+
+// 6. Character Aliases Table (Strict 3NF/4NF Alias Normalization)
+// Transitive novel_id removed; cross-novel uniqueness enforced via DB trigger + advisory lock
+model CharacterAlias {
+  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  character_id String @db.Uuid
+  alias        String @db.VarChar(100)
+
+  character Character @relation(fields: [character_id], references: [id], onDelete: Cascade)
+
+  @@unique([character_id, alias], map: "uq_character_aliases_character_alias")
+  @@index([character_id], map: "ix_character_aliases_character_id")
+  @@map("character_aliases")
+}
+
+// 7. Synthesis Jobs Table (4NF Pure Queue Broker with SKIP LOCKED)
+model SynthesisJob {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requested_by  String?   @db.Uuid
+  job_type      String    @db.VarChar(30)
+  status        String    @default("queued") @db.VarChar(20)
+  progress_pct  Float     @default(0.0) @db.Real
+  attempts      Int       @default(0)
+  max_attempts  Int       @default(3)
+  run_after     DateTime  @default(now()) @db.Timestamptz(6)
+  worker_id     String?   @db.VarChar(100)
+  locked_at     DateTime? @db.Timestamptz(6)
+  error_message String?   @db.Text
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  completed_at  DateTime? @db.Timestamptz(6)
+
+  requester      User?                      @relation(fields: [requested_by], references: [id], onDelete: SetNull)
+  novel_target   NovelProfileJobTarget?
+  chapter_target ChapterSynthesisJobTarget?
+
+  @@index([status, run_after, attempts], map: "idx_synthesis_jobs_claim")
+  @@index([requested_by], map: "ix_synthesis_jobs_requested_by")
+  @@map("synthesis_jobs")
+}
+
+// 8. Novel Profile Job Targets Table (4NF Subtype for profile_novel Jobs)
+model NovelProfileJobTarget {
+  job_id   String @id @db.Uuid
+  novel_id String @db.Uuid
+
+  job   SynthesisJob @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  novel Novel        @relation(fields: [novel_id], references: [id], onDelete: Cascade)
+
+  @@index([novel_id], map: "ix_novel_profile_job_targets_novel_id")
+  @@map("novel_profile_job_targets")
+}
+
+// 9. Chapter Synthesis Job Targets Table (4NF Subtype for synthesize_chapter Jobs)
+model ChapterSynthesisJobTarget {
+  job_id     String @id @db.Uuid
+  chapter_id String @db.Uuid
+
+  job     SynthesisJob @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  chapter Chapter      @relation(fields: [chapter_id], references: [id], onDelete: Cascade)
+
+  @@index([chapter_id], map: "ix_chapter_synthesis_job_targets_chapter_id")
+  @@map("chapter_synthesis_job_targets")
+}
+
+// 10. Segment Audio Cache Table (LRU Lookup for Synthesized 24kHz PCM Buffers)
+model SegmentAudioCache {
+  text_hash      String   @db.VarChar(64)
+  voice_hash     String   @db.VarChar(64)
+  local_pcm_path String   @db.VarChar(512)
+  n_samples      Int
+  sample_rate    Int      @default(24000)
+  last_used_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([text_hash, voice_hash])
+  @@index([last_used_at], map: "idx_segment_audio_cache_lru")
+  @@map("segment_audio_cache")
+}
+
+// 11. Playback History Table (4NF User-Novel Bookmark Identity)
+model PlaybackHistory {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.Uuid
+  novel_id   String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  user     User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  novel    Novel             @relation(fields: [novel_id], references: [id], onDelete: Cascade)
+  position PlaybackPosition?
+
+  @@unique([user_id, novel_id], map: "uq_playback_history_user_novel")
+  @@index([user_id], map: "ix_playback_history_user_id")
+  @@index([novel_id], map: "ix_playback_history_novel_id")
+  @@map("playback_history")
+}
+
+// 12. Playback Positions Table (4NF Chapter & Millisecond Offset State)
+model PlaybackPosition {
+  history_id    String   @id @db.Uuid
+  chapter_id    String   @db.Uuid
+  segment_order Int      @default(0)
+  position_ms   Int      @default(0)
+  updated_at    DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  history PlaybackHistory @relation(fields: [history_id], references: [id], onDelete: Cascade)
+  chapter Chapter         @relation(fields: [chapter_id], references: [id], onDelete: Cascade)
+
+  @@index([chapter_id], map: "ix_playback_positions_chapter_id")
+  @@map("playback_positions")
+}

@@ -22,7 +22,7 @@ from sqlalchemy import select, update, func
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.db.models import SynthesisJob, Chapter, Character, Voice
+from app.db.models import SynthesisJob, Chapter, Character, Voice, ChapterSynthesisJobTarget, NovelProfileJobTarget
 from app.core.logger import get_logger
 
 logger = get_logger("synctone.worker")
@@ -64,6 +64,7 @@ class HeadlessWorker:
             select(SynthesisJob)
             .where(
                 SynthesisJob.status == "queued",
+                SynthesisJob.job_type.in_(["synthesize_chapter", "profile_novel"]),
                 SynthesisJob.run_after <= now,
                 SynthesisJob.attempts < SynthesisJob.max_attempts,
             )
@@ -85,7 +86,12 @@ class HeadlessWorker:
     async def process_job(self, job: SynthesisJob, db: Session):
         """Execute speech synthesis for the claimed job."""
         try:
-            logger.info(f"[{self.worker_id}] Processing job {job.id} for chapter {job.chapter_id}...")
+            target_chapter_id = job.chapter_id
+            if not target_chapter_id and job.job_type == "synthesize_chapter":
+                target = db.scalar(select(ChapterSynthesisJobTarget).where(ChapterSynthesisJobTarget.job_id == job.id))
+                target_chapter_id = target.chapter_id if target else None
+
+            logger.info(f"[{self.worker_id}] Processing job {job.id} (chapter: {target_chapter_id})...")
             job.progress_pct = 20.0
             db.commit()
 

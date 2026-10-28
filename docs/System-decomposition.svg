@@ -1,0 +1,296 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3225.1320000000005 1196.3999999999999" width="3225.1320000000005" height="1196.3999999999999" style="--bg:#1F1F1F;--fg:#CCCCCC;--line:#CCCCCC;--accent:#0078D4;--muted:#CCCCCCCC;--surface:#181818;--border:#CCCCCC;background:#1F1F1F">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="#0078D4" stroke="#0078D4" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="#0078D4" stroke="#0078D4" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<rect width="100%" height="100%" fill="#1F1F1F"/>
+<polyline class="edge" data-from="User" data-to="P1" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Login / Register" points="452.48411666666686,277.90000000000003 452.48411666666686,510.0000000000001 226.7039999999998,510.0000000000001 226.7039999999998,590.3000000000001 246.12183333333326,590.3000000000001 246.12183333333326,571.3000000000001" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P1" data-to="D1" data-style="solid" data-arrow-start="true" data-arrow-end="true" data-label="Verify credentials &amp; role" points="280.65399999999994,625.1 280.65400000000005,826.6999999999999" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" marker-start="url(#arrowhead-start)" />
+<polyline class="edge" data-from="P1" data-to="User" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="httpOnly JWT Cookie" points="315.1861666666666,571.3000000000001 315.1861666666666,590.3000000000001 334.60399999999987,590.3000000000001 334.60399999999987,522.0000000000001 490.9682833333335,522.0000000000001 490.9682833333335,277.90000000000003" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="User" data-to="P2" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Upload novel metadata &amp; chapter prose" points="529.4524500000002,241 529.4524500000001,160.7 1001.5423666666674,160.7 1001.5423666666674,136.7" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P2" data-to="D2" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="1. Insert novel &amp; chapter row (BEGIN...COMMIT)" points="1044.843033333334,136.7 1044.843033333334,289.90000000000003 1041.8860000000002,289.90000000000003 1041.8860000000002,528.3000000000001 1801.4928833333336,528.3000000000001 1801.4928833333336,571.3000000000001" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P2" data-to="D5" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="2. Store raw_text document (pg_chapter_id)" points="1131.4443666666675,136.7 1131.4443666666675,153.8 1364.5640000000003,153.8 1364.5640000000003,198.1 2591.787433333334,198.1 2591.787433333334,210.1" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P2" data-to="D2" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="Compensating rollback on failure" points="1088.1437000000008,136.7 1088.1437000000008,289.90000000000003 1247.5640000000003,289.90000000000003 1247.5640000000003,516.3000000000001 1847.0810833333337,516.3000000000001 1847.0810833333337,571.3000000000001" fill="none" stroke="#8C8C8C" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P2" data-to="D4" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="3. Enqueue synthesis/profiling job" points="958.2417000000007,136.7 958.2417000000007,148.7 124,148.7 124,906.4999999999999 2320.5315000000005,906.4999999999999 2320.5315000000005,918.4999999999999" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D4" data-to="P3" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Claim profile_novel job" points="2404.8907000000004,918.4999999999999 2404.8907000000004,894.4999999999999 2519.972,894.4999999999999 2519.972,484.00000000000006 2316.7587000000003,484.00000000000006 2316.7587000000003,424.00000000000006" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D5" data-to="P3" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Read chapter raw_text" points="2562.6797000000006,277.90000000000003 2562.6797000000006,289.90000000000003 2254.7717000000002,289.90000000000003 2254.7717000000002,370.20000000000005" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P3" data-to="D3" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Save grounded characters, aliases &amp; voice_id" points="2192.7847,424.00000000000006 2192.7847,460.00000000000006 2104.6527000000006,460.00000000000006 2104.6527000000006,564.3000000000001 2281.5327666666667,564.3000000000001 2281.5327666666667,571.3000000000001" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P3" data-to="D2" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Update novel status &amp; global_tone" points="2254.7717000000002,424.00000000000006 2254.7717000000002,484.00000000000006 2312.6127,484.00000000000006 2312.6127,528.3000000000001 1938.2574833333335,528.3000000000001 1938.2574833333335,571.3000000000001" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D4" data-to="P4" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Claim synthesize_chapter job" points="2383.8009000000006,986.2999999999998 2383.8009000000006,1102.6" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D5" data-to="P4" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Read chapter raw_text" points="2650.002900000001,277.90000000000003 2650.002900000001,647.8000000000001 2718.7240000000006,647.8000000000001 2718.7240000000006,1078.6 2431.918066666667,1078.6 2431.918066666667,1102.6" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D3" data-to="P4" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Lookup character aliases &amp; assigned voices" points="2320.6344333333336,639.1 2320.634433333333,894.4999999999999 2143.754366666667,894.4999999999999 2143.754366666667,1078.6 2335.6837333333337,1078.6 2335.6837333333337,1102.6" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P4" data-to="D5" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Save attributed segments[]" points="2480.0352333333335,1102.6 2480.0352333333335,1090.6 2855.106,1090.6 2855.106,635.8000000000001 2693.6645000000008,635.8000000000001 2693.6645000000008,277.90000000000003" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P4" data-to="P5" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Pass ordered segments + voice IDs" points="2287.566566666667,1102.6 2287.566566666667,1090.6 1288.75945,1090.6 1288.75945,862.1999999999999 1439.10545,862.1999999999999 1439.10545,814.1999999999999" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D3" data-to="P5" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Read voice parameters" points="2242.4311000000002,639.1 2242.4311000000002,656.1 2066.3591,656.1 2066.3591,700.4 1553.8408666666667,700.4 1553.8408666666667,760.4" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P5" data-to="D7" data-style="solid" data-arrow-start="true" data-arrow-end="true" data-label="Lookup / store cached audio by (text_hash, voice_hash)" points="1507.9467,814.1999999999999 1507.9467,862.1999999999999 1516.6239500000001,862.1999999999999 1516.6239500000001,1010.7999999999998" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" marker-start="url(#arrowhead-start)" />
+<polyline class="edge" data-from="P5" data-to="P6" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Synthesized segment audio buffers" points="1462.0525333333335,760.4 1462.0525333333335,724.4 1480.174,724.4 1480.174,105.80000000000001 2692.5569333333337,105.80000000000001 2692.5569333333337,93.80000000000001" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P5" data-to="D4" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Broadcast progress_pct" points="1576.7879500000001,814.1999999999999 1576.7879500000001,838.1999999999999 1727.13395,838.1999999999999 1727.13395,882.4999999999999 2362.7111000000004,882.4999999999999 2362.7111000000004,918.4999999999999" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P6" data-to="D6" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="1. Upload stitched master audio" points="2782.122266666667,93.80000000000001 2782.122266666667,129.8 2660.802933333334,129.8 2660.802933333334,186.1 2964.606,186.1 2964.606,571.3000000000001" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P6" data-to="D5" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="2. Update segments[] start_ms/end_ms &amp; manifest" points="2826.9049333333337,93.80000000000001 2826.9049333333337,129.8 2865.6369333333337,129.8 2865.6369333333337,198.1 2664.5567666666675,198.1 2664.5567666666675,210.1" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P6" data-to="D2" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="3. Mark chapter completed &amp; set total_duration_ms" points="2737.3396000000007,93.80000000000001 2737.3396000000007,117.80000000000001 1868.1713000000002,117.80000000000001 1868.1713000000002,528.3000000000001 1892.6692833333336,528.3000000000001 1892.6692833333336,571.3000000000001" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P6" data-to="D4" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Mark job completed" points="2871.6876000000007,93.80000000000001 2871.6876000000007,129.8 3125.3660000000004,129.8 3125.3660000000004,906.4999999999999 2447.0703000000003,906.4999999999999 2447.0703000000003,918.4999999999999" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="User" data-to="P7" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Open chapter in Synced Reader" points="529.4524500000001,277.90000000000003 529.4524500000001,668.1 433.57000000000005,668.1 433.57000000000005,736.4 1716.5662,736.4 1716.5662,760.4" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D2" data-to="P7" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Verify chapter status &amp; swift_audio_object" points="1869.8751833333336,639.1 1869.8751833333336,736.4 1845.3772000000001,736.4 1845.3772000000001,760.4" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D5" data-to="P7" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Load segments[] &amp; manifest.timeline[]" points="2606.3413000000005,277.90000000000003 2606.3413000000005,647.8000000000001 2619.972,647.8000000000001 2619.972,724.4 1888.3142,724.4 1888.3142,760.4" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D6" data-to="P7" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Stream byte ranges (206 Partial Content)" points="2964.606,639.1 2964.606,736.4 1931.2512000000002,736.4 1931.2512000000002,760.4" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D8" data-to="P7" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Load saved position_ms" points="849.0260000000003,639.1 849.0260000000002,688.4 1802.4402,688.4 1802.4402,760.4" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P7" data-to="User" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Streamed audio + 60fps active segment highlight" points="1759.5032,760.4 1759.5032,712.4 640.4080000000001,712.4 640.4080000000001,668.1 567.9366166666669,668.1 567.9366166666669,277.90000000000003" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="User" data-to="P8" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Pause / Seek / Periodic tick" points="606.4207833333335,277.90000000000003 606.4207833333335,289.90000000000003 849.0260000000002,289.90000000000003 849.0260000000003,370.20000000000005" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P8" data-to="D8" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Atomic upsert (user_id, novel_id)" points="849.0260000000003,424.00000000000006 849.0260000000003,571.3000000000001" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="User" data-to="P1" data-label="Login / Register">
+  <rect x="180.70399999999984" y="529.0000000000001" width="91.9" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="226.65399999999983" y="544.1500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Login / Register</text>
+</g>
+<g class="edge-label" data-from="P1" data-to="D1" data-label="Verify credentials &amp; role">
+  <rect x="215.65399999999997" y="753.4" width="129.916" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="280.61199999999997" y="768.55" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Verify credentials &amp; role</text>
+</g>
+<g class="edge-label" data-from="P1" data-to="User" data-label="httpOnly JWT Cookie">
+  <rect x="276.60399999999987" y="529.0000000000001" width="115.66000000000001" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="334.43399999999986" y="544.1500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">httpOnly JWT Cookie</text>
+</g>
+<g class="edge-label" data-from="User" data-to="P2" data-label="Upload novel metadata &amp; chapter prose">
+  <rect x="429.95245000000006" y="167.7" width="198.82000000000002" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="529.3624500000001" y="182.85" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Upload novel metadata &amp; chapter prose</text>
+</g>
+<g class="edge-label" data-from="P2" data-to="D2" data-label="1. Insert novel &amp; chapter row (BEGIN...COMMIT)">
+  <rect x="925.3860000000002" y="296.90000000000003" width="232.67799999999997" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="1041.7250000000001" y="312.05" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">1. Insert novel &amp; chapter row (BEGIN...COMMIT)</text>
+</g>
+<g class="edge-label" data-from="P2" data-to="D5" data-label="2. Store raw_text document (pg_chapter_id)">
+  <rect x="1254.5640000000003" y="160.8" width="219.60999999999999" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="1364.3690000000004" y="175.95000000000002" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">2. Store raw_text document (pg_chapter_id)</text>
+</g>
+<g class="edge-label" data-from="P2" data-to="D2" data-label="Compensating rollback on failure">
+  <rect x="1162.0640000000003" y="479.00000000000006" width="170.30800000000002" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="1247.2180000000003" y="494.15000000000003" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Compensating rollback on failure</text>
+</g>
+<g class="edge-label" data-from="P2" data-to="D4" data-label="3. Enqueue synthesis/profiling job">
+  <rect x="36" y="753.4" width="175.65399999999997" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="123.82699999999998" y="768.55" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">3. Enqueue synthesis/profiling job</text>
+</g>
+<g class="edge-label" data-from="D4" data-to="P3" data-label="Claim profile_novel job">
+  <rect x="2458.472" y="687.1" width="122.19400000000003" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2519.5690000000004" y="702.25" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Claim profile_novel job</text>
+</g>
+<g class="edge-label" data-from="D5" data-to="P3" data-label="Read chapter raw_text">
+  <rect x="2192.7717000000002" y="296.90000000000003" width="123.38200000000002" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2254.4627" y="312.05" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Read chapter raw_text</text>
+</g>
+<g class="edge-label" data-from="P3" data-to="D3" data-label="Save grounded characters, aliases &amp; voice_id">
+  <rect x="1987.1527" y="467.00000000000006" width="234.46" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2104.3827" y="482.15000000000003" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Save grounded characters, aliases &amp; voice_id</text>
+</g>
+<g class="edge-label" data-from="P3" data-to="D2" data-label="Update novel status &amp; global_tone">
+  <rect x="2225.6127" y="491.00000000000006" width="173.27800000000002" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2312.2517000000003" y="506.15000000000003" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Update novel status &amp; global_tone</text>
+</g>
+<g class="edge-label" data-from="D4" data-to="P4" data-label="Claim synthesize_chapter job">
+  <rect x="2305.8009000000006" y="1029.3" width="155.458" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2383.5299000000005" y="1044.45" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Claim synthesize_chapter job</text>
+</g>
+<g class="edge-label" data-from="D5" data-to="P4" data-label="Read chapter raw_text">
+  <rect x="2656.7240000000006" y="699.1" width="123.38200000000002" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2718.4150000000004" y="714.25" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Read chapter raw_text</text>
+</g>
+<g class="edge-label" data-from="D3" data-to="P4" data-label="Lookup character aliases &amp; assigned voices">
+  <rect x="2206.634433333333" y="845.1999999999999" width="227.33200000000005" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2320.3004333333333" y="860.3499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Lookup character aliases &amp; assigned voices</text>
+</g>
+<g class="edge-label" data-from="P4" data-to="D5" data-label="Save attributed segments[]">
+  <rect x="2784.106" y="699.1" width="141.20200000000003" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2854.7070000000003" y="714.25" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Save attributed segments[]</text>
+</g>
+<g class="edge-label" data-from="P4" data-to="P5" data-label="Pass ordered segments + voice IDs">
+  <rect x="1196.75945" y="1053.3" width="183.376" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="1288.4474500000001" y="1068.45" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Pass ordered segments + voice IDs</text>
+</g>
+<g class="edge-label" data-from="D3" data-to="P5" data-label="Read voice parameters">
+  <rect x="2002.8591000000001" y="663.1" width="126.94600000000003" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2066.3321" y="678.25" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Read voice parameters</text>
+</g>
+<g class="edge-label" data-from="P5" data-to="D7" data-label="Lookup / store cached audio by (text_hash, voice_hash)">
+  <rect x="1376.6239500000001" y="869.1999999999999" width="279.01" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="1516.1289500000003" y="884.3499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Lookup / store cached audio by (text_hash, voice_hash)</text>
+</g>
+<g class="edge-label" data-from="P5" data-to="P6" data-label="Synthesized segment audio buffers">
+  <rect x="1389.674" y="479.00000000000006" width="180.99999999999997" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="1480.174" y="494.15000000000003" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Synthesized segment audio buffers</text>
+</g>
+<g class="edge-label" data-from="P5" data-to="D4" data-label="Broadcast progress_pct">
+  <rect x="1659.63395" y="845.1999999999999" width="134.66800000000003" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="1726.96795" y="860.3499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Broadcast progress_pct</text>
+</g>
+<g class="edge-label" data-from="P6" data-to="D6" data-label="1. Upload stitched master audio">
+  <rect x="2581.802933333334" y="136.8" width="157.834" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2660.7199333333338" y="151.95000000000002" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">1. Upload stitched master audio</text>
+</g>
+<g class="edge-label" data-from="P6" data-to="D5" data-label="2. Update segments[] start_ms/end_ms &amp; manifest">
+  <rect x="2743.6369333333337" y="136.8" width="243.37000000000003" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2865.3219333333336" y="151.95000000000002" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">2. Update segments[] start_ms/end_ms &amp; manifest</text>
+</g>
+<g class="edge-label" data-from="P6" data-to="D2" data-label="3. Mark chapter completed &amp; set total_duration_ms">
+  <rect x="1743.1713000000002" y="434.70000000000005" width="249.90399999999997" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="1868.1233000000002" y="449.85" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">3. Mark chapter completed &amp; set total_duration_ms</text>
+</g>
+<g class="edge-label" data-from="P6" data-to="D4" data-label="Mark job completed">
+  <rect x="3070.8660000000004" y="869.1999999999999" width="108.53200000000002" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="3125.1320000000005" y="884.3499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Mark job completed</text>
+</g>
+<g class="edge-label" data-from="User" data-to="P7" data-label="Open chapter in Synced Reader">
+  <rect x="349.57000000000005" y="699.1" width="167.33800000000005" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="433.2390000000001" y="714.25" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Open chapter in Synced Reader</text>
+</g>
+<g class="edge-label" data-from="D2" data-to="P7" data-label="Verify chapter status &amp; swift_audio_object">
+  <rect x="1763.8751833333336" y="651.1" width="211.29399999999998" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="1869.5221833333335" y="666.25" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Verify chapter status &amp; swift_audio_object</text>
+</g>
+<g class="edge-label" data-from="D5" data-to="P7" data-label="Load segments[] &amp; manifest.timeline[]">
+  <rect x="2526.972" y="654.8000000000001" width="185.75199999999992" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2619.848" y="669.95" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Load segments[] &amp; manifest.timeline[]</text>
+</g>
+<g class="edge-label" data-from="D6" data-to="P7" data-label="Stream byte ranges (206 Partial Content)">
+  <rect x="2862.106" y="666.8000000000001" width="204.76" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="2964.4860000000003" y="681.95" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Stream byte ranges (206 Partial Content)</text>
+</g>
+<g class="edge-label" data-from="D8" data-to="P7" data-label="Load saved position_ms">
+  <rect x="783.0260000000002" y="651.1" width="131.698" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="848.8750000000002" y="666.25" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Load saved position_ms</text>
+</g>
+<g class="edge-label" data-from="P7" data-to="User" data-label="Streamed audio + 60fps active segment highlight">
+  <rect x="520.9080000000001" y="675.1" width="238.618" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="640.2170000000001" y="690.25" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Streamed audio + 60fps active segment highlight</text>
+</g>
+<g class="edge-label" data-from="User" data-to="P8" data-label="Pause / Seek / Periodic tick">
+  <rect x="776.0260000000002" y="296.90000000000003" width="145.35999999999999" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="848.7060000000001" y="312.05" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Pause / Seek / Periodic tick</text>
+</g>
+<g class="edge-label" data-from="P8" data-to="D8" data-label="Atomic upsert (user_id, novel_id)">
+  <rect x="763.5260000000002" y="467.00000000000006" width="170.30800000000002" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="848.6800000000002" y="482.15000000000003" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">Atomic upsert (user_id, novel_id)</text>
+</g>
+<g class="node" data-id="User" data-label="👤 User (Reader / Writer / Admin)" data-shape="stadium">
+  <rect x="413.9999500000002" y="241" width="230.90499999999994" height="36.900000000000006" rx="18.450000000000003" ry="18.450000000000003" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="529.4524500000001" y="259.45" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC" dy="4.55">👤 User (Reader / Writer / Admin)</text>
+</g>
+<g class="node" data-id="P1" data-label="1.0 Auth &amp; RBAC Verification
+(Express + JWT + pgcrypto)" data-shape="rectangle">
+  <rect x="177.05749999999995" y="571.3000000000001" width="207.19299999999998" height="53.800000000000004" rx="0" ry="0" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="280.65399999999994" y="598.2" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="280.65399999999994" dy="-3.9000000000000012">1.0 Auth &amp; RBAC Verification</tspan><tspan x="280.65399999999994" dy="16.900000000000002">(Express + JWT + pgcrypto)</tspan></text>
+</g>
+<g class="node" data-id="P2" data-label="2.0 Polyglot Chapter Ingestion
+(Compensating Transaction Gateway)" data-shape="rectangle">
+  <rect x="914.9410333333341" y="82.89999999999999" width="259.804" height="53.800000000000004" rx="0" ry="0" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="1044.843033333334" y="109.8" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="1044.843033333334" dy="-3.9000000000000012">2.0 Polyglot Chapter Ingestion</tspan><tspan x="1044.843033333334" dy="16.900000000000002">(Compensating Transaction Gateway)</tspan></text>
+</g>
+<g class="node" data-id="P3" data-label="3.0 Character Discovery &amp; Profiling
+(Grounded NLP &amp; Voice Selector)" data-shape="rectangle">
+  <rect x="2130.7977" y="370.20000000000005" width="247.94799999999995" height="53.800000000000004" rx="0" ry="0" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="2254.7717000000002" y="397.1" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="2254.7717000000002" dy="-3.9000000000000012">3.0 Character Discovery &amp; Profiling</tspan><tspan x="2254.7717000000002" dy="16.900000000000002">(Grounded NLP &amp; Voice Selector)</tspan></text>
+</g>
+<g class="node" data-id="P4" data-label="4.0 Dialogue Parsing &amp; Speaker Attribution
+(Quote Parser + SpaCy nsubj + Aliases)" data-shape="rectangle">
+  <rect x="2239.4494000000004" y="1102.6" width="288.703" height="53.800000000000004" rx="0" ry="0" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="2383.8009" y="1129.5" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="2383.8009" dy="-3.9000000000000012">4.0 Dialogue Parsing &amp; Speaker Attribution</tspan><tspan x="2383.8009" dy="16.900000000000002">(Quote Parser + SpaCy nsubj + Aliases)</tspan></text>
+</g>
+<g class="node" data-id="P5" data-label="5.0 Multi-Voice TTS &amp; Cache Manager
+(Edge Neural TTS + Kokoro-82M ONNX)" data-shape="rectangle">
+  <rect x="1370.2642" y="760.4" width="275.365" height="53.800000000000004" rx="0" ry="0" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="1507.9467" y="787.3" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="1507.9467" dy="-3.9000000000000012">5.0 Multi-Voice TTS &amp; Cache Manager</tspan><tspan x="1507.9467" dy="16.900000000000002">(Edge Neural TTS + Kokoro-82M ONNX)</tspan></text>
+</g>
+<g class="node" data-id="P6" data-label="6.0 Audio Stitcher &amp; Manifest Publisher
+(250ms Silence + Timeline Computation)" data-shape="rectangle">
+  <rect x="2647.7742666666672" y="40" width="268.6959999999999" height="53.800000000000004" rx="0" ry="0" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="2782.122266666667" y="66.9" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="2782.122266666667" dy="-3.9000000000000012">6.0 Audio Stitcher &amp; Manifest Publisher</tspan><tspan x="2782.122266666667" dy="16.900000000000002">(250ms Silence + Timeline Computation)</tspan></text>
+</g>
+<g class="node" data-id="P7" data-label="7.0 Range Audio Proxy &amp; 60fps Reader Sync
+(HTTP 206 Stream + Binary Search Sync)" data-shape="rectangle">
+  <rect x="1673.6292" y="760.4" width="300.55899999999997" height="53.800000000000004" rx="0" ry="0" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="1823.9087" y="787.3" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="1823.9087" dy="-3.9000000000000012">7.0 Range Audio Proxy &amp; 60fps Reader Sync</tspan><tspan x="1823.9087" dy="16.900000000000002">(HTTP 206 Stream + Binary Search Sync)</tspan></text>
+</g>
+<g class="node" data-id="P8" data-label="8.0 Playback Progress Manager
+(Atomic Upsert Controller)" data-shape="rectangle">
+  <rect x="731.7210000000002" y="370.20000000000005" width="234.61" height="53.800000000000004" rx="0" ry="0" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="849.0260000000003" y="397.1" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="849.0260000000003" dy="-3.9000000000000012">8.0 Playback Progress Manager</tspan><tspan x="849.0260000000003" dy="16.900000000000002">(Atomic Upsert Controller)</tspan></text>
+</g>
+<g class="node" data-id="D1" data-label="D1: Users
+(PostgreSQL 16)" data-shape="cylinder">
+  <rect x="212.62550000000005" y="833.6999999999999" width="136.057" height="53.80000000000001" fill="#242424" stroke="none" />
+  <line x1="212.62550000000005" y1="833.6999999999999" x2="212.62550000000005" y2="887.5" stroke="#474747" stroke-width="0.75" />
+  <line x1="348.6825" y1="833.6999999999999" x2="348.6825" y2="887.5" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="280.65400000000005" cy="887.5" rx="68.0285" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="280.65400000000005" cy="833.6999999999999" rx="68.0285" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="280.65400000000005" y="860.5999999999999" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="280.65400000000005" dy="-3.9000000000000012">D1: Users</tspan><tspan x="280.65400000000005" dy="16.900000000000002">(PostgreSQL 16)</tspan></text>
+</g>
+<g class="node" data-id="D2" data-label="D2: Novels &amp; Chapters Metadata
+(PostgreSQL 16)" data-shape="cylinder">
+  <rect x="1755.9046833333337" y="578.3000000000001" width="227.94099999999995" height="53.80000000000001" fill="#242424" stroke="none" />
+  <line x1="1755.9046833333337" y1="578.3000000000001" x2="1755.9046833333337" y2="632.1000000000001" stroke="#474747" stroke-width="0.75" />
+  <line x1="1983.8456833333337" y1="578.3000000000001" x2="1983.8456833333337" y2="632.1000000000001" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="1869.8751833333336" cy="632.1000000000001" rx="113.97049999999997" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="1869.8751833333336" cy="578.3000000000001" rx="113.97049999999997" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="1869.8751833333336" y="605.2" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="1869.8751833333336" dy="-3.9000000000000012">D2: Novels &amp; Chapters Metadata</tspan><tspan x="1869.8751833333336" dy="16.900000000000002">(PostgreSQL 16)</tspan></text>
+</g>
+<g class="node" data-id="D3" data-label="D3: Characters, Aliases &amp; Voices
+(PostgreSQL 16)" data-shape="cylinder">
+  <rect x="2164.227766666667" y="578.3000000000001" width="234.60999999999999" height="53.80000000000001" fill="#242424" stroke="none" />
+  <line x1="2164.227766666667" y1="578.3000000000001" x2="2164.227766666667" y2="632.1000000000001" stroke="#474747" stroke-width="0.75" />
+  <line x1="2398.837766666667" y1="578.3000000000001" x2="2398.837766666667" y2="632.1000000000001" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="2281.5327666666667" cy="632.1000000000001" rx="117.30499999999999" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="2281.5327666666667" cy="578.3000000000001" rx="117.30499999999999" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="2281.5327666666667" y="605.2" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="2281.5327666666667" dy="-3.9000000000000012">D3: Characters, Aliases &amp; Voices</tspan><tspan x="2281.5327666666667" dy="16.900000000000002">(PostgreSQL 16)</tspan></text>
+</g>
+<g class="node" data-id="D4" data-label="D4: Synthesis Jobs Queue &amp; Targets
+(PostgreSQL SKIP LOCKED)" data-shape="cylinder">
+  <rect x="2278.3519000000006" y="925.4999999999999" width="210.89799999999994" height="53.80000000000001" fill="#242424" stroke="none" />
+  <line x1="2278.3519000000006" y1="925.4999999999999" x2="2278.3519000000006" y2="979.3" stroke="#474747" stroke-width="0.75" />
+  <line x1="2489.2499000000007" y1="925.4999999999999" x2="2489.2499000000007" y2="979.3" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="2383.8009000000006" cy="979.3" rx="105.44899999999997" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="2383.8009000000006" cy="925.4999999999999" rx="105.44899999999997" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="2383.8009000000006" y="952.3999999999999" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="2383.8009000000006" dy="-3.9000000000000012">D4: Synthesis Queue &amp; Targets</tspan><tspan x="2383.8009000000006" dy="16.900000000000002">(PostgreSQL SKIP LOCKED)</tspan></text>
+</g>
+<g class="node" data-id="D5" data-label="D5: Chapter Prose &amp; Timelines
+(MongoDB 7.0)" data-shape="cylinder">
+  <rect x="2519.0181000000007" y="217.1" width="218.30799999999996" height="53.80000000000001" fill="#242424" stroke="none" />
+  <line x1="2519.0181000000007" y1="217.1" x2="2519.0181000000007" y2="270.9" stroke="#474747" stroke-width="0.75" />
+  <line x1="2737.3261000000007" y1="217.1" x2="2737.3261000000007" y2="270.9" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="2628.1721000000007" cy="270.9" rx="109.15399999999998" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="2628.1721000000007" cy="217.1" rx="109.15399999999998" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="2628.1721000000007" y="244" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="2628.1721000000007" dy="-3.9000000000000012">D5: Chapter Prose &amp; Timelines</tspan><tspan x="2628.1721000000007" dy="16.900000000000002">(MongoDB 7.0)</tspan></text>
+</g>
+<g class="node" data-id="D6" data-label="D6: Audio &amp; Cover Objects
+(OpenStack Swift)" data-shape="cylinder">
+  <rect x="2868.0490000000004" y="578.3000000000001" width="193.11399999999998" height="53.80000000000001" fill="#242424" stroke="none" />
+  <line x1="2868.0490000000004" y1="578.3000000000001" x2="2868.0490000000004" y2="632.1000000000001" stroke="#474747" stroke-width="0.75" />
+  <line x1="3061.1630000000005" y1="578.3000000000001" x2="3061.1630000000005" y2="632.1000000000001" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="2964.606" cy="632.1000000000001" rx="96.55699999999999" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="2964.606" cy="578.3000000000001" rx="96.55699999999999" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="2964.606" y="605.2" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="2964.606" dy="-3.9000000000000012">D6: Audio &amp; Cover Objects</tspan><tspan x="2964.606" dy="16.900000000000002">(OpenStack Swift)</tspan></text>
+</g>
+<g class="node" data-id="D7" data-label="D7: Segment Audio Cache
+(Postgres Index + PCM Volume)" data-shape="cylinder">
+  <rect x="1404.1354500000002" y="1017.7999999999998" width="224.97699999999995" height="53.80000000000001" fill="#242424" stroke="none" />
+  <line x1="1404.1354500000002" y1="1017.7999999999998" x2="1404.1354500000002" y2="1071.6" stroke="#474747" stroke-width="0.75" />
+  <line x1="1629.11245" y1="1017.7999999999998" x2="1629.11245" y2="1071.6" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="1516.6239500000001" cy="1071.6" rx="112.48849999999997" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="1516.6239500000001" cy="1017.7999999999998" rx="112.48849999999997" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="1516.6239500000001" y="1044.6999999999998" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="1516.6239500000001" dy="-3.9000000000000012">D7: Segment Audio Cache</tspan><tspan x="1516.6239500000001" dy="16.900000000000002">(Postgres Index + PCM Volume)</tspan></text>
+</g>
+<g class="node" data-id="D8" data-label="D8: Playback History &amp; Positions
+(PostgreSQL 16 - 4NF)" data-shape="cylinder">
+  <rect x="766.5480000000003" y="578.3000000000001" width="164.95600000000002" height="53.80000000000001" fill="#242424" stroke="none" />
+  <line x1="766.5480000000003" y1="578.3000000000001" x2="766.5480000000003" y2="632.1000000000001" stroke="#474747" stroke-width="0.75" />
+  <line x1="931.5040000000004" y1="578.3000000000001" x2="931.5040000000004" y2="632.1000000000001" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="849.0260000000003" cy="632.1000000000001" rx="82.47800000000001" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <ellipse cx="849.0260000000003" cy="578.3000000000001" rx="82.47800000000001" ry="7" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="849.0260000000003" y="605.2" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="849.0260000000003" dy="-3.9000000000000012">D8: Playback History &amp; Positions</tspan><tspan x="849.0260000000003" dy="16.900000000000002">(PostgreSQL 16 - 4NF)</tspan></text>
+</g>
+</svg>

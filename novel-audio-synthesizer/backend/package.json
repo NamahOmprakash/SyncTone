@@ -7,10 +7,15 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "prisma:studio": "prisma studio",
+    "seed:demos": "node src/scripts/seedDemos.js",
     "test": "node test_sprint1.js",
     "test:de": "node test_de_integrity.js"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "axios": "^1.6.8",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
@@ -19,8 +24,12 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.2.0",
     "msedge-tts": "^2.1.0",
+    "multer": "^2.5.0",
     "pg": "^8.11.3",
     "uuid": "^9.0.1",
     "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
   }
 }

@@ -34,9 +34,9 @@ class Settings(BaseSettings):
     spacy_model: str = "en_core_web_sm"
 
     class Config:
-        env_prefix = "NAS_"
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
     def resolve_path(self, relative: Path | str) -> Path:
         """Resolve a relative path against the backend base directory."""

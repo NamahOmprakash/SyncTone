@@ -160,6 +160,17 @@ function simpleHash(str) {
   return Math.abs(hash);
 }
 
+// Sorted by descending length so compound keywords match before short roots
+const SORTED_KEYWORDS = Object.entries(KEYWORD_MAP).sort(
+  (a, b) => b[0].length - a[0].length
+);
+
+function matchesKeyword(text, kw) {
+  if (!text) return false;
+  const regex = new RegExp(`(?:^|[^a-z0-9])${kw}(?:$|[^a-z0-9])`, 'i');
+  return regex.test(text);
+}
+
 class VoiceProfiler {
   constructor() {
     this.persistPath = path.resolve(config.paths.outputDir, 'voice_registry.json');
@@ -200,8 +211,8 @@ class VoiceProfiler {
 
     // 1. Direct name match (highest priority: prevents dialogue contents from hijacking speaker identity)
     const nameLower = name.toLowerCase().trim();
-    for (const [kw, archetype] of Object.entries(KEYWORD_MAP)) {
-      if (nameLower.includes(kw)) {
+    for (const [kw, archetype] of SORTED_KEYWORDS) {
+      if (matchesKeyword(nameLower, kw)) {
         const voiceId = VOICE_PALETTE[archetype];
         this.registry[charId] = voiceId;
         this.save();
@@ -211,8 +222,8 @@ class VoiceProfiler {
 
     // 2. Context snippet keywords (fallback for unnamed characters like 'the beast')
     const snippetLower = contextSnippet.toLowerCase();
-    for (const [kw, archetype] of Object.entries(KEYWORD_MAP)) {
-      if (snippetLower.includes(kw)) {
+    for (const [kw, archetype] of SORTED_KEYWORDS) {
+      if (matchesKeyword(snippetLower, kw)) {
         const voiceId = VOICE_PALETTE[archetype];
         this.registry[charId] = voiceId;
         this.save();
@@ -260,10 +271,22 @@ class VoiceProfiler {
   }
 }
 
+const EDGE_TO_KOKORO_MAP = {
+  'en-GB-RyanNeural': 'bm_george',
+  'en-GB-ThomasNeural': 'am_adam',
+  'en-GB-LibbyNeural': 'bf_emma',
+  'en-GB-AlfieNeural': 'bm_daniel',
+  'en-GB-ArthurNeural': 'am_george',
+  'en-GB-NoahNeural': 'am_michael',
+  'en-GB-SoniaNeural': 'af_sarah',
+  'en-GB-OliverNeural': 'bm_george',
+};
+
 const voiceProfiler = new VoiceProfiler();
 
 module.exports = {
   voiceProfiler,
   VOICE_PALETTE,
   VOICE_CATALOG,
+  EDGE_TO_KOKORO_MAP,
 };

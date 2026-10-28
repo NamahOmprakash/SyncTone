@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 976.596 376.55" width="976.596" height="376.55" style="--bg:#1F1F1F;--fg:#CCCCCC;--line:#CCCCCC;--accent:#0078D4;--muted:#CCCCCCCC;--surface:#181818;--border:#CCCCCC;background:#1F1F1F">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="#0078D4" stroke="#0078D4" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="#0078D4" stroke="#0078D4" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<rect width="100%" height="100%" fill="#1F1F1F"/>
+<polyline class="edge" data-from="User" data-to="System" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="1. Auth Credentials &amp; Role Requests" points="754.597,189.58 706.597,189.58 706.597,217.5 456.73099999999994,217.5 456.73099999999994,187.89000000000001 408.73099999999994,187.89000000000001" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="User" data-to="System" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="2. Novel &amp; Chapter Prose Upload" points="754.597,194.96000000000004 718.597,194.96000000000004 718.597,250.8 444.73099999999994,250.8 444.73099999999994,191.58 408.73099999999994,191.58" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="User" data-to="System" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="3. Character Voice Reassignment Overrides" points="754.597,200.34000000000003 730.597,200.34000000000003 730.597,284.1 432.73099999999994,284.1 432.73099999999994,195.27 408.73099999999994,195.27" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="User" data-to="System" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="4. Audio Seek &amp; Playback Progress Ticks" points="754.597,205.72000000000003 742.597,205.72000000000003 742.597,317.40000000000003 420.73099999999994,317.40000000000003 420.73099999999994,198.96 408.73099999999994,198.96" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="System" data-to="User" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="1. JWT Session Cookie &amp; Role Access" points="408.73099999999994,169.44 420.73099999999994,169.44 420.73099999999994,51 742.597,51 742.597,162.68 754.597,162.68" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="System" data-to="User" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="2. Novel Catalog &amp; Character Cast Roster" points="408.73099999999994,173.13 432.73099999999994,173.13 432.73099999999994,84.30000000000001 730.597,84.30000000000001 730.597,168.06 754.597,168.06" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="System" data-to="User" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="3. Range-Streamed Multi-Voice Audio (HTTP 206)" points="408.73099999999994,176.82 444.73099999999994,176.82 444.73099999999994,117.60000000000001 718.597,117.60000000000001 718.597,173.44 754.597,173.44" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="System" data-to="User" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="4. 60fps Synchronized Text Highlight Manifest" points="408.73099999999994,180.51 456.73099999999994,180.51 456.73099999999994,150.9 706.597,150.9 706.597,178.82000000000002 754.597,178.82000000000002" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="System" data-to="User" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="5. Real-Time Synthesis Progress (WebSocket)" points="408.73099999999994,184.2 754.597,184.20000000000002" fill="none" stroke="#8C8C8C" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="User" data-to="System" data-label="1. Auth Credentials &amp; Role Requests">
+  <rect x="518.7849999999999" y="201.5" width="179.812" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="608.6909999999998" y="216.65" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">1. Auth Credentials &amp; Role Requests</text>
+</g>
+<g class="edge-label" data-from="User" data-to="System" data-label="2. Novel &amp; Chapter Prose Upload">
+  <rect x="541.4769999999999" y="234.8" width="169.12" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="626.0369999999998" y="249.95000000000002" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">2. Novel &amp; Chapter Prose Upload</text>
+</g>
+<g class="edge-label" data-from="User" data-to="System" data-label="3. Character Voice Reassignment Overrides">
+  <rect x="498.23499999999996" y="268.1" width="224.362" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="610.4159999999999" y="283.25" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">3. Character Voice Reassignment Overrides</text>
+</g>
+<g class="edge-label" data-from="User" data-to="System" data-label="4. Audio Seek &amp; Playback Progress Ticks">
+  <rect x="520.9269999999999" y="301.40000000000003" width="213.67000000000002" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="627.762" y="316.55" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">4. Audio Seek &amp; Playback Progress Ticks</text>
+</g>
+<g class="edge-label" data-from="System" data-to="User" data-label="1. JWT Session Cookie &amp; Role Access">
+  <rect x="541.7169999999999" y="35" width="192.88" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="638.1569999999999" y="50.15" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">1. JWT Session Cookie &amp; Role Access</text>
+</g>
+<g class="edge-label" data-from="System" data-to="User" data-label="2. Novel Catalog &amp; Character Cast Roster">
+  <rect x="514.867" y="68.30000000000001" width="207.73000000000002" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="618.732" y="83.45000000000002" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">2. Novel Catalog &amp; Character Cast Roster</text>
+</g>
+<g class="edge-label" data-from="System" data-to="User" data-label="3. Range-Streamed Multi-Voice Audio (HTTP 206)">
+  <rect x="464.85099999999994" y="101.60000000000001" width="245.746" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="587.7239999999999" y="116.75000000000001" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">3. Range-Streamed Multi-Voice Audio (HTTP 206)</text>
+</g>
+<g class="edge-label" data-from="System" data-to="User" data-label="4. 60fps Synchronized Text Highlight Manifest">
+  <rect x="468.29499999999996" y="134.9" width="230.30199999999996" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="583.4459999999999" y="150.05" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">4. 60fps Synchronized Text Highlight Manifest</text>
+</g>
+<g class="edge-label" data-from="System" data-to="User" data-label="5. Real-Time Synthesis Progress (WebSocket)">
+  <rect x="464.731" y="168.20000000000002" width="233.866" height="30.3" rx="2" ry="2" fill="#1F1F1F" stroke="#383838" stroke-width="1" />
+  <text x="581.664" y="183.35000000000002" text-anchor="middle" font-size="11" font-weight="400" fill="#9E9E9E" dy="3.8499999999999996">5. Real-Time Synthesis Progress (WebSocket)</text>
+</g>
+<g class="node" data-id="User" data-label="👤 User
+(Reader / Writer / Admin)" data-shape="stadium">
+  <rect x="754.597" y="157.3" width="181.999" height="53.800000000000004" rx="26.900000000000002" ry="26.900000000000002" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="845.5965" y="184.20000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC"><tspan x="845.5965" dy="-3.9000000000000012">👤 User</tspan><tspan x="845.5965" dy="16.900000000000002">(Reader / Writer / Admin)</tspan></text>
+</g>
+<g class="node" data-id="System" data-label="0.0 SyncTone Multi-Voice Novel Audiobook Synthesizer" data-shape="rectangle">
+  <rect x="40" y="165.75" width="368.73099999999994" height="36.900000000000006" rx="0" ry="0" fill="#242424" stroke="#474747" stroke-width="0.75" />
+  <text x="224.36549999999997" y="184.2" text-anchor="middle" font-size="13" font-weight="500" fill="#CCCCCC" dy="4.55">0.0 SyncTone Multi-Voice Novel Audiobook Synthesizer</text>
+</g>
+</svg>

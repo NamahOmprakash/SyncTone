@@ -81,6 +81,7 @@ class AudioStitcher:
         all_samples: list[np.ndarray] = []
         total_samples = 0
         prev_voice: Optional[str] = None
+        current_ms = 0
 
         for seg in segments:
             pcm = seg["pcm_samples"]

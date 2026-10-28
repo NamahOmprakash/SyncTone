@@ -1,0 +1,15 @@
+{
+  "name": "synctone-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SyncTone Monorepo Workspace Root",
+  "scripts": {
+    "build": "npm run build --prefix novel-audio-synthesizer/frontend",
+    "build:frontend": "npm run build --prefix novel-audio-synthesizer/frontend",
+    "dev:frontend": "npm run dev --prefix novel-audio-synthesizer/frontend",
+    "dev:backend": "npm run dev --prefix novel-audio-synthesizer/backend",
+    "start:backend": "npm start --prefix novel-audio-synthesizer/backend",
+    "test": "npm test --prefix novel-audio-synthesizer/backend",
+    "test:de": "npm run test:de --prefix novel-audio-synthesizer/backend"
+  }
+}

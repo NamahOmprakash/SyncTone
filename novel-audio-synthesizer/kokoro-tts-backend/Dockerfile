@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m spacy download en_core_web_sm
 
 # Copy worker application
 COPY alembic.ini ./
@@ -24,4 +25,4 @@ COPY app ./app
 # Create cache directories
 RUN mkdir -p /app/output/pcm_cache /app/models_cache
 
-CMD ["python", "-m", "app.worker"]
+CMD ["sh", "-c", "alembic upgrade head && python -m app.worker"]

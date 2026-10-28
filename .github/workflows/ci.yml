@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, dev, develop]
+  pull_request:
+    branches: [main, master, dev, develop]
+
+jobs:
+  backend-test:
+    name: Backend Tests & Database Integrity
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: synctone_user
+          POSTGRES_PASSWORD: synctone_pass
+          POSTGRES_DB: synctone
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      mongo:
+        image: mongo:7.0
+        env:
+          MONGO_INITDB_ROOT_USERNAME: synctone_user
+          MONGO_INITDB_ROOT_PASSWORD: synctone_pass
+          MONGO_INITDB_DATABASE: synctone
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "echo 'db.runCommand({serverStatus:1}).ok' | mongosh --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://synctone_user:synctone_pass@localhost:5432/synctone
+      MONGO_URI: mongodb://synctone_user:synctone_pass@localhost:27017/synctone?authSource=admin
+      JWT_SECRET: synctone_super_secret_jwt_key_2026_dev_mode
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PostgreSQL Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Apply Schema & Verify Python Syntax
+        run: |
+          PGPASSWORD=synctone_pass psql -h localhost -U synctone_user -d synctone -f migrations/0001_initial_schema.sql
+          python3 -m py_compile novel-audio-synthesizer/kokoro-tts-backend/app/worker.py novel-audio-synthesizer/kokoro-tts-backend/app/db/models.py novel-audio-synthesizer/kokoro-tts-backend/app/db/session.py
+          pip install --break-system-packages alembic "sqlalchemy[asyncio]" greenlet asyncpg "psycopg[binary]" psycopg2-binary python-dotenv || pip install alembic "sqlalchemy[asyncio]" greenlet asyncpg "psycopg[binary]" psycopg2-binary python-dotenv
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: novel-audio-synthesizer/backend/package-lock.json
+
+      - name: Install Backend Dependencies
+        working-directory: novel-audio-synthesizer/backend
+        run: npm install
+
+      - name: Validate & Generate Prisma
+        working-directory: novel-audio-synthesizer/backend
+        run: npm run prisma:validate && npm run prisma:generate
+
+      - name: Syntax Check Backend JS Files
+        working-directory: novel-audio-synthesizer/backend
+        run: node -e "require('./src/app'); console.log('Backend app loaded OK')"
+
+      - name: Run Sprint 1 & Data Engineering Integrity Tests
+        working-directory: novel-audio-synthesizer/backend
+        run: |
+          npm test
+          npm run test:de
+
+      - name: Verify Idempotent Demo Seeding
+        working-directory: novel-audio-synthesizer/backend
+        run: node src/scripts/seedDemos.js
+
+  frontend-test:
+    name: Frontend Tests & Production Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: novel-audio-synthesizer/frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: novel-audio-synthesizer/frontend
+        run: npm install
+
+      - name: Run Frontend Tests (Vitest)
+        working-directory: novel-audio-synthesizer/frontend
+        run: npm test
+
+      - name: Build Frontend (Vite Production Build)
+        working-directory: novel-audio-synthesizer/frontend
+        run: npm run build
