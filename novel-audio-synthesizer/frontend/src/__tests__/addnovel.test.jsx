@@ -212,4 +212,26 @@ describe('AddNovelModal with Drag-and-Drop Dropzone & Read Now', () => {
     expect(screen.queryByText('TXT')).not.toBeInTheDocument();
     expect(screen.getByText(/Drag & drop your novel manuscript here/i)).toBeInTheDocument();
   });
+
+  it('shows clear error when EPUB parsing fails instead of generating dummy 3-line chapter', async () => {
+    vi.spyOn(api.novels, 'parseFile').mockRejectedValue(new Error('Corrupt zip archive'));
+
+    render(
+      <AuthProvider>
+        <AddNovelModal isOpen={true} onClose={vi.fn()} onNovelCreated={vi.fn()} />
+      </AuthProvider>
+    );
+
+    const corruptFile = new File(['not an epub'], 'broken_book.epub', { type: 'application/epub+zip' });
+    const fileInput = screen.getByTestId('novel-file-input');
+    fireEvent.change(fileInput, { target: { files: [corruptFile] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Could not extract readable chapters from "broken_book.epub"/i)).toBeInTheDocument();
+    });
+
+    // Verify it never generated or displayed the dummy placeholder text
+    expect(screen.queryByText(/Opening of/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/This file was processed and is ready for neural speech synthesis/i)).not.toBeInTheDocument();
+  });
 });

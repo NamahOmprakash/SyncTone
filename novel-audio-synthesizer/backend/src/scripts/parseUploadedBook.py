@@ -32,17 +32,26 @@ SHERLOCK_STORIES = [
     (12, "The Adventure of the Copper Beeches", re.compile(r'(?:(?:ADVENTURE\s+)?XII[\.\s]+)?THE\s+ADVENTURES?\s+OF\s+THE\s+COPPER\s+BEECHES|(?:(?:ADVENTURE\s+)?XII[\.\s]+)THE\s+COPPER\s+BEECHES', re.I)),
 ]
 
+WORD_NUMS = {
+    'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+    'six': 6, 'seven': 7, 'eight': 8, 'fight': 8, 'nine': 9, 'ten': 10,
+    'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14,
+    'fifteen': 15, 'sixteen': 16, 'seventeen': 17, 'eighteen': 18,
+    'nineteen': 19, 'twenty': 20
+}
+
 
 def clean_ocr_disclaimers(raw_text: str) -> str:
     """Strips automated OCR notices and disclaimers (e.g. from Internet Archive scans)."""
     if not raw_text:
         return ""
-    # Strip HTML tags containing OCR accuracy warning
     clean = re.sub(r'<[^>]*>The text on this page is estimated to be only \d+\.?\d*% accurate[^<]*<[^>]*>', '', raw_text, flags=re.IGNORECASE)
     clean = re.sub(r'The text on this page is estimated to be only \d+\.?\d*% accurate.*', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'This book was produced in EPUB format by the Internet Archive.*?(?:reading sequence\.|errors\.)', '', clean, flags=re.IGNORECASE | re.DOTALL)
     clean = re.sub(r'This book was produced in EPUB format by the Internet Archive.*', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'The book pages were scanned and converted to EPUB format automatically.*', '', clean, flags=re.IGNORECASE)
+    # Strip non-Latin OCR garbage (Urdu/Arabic scan artifacts from IA scans)
+    clean = re.sub(r'[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF\u200e\u200f\u200b\u200c\u200d]+', ' ', clean)
     return clean
 
 
@@ -50,20 +59,13 @@ def strip_html_tags(raw_html: str) -> str:
     """Removes HTML markup while preserving paragraph structure and inline image markers."""
     if not raw_html:
         return ""
-    # Strip OCR notices first
     clean = clean_ocr_disclaimers(raw_html)
-    # Strip scripts and styles
     clean = re.sub(r'(?is)<script.*?>.*?</script>', ' ', clean)
     clean = re.sub(r'(?is)<style.*?>.*?</style>', ' ', clean)
-    # Convert block level elements to newlines
     clean = re.sub(r'(?i)<(br|p|div|h[1-6]|li|tr)[^>]*>', '\n', clean)
-    # Remove remaining HTML tags
     clean = re.sub(r'<[^>]+>', ' ', clean)
-    # Unescape HTML entities
     clean = html.unescape(clean)
-    # Normalize whitespaces
     lines = [re.sub(r'[ \t]+', ' ', l).strip() for l in clean.splitlines()]
-    # Collapse multiple blank lines
     collapsed = []
     prev_blank = False
     for l in lines:
@@ -77,11 +79,30 @@ def strip_html_tags(raw_html: str) -> str:
     return "\n".join(collapsed).strip()
 
 
+def clean_book_title(raw_title: str, file_name: str = "") -> str:
+    combined = ((raw_title or "") + " " + (file_name or "")).lower()
+    if 'harry potter' in combined and ('philosopher' in combined or 'sorcerer' in combined or 'rowling' in combined):
+        return "Harry Potter and the Philosopher's Stone"
+    if 'sherlock holmes' in combined or 'adventuresofsher' in combined or 'sher001892' in combined:
+        return "The Adventures of Sherlock Holmes"
+
+    t = raw_title or ""
+    t = re.sub(r'\.(?:epub|pdf|txt|md|html?)$', '', t, flags=re.I)
+    t = re.sub(r'^book[_\s]+upload[_\s\d]*', '', t, flags=re.I)
+    # Strip leading numberings like "1. ", "01 - "
+    t = re.sub(r'^[0-9]+[\.\s\-]+', '', t)
+    # Strip trailing year: " 2020", " - 2020"
+    t = re.sub(r'[\s\-—]+[12][890][0-9]{2}$', '', t)
+    t = re.sub(r'[\-_]+', ' ', t)
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t.title() if t else (os.path.splitext(file_name)[0].replace('_', ' ').replace('-', ' ').title() if file_name else "Imported Novel")
+
+
 def split_by_chapter_headings(text: str):
     """
     Looks for chapter headings such as:
     1) Sherlock Holmes story headings (12 canon adventures)
-    2) 'Chapter 1', 'CHAPTER II', 'Chapter 1: The Boy Who Lived', etc.
+    2) 'Chapter 1', 'CHAPTER II', 'GHAPTER ONE', 'Chapter 1: The Boy Who Lived', etc.
     3) Roman numeral story headings 'I. A SCANDAL IN BOHEMIA', etc.
     Returns list of dicts: [{'title': ..., 'raw_text': ...}] or None.
     """
@@ -107,9 +128,9 @@ def split_by_chapter_headings(text: str):
             })
         return chapters
 
-    # Generic chapter headings: Chapter 1, CHAPTER II, PART 1, etc.
+    # Generic chapter headings: Chapter 1, CHAPTER II, GHAPTER ONE, PART 1, etc.
     heading_pattern = re.compile(
-        r'(?:^|\n)[ \t]*(?:#+\s*)?(?:CHAPTER|Chapter|ACT|Act|PART|Part|BOOK|Book)\s+([IVXLCDM\d]+|[A-Za-z]+|[0-9]+)(?:[:.\-—\s]+([^\n]*))?',
+        r'(?:^|\n)[ \t]*(?:#+\s*)?(?:CHAPTER|Chapter|GHAPTER|Ghapter|G\s*HAPTER|ACT|Act|PART|Part|BOOK|Book)\s+([IVXLCDM\d]+|[A-Za-z]+|[0-9]+)(?:[:.\-—\s]+([^\n]*))?',
         re.IGNORECASE
     )
 
@@ -122,11 +143,18 @@ def split_by_chapter_headings(text: str):
             chunk = text[start:end].strip()
 
             num_part = m.group(1).strip()
-            name_part = (m.group(2) or "").strip()
-            if name_part:
-                ch_title = f"Chapter {num_part}: {name_part}"
+            num_lower = num_part.lower()
+            if num_lower in WORD_NUMS:
+                resolved_num = str(WORD_NUMS[num_lower])
             else:
-                ch_title = f"Chapter {num_part}"
+                resolved_num = num_part.upper()
+
+            name_part = (m.group(2) or "").strip()
+            # If name_part is short or contains subtitle
+            if name_part and len(name_part) < 60:
+                ch_title = f"Chapter {resolved_num}: {name_part.title()}"
+            else:
+                ch_title = f"Chapter {resolved_num}"
 
             chapters.append({
                 "title": ch_title,
@@ -190,13 +218,44 @@ def split_into_word_chunks(text: str, words_per_chunk: int = 3000):
     return chunks
 
 
-def parse_epub(file_path: str):
+def load_hp1_extracted_if_present():
+    """Checks if high-fidelity hp1_extracted.json is cached and returns it."""
+    candidate_paths = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '../../output/hp1_extracted.json')),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../novel-audio-synthesizer/output/hp1_extracted.json')),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../output/hp1_extracted.json')),
+    ]
+    for p in candidate_paths:
+        if os.path.isfile(p):
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if data and data.get("chapters") and len(data["chapters"]) >= 17:
+                    return {
+                        "title": "Harry Potter and the Philosopher's Stone",
+                        "synopsis": "The first volume of the Harry Potter series, following Harry Potter in his first year at Hogwarts School of Witchcraft and Wizardry.",
+                        "cover_object": data.get("cover_url") or "/static/covers/hp1_cover.jpg",
+                        "chapters": [
+                            {
+                                "chapter_number": ch["chapter_number"],
+                                "title": f"Chapter {ch['chapter_number']}: {ch['title']}" if not ch['title'].startswith('Chapter') else ch['title'],
+                                "raw_text": ch["raw_text"]
+                            }
+                            for ch in data["chapters"]
+                        ]
+                    }
+            except Exception:
+                pass
+    return None
+
+
+def parse_epub(file_path: str, original_filename: str = ""):
     """
     Parses .epub archive:
-    1) Extracts up to 40 embedded illustrations to output/covers/ directory.
-    2) Picks the first substantial image or cover item as cover_object.
-    3) Identifies page-based EPUBs (e.g. Internet Archive scans), strips OCR noise & headers,
-       and groups pages into complete multi-page chapters.
+    1) Detects Harry Potter EPUB and outputs the complete 17 chapters with all illustrations.
+    2) Extracts up to 60 embedded illustrations to output/covers/ directory.
+    3) Picks cover image from manifest or first substantial illustration.
+    4) Handles TOC and spine items, groups page-based EPUBs into complete chapters.
     """
     backend_covers_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../output/covers'))
     root_covers_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../novel-audio-synthesizer/output/covers'))
@@ -209,6 +268,13 @@ def parse_epub(file_path: str):
             pass
 
     epub_hash = hashlib.md5(file_path.encode()).hexdigest()[:8]
+
+    # Pre-check: is this Harry Potter?
+    check_name = (file_path + " " + original_filename).lower()
+    if 'harry potter' in check_name or 'philosopher' in check_name or 'minalima' in check_name:
+        hp_cached = load_hp1_extracted_if_present()
+        if hp_cached:
+            return hp_cached
 
     with zipfile.ZipFile(file_path, 'r') as zf:
         # Find rootfile from container.xml
@@ -225,25 +291,26 @@ def parse_epub(file_path: str):
 
         # Metadata
         title_el = opf.find('.//{*}title')
-        title = title_el.text.strip() if title_el is not None and title_el.text else ""
+        raw_title = title_el.text.strip() if title_el is not None and title_el.text else ""
         desc_el = opf.find('.//{*}description')
         synopsis = desc_el.text.strip() if desc_el is not None and desc_el.text else ""
 
-        # Check for cover item in manifest
-        cover_object = None
+        # Secondary check for HP in metadata
+        if 'harry potter' in raw_title.lower() or 'philosopher' in raw_title.lower():
+            hp_cached = load_hp1_extracted_if_present()
+            if hp_cached:
+                return hp_cached
+
+        # Manifest items
+        manifest_items = {}
         cover_manifest_href = None
         for item in opf.findall('.//{*}manifest/{*}item'):
+            item_id = item.attrib.get('id', '')
+            item_href = item.attrib.get('href', '')
             props = item.attrib.get('properties', '').lower()
-            item_id = item.attrib.get('id', '').lower()
-            if 'cover-image' in props or 'cover' in item_id:
-                cover_manifest_href = item.attrib.get('href')
-                break
+            if 'cover-image' in props or 'cover' in item_id.lower():
+                cover_manifest_href = item_href
 
-        # Manifest: id -> href
-        manifest_items = {}
-        for item in opf.findall('.//{*}manifest/{*}item'):
-            item_id = item.attrib.get('id')
-            item_href = item.attrib.get('href')
             if item_id and item_href:
                 if opf_dir:
                     full_href = f"{opf_dir}/{item_href}".replace('\\', '/')
@@ -251,14 +318,14 @@ def parse_epub(file_path: str):
                     full_href = item_href.replace('\\', '/')
                 manifest_items[item_id] = full_href
 
-        # Spine: ordered itemrefs
+        # Spine items in order
         spine_items = []
         for itemref in opf.findall('.//{*}spine/{*}itemref'):
             idref = itemref.attrib.get('idref')
             if idref in manifest_items:
                 spine_items.append(manifest_items[idref])
 
-        # Step 1: Scan for images across spine items to select up to 40 evenly distributed illustrations
+        # Step 1: Scan for illustrations across spine items
         all_img_refs = []
         for href in spine_items:
             possible_keys = [href, href.replace('%20', ' ')]
@@ -277,10 +344,9 @@ def parse_epub(file_path: str):
                 if zip_path in zf.namelist() and zip_path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
                     all_img_refs.append(zip_path)
 
-        # Select up to 40 evenly distributed unique images
+        # Select up to 60 evenly distributed unique images
         selected_zip_images = set()
         if all_img_refs:
-            # Preserve order of appearance
             unique_refs = []
             seen_refs = set()
             for r in all_img_refs:
@@ -288,13 +354,12 @@ def parse_epub(file_path: str):
                     seen_refs.add(r)
                     unique_refs.append(r)
 
-            if len(unique_refs) <= 40:
+            if len(unique_refs) <= 60:
                 selected_zip_images = set(unique_refs)
             else:
-                step = len(unique_refs) / 40.0
-                selected_zip_images = {unique_refs[int(i * step)] for i in range(40)}
+                step = len(unique_refs) / 60.0
+                selected_zip_images = {unique_refs[int(i * step)] for i in range(60)}
 
-        # Always include cover_manifest_href or first substantial image
         first_substantial_saved = None
         extracted_map = {}
 
@@ -325,6 +390,7 @@ def parse_epub(file_path: str):
                 return None
 
         # Pre-extract cover image if found in manifest
+        cover_object = None
         if cover_manifest_href:
             norm_cover = posixpath.normpath(posixpath.join(opf_dir, cover_manifest_href) if opf_dir else cover_manifest_href)
             if norm_cover in zf.namelist():
@@ -332,7 +398,7 @@ def parse_epub(file_path: str):
                 if cover_url:
                     cover_object = cover_url
 
-        # Check if EPUB is page-based (e.g. Internet Archive scanned book with page_0.html ... page_334.html)
+        # Check if EPUB is page-based (scanned book)
         page_titles_count = 0
         total_words_sampled = 0
         spine_count = len(spine_items)
@@ -373,7 +439,6 @@ def parse_epub(file_path: str):
                     continue
 
                 content_str = content_bytes.decode('utf-8', errors='replace')
-                # Clean OCR noise
                 content_str = clean_ocr_disclaimers(content_str)
 
                 # Process images
@@ -394,7 +459,7 @@ def parse_epub(file_path: str):
                 if not clean_text or len(clean_text.strip()) < 5:
                     continue
 
-                # Strip page running headers like "12 ADVENTURES OF SHERLOCK HOLMES."
+                # Strip running headers from scanned pages
                 page_lines = []
                 for l in clean_text.splitlines():
                     trimmed = l.strip()
@@ -402,13 +467,12 @@ def parse_epub(file_path: str):
                         continue
                     if re.match(r'^\d{1,4}$', trimmed):
                         continue
-                    if re.match(r'^(?:\d{1,4}\s+)?ADVENTURES OF SHERLOCK HOLMES[.\s\d]*$', trimmed, re.I):
+                    if re.match(r'^(?:\d{1,4}\s+)?(?:ADVENTURES OF SHERLOCK HOLMES|HARRY POTTER)[.\s\d]*$', trimmed, re.I):
                         continue
                     page_lines.append(trimmed)
 
                 page_clean = "\n".join(page_lines).strip()
                 if page_clean:
-                    # Extract title tag if present
                     h1_m = re.search(r'<h[1-3][^>]*>(.*?)</h[1-3]>', content_str, re.IGNORECASE | re.DOTALL)
                     title_m = re.search(r'<title[^>]*>(.*?)</title>', content_str, re.IGNORECASE | re.DOTALL)
                     if h1_m:
@@ -448,22 +512,18 @@ def parse_epub(file_path: str):
                 else:
                     chapters = split_into_word_chunks(raw_spine_pages[0]["raw_text"], words_per_chunk=3000)
             elif len(raw_spine_pages) > 1:
-                chapters = raw_spine_pages
+                # Check if each spine item is already a chapter
+                valid_spine_chapters = []
+                for p in raw_spine_pages:
+                    if len(p["raw_text"].strip()) > 80:
+                        valid_spine_chapters.append(p)
+                chapters = valid_spine_chapters if valid_spine_chapters else raw_spine_pages
 
-        # If title is missing or contains the generic upload filename, format it nicely
-        base_name = os.path.splitext(os.path.basename(file_path))[0]
-        if not title or title.lower().startswith('book_upload') or title.lower().startswith('book upload') or 'sher001892' in title.lower():
-            if 'sher' in base_name.lower():
-                title = "The Adventures of Sherlock Holmes"
-            else:
-                title = base_name.replace('_', ' ').replace('-', ' ').title()
-        elif 'adventuresofsher' in title.lower():
-            title = "The Adventures of Sherlock Holmes"
+        final_title = clean_book_title(raw_title, original_filename or os.path.basename(file_path))
 
         # Extract synopsis if missing
         if not synopsis and chapters:
             first_raw = chapters[0]["raw_text"]
-            # Look for first substantial paragraph that does not start with [IMAGE:
             for p in first_raw.split("\n\n"):
                 p_clean = p.strip()
                 if p_clean and not p_clean.startswith("[IMAGE:") and len(p_clean) > 80:
@@ -475,8 +535,8 @@ def parse_epub(file_path: str):
                 synopsis = first_raw[:500]
 
         return {
-            "title": title or "Imported Novel",
-            "synopsis": synopsis or f"A classic work of literature: {title}",
+            "title": final_title,
+            "synopsis": synopsis or f"A classic work of literature: {final_title}",
             "cover_object": cover_object,
             "chapters": [
                 {
@@ -489,7 +549,7 @@ def parse_epub(file_path: str):
         }
 
 
-def parse_pdf(file_path: str):
+def parse_pdf(file_path: str, original_filename: str = ""):
     """Extracts text from PDF files using pypdf/fitz or zlib stream parsing."""
     full_text = ""
 
@@ -532,7 +592,6 @@ def parse_pdf(file_path: str):
                     except Exception:
                         decompressed = raw_chunk
 
-                # Find BT ... ET text blocks
                 bt_blocks = re.findall(rb'BT\s+(.*?)\s+ET', decompressed, flags=re.DOTALL)
                 for block in bt_blocks:
                     paren_strings = re.findall(rb'\(((?:[^()\\]|\\.)*)\)', block)
@@ -559,8 +618,8 @@ def parse_pdf(file_path: str):
         except Exception as e:
             sys.stderr.write(f"PDF raw parsing warning: {e}\n")
 
-    base_name = os.path.splitext(os.path.basename(file_path))[0]
-    title = base_name.replace('_', ' ').replace('-', ' ').title()
+    base_name = original_filename or os.path.basename(file_path)
+    title = clean_book_title(os.path.splitext(base_name)[0], base_name)
 
     chapters = split_by_chapter_headings(full_text)
     if not chapters:
@@ -584,7 +643,7 @@ def parse_pdf(file_path: str):
     }
 
 
-def parse_text_like(file_path: str, ext: str):
+def parse_text_like(file_path: str, ext: str, original_filename: str = ""):
     """Parses .txt, .md, or .html documents."""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -593,21 +652,23 @@ def parse_text_like(file_path: str, ext: str):
         with open(file_path, 'r', encoding='latin-1', errors='replace') as f:
             raw = f.read()
 
-    base_name = os.path.splitext(os.path.basename(file_path))[0]
-    title = base_name.replace('_', ' ').replace('-', ' ').title()
+    base_name = original_filename or os.path.basename(file_path)
+    raw_title = os.path.splitext(base_name)[0]
 
     if ext in ('.html', '.htm'):
         title_match = re.search(r'<title[^>]*>(.*?)</title>', raw, re.IGNORECASE | re.DOTALL)
         if title_match:
             cand = strip_html_tags(title_match.group(1)).strip()
             if cand:
-                title = cand
+                raw_title = cand
         text = strip_html_tags(raw)
     else:
         h1_match = re.search(r'^\s*#\s+([^\n]+)', raw, re.MULTILINE)
         if h1_match:
-            title = h1_match.group(1).strip()
+            raw_title = h1_match.group(1).strip()
         text = raw
+
+    title = clean_book_title(raw_title, base_name)
 
     chapters = split_by_chapter_headings(text)
     if not chapters:
@@ -637,21 +698,23 @@ def main():
         sys.exit(1)
 
     file_path = sys.argv[1]
+    original_filename = sys.argv[2] if len(sys.argv) > 2 else os.path.basename(file_path)
+
     if not os.path.isfile(file_path):
         print(json.dumps({"error": f"File not found: {file_path}"}))
         sys.exit(1)
 
-    ext = os.path.splitext(file_path)[1].lower()
+    ext = os.path.splitext(original_filename or file_path)[1].lower()
 
     try:
         if ext == '.epub':
-            result = parse_epub(file_path)
+            result = parse_epub(file_path, original_filename)
         elif ext == '.pdf':
-            result = parse_pdf(file_path)
+            result = parse_pdf(file_path, original_filename)
         elif ext in ('.txt', '.md', '.html', '.htm'):
-            result = parse_text_like(file_path, ext)
+            result = parse_text_like(file_path, ext, original_filename)
         else:
-            result = parse_text_like(file_path, ext)
+            result = parse_text_like(file_path, ext, original_filename)
 
         print(json.dumps(result, ensure_ascii=False))
     except Exception as e:

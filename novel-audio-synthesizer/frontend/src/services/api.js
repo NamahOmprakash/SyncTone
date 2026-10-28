@@ -26,9 +26,13 @@ async function request(endpoint, options = {}) {
   };
 
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
-  if (!isFormData && options.body && typeof options.body === 'object') {
-    headers['Content-Type'] = 'application/json';
-    options.body = JSON.stringify(options.body);
+  if (!isFormData) {
+    if (options.body && typeof options.body === 'object') {
+      headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(options.body);
+    } else if (typeof options.body === 'string' && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
   }
 
   const config = {
@@ -95,7 +99,12 @@ export const api = {
     get: (id) => api.get(`/novels/${id}`),
     create: (novelData) => api.post('/novels', novelData),
     uploadChapter: (novelId, chapterData) => api.post(`/novels/${novelId}/chapters`, chapterData),
-    parseFile: (payload) => request('/novels/parse-file', { method: 'POST', body: JSON.stringify(payload) }),
+    parseFile: (payload) => {
+      if (typeof FormData !== 'undefined' && payload instanceof FormData) {
+        return request('/novels/parse-file', { method: 'POST', body: payload });
+      }
+      return api.post('/novels/parse-file', payload);
+    },
   },
 
   // Chapters & Synthesis Endpoints

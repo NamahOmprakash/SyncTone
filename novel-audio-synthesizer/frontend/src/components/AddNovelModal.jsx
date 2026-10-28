@@ -133,73 +133,75 @@ export default function AddNovelModal({
       .replace(/\b\w/g, (c) => c.toUpperCase());
 
     try {
-      let base64 = '';
-      let textContent = '';
-
-      try {
-        base64 = await readFileAsBase64(file);
-      } catch (_) {}
-
-      if (['txt', 'md', 'html', 'htm'].includes(ext)) {
-        try {
-          textContent = await readFileAsText(file);
-        } catch (_) {}
-      }
-
       let parsedResult = null;
 
-      // Call backend parsing endpoint
+      // Strategy 1: Fast Multipart FormData stream to backend parser
       try {
-        parsedResult = await api.novels.parseFile({
-          file_name: file.name,
-          file_base64: base64,
-        });
-      } catch (apiErr) {
-        // Safe fallback to client parser
-      }
-
-      const resolvedTitle = parsedResult?.title || cleanTitle;
-      let resolvedSynopsis = parsedResult?.synopsis || '';
-      let chapters = parsedResult?.chapters || [];
-
-      // Extract client-side if server returned no chapters
-      if (!chapters || chapters.length === 0) {
-        if (textContent) {
-          chapters = extractChaptersFromText(textContent, resolvedTitle);
-        } else {
-          chapters = [
-            {
-              chapter_number: 1,
-              title: 'Chapter 1: The Beginning',
-              raw_text: `Opening of ${resolvedTitle}.\n\nImported from ${file.name}.\nThis file was processed and is ready for neural speech synthesis and playback.`,
-            },
-          ];
+        const formData = new FormData();
+        formData.append('file', file);
+        parsedResult = await api.novels.parseFile(formData);
+      } catch (uploadErr) {
+        console.warn('[Upload Parse API Warning]:', uploadErr);
+        // Strategy 2: If multipart failed (e.g. proxy issue), try base64 fallback for files < 50MB
+        if (file.size < 50 * 1024 * 1024) {
+          try {
+            const base64 = await readFileAsBase64(file);
+            parsedResult = await api.novels.parseFile({
+              file_name: file.name,
+              file_base64: base64,
+            });
+          } catch (b64Err) {
+            console.error('[Base64 Parse Fallback Error]:', b64Err);
+          }
         }
       }
 
-      if (!resolvedSynopsis) {
-        const excerpt = chapters[0]?.raw_text?.slice(0, 180)?.replace(/\s+/g, ' ') || '';
-        resolvedSynopsis = excerpt
-          ? `${excerpt}...`
-          : `Imported from ${file.name}. Contains ${chapters.length} chapters ready for playback.`;
-      }
+      // Check if backend returned parsed chapters
+      if (parsedResult && parsedResult.chapters && parsedResult.chapters.length > 0) {
+        const resolvedTitle = parsedResult.title || cleanTitle;
+        const resolvedSynopsis = parsedResult.synopsis || `Imported from ${file.name}. Contains ${parsedResult.chapters.length} chapters ready for playback.`;
 
-      // Auto-fill title & synopsis if empty
-      if (!title.trim()) {
         setTitle(resolvedTitle);
-      }
-      if (!synopsis.trim()) {
         setSynopsis(resolvedSynopsis);
+        setCoverObject(parsedResult.cover_object || null);
+        setParsedChapters(parsedResult.chapters);
+        setUploadedFile({
+          name: file.name,
+          size: `${(file.size / 1024).toFixed(1)} KB`,
+          format: formatBadge,
+          chapterCount: parsedResult.chapters.length,
+        });
+        return;
       }
 
-      setCoverObject(parsedResult?.cover_object || null);
-      setParsedChapters(chapters);
-      setUploadedFile({
-        name: file.name,
-        size: `${(file.size / 1024).toFixed(1)} KB`,
-        format: formatBadge,
-        chapterCount: chapters.length,
-      });
+      // Strategy 3: Client-side parsing for plain text documents (.txt, .md, .html)
+      if (['txt', 'md', 'html', 'htm'].includes(ext)) {
+        let textContent = '';
+        try {
+          textContent = await readFileAsText(file);
+        } catch (_) {}
+
+        if (textContent && textContent.trim()) {
+          const chapters = extractChaptersFromText(textContent, cleanTitle);
+          if (chapters && chapters.length > 0) {
+            setTitle(cleanTitle);
+            setSynopsis(textContent.slice(0, 200).trim() + '...');
+            setParsedChapters(chapters);
+            setUploadedFile({
+              name: file.name,
+              size: `${(file.size / 1024).toFixed(1)} KB`,
+              format: formatBadge,
+              chapterCount: chapters.length,
+            });
+            return;
+          }
+        }
+      }
+
+      // If we got here, parsing failed — report real error rather than generating 3 dummy lines!
+      throw new Error(
+        `Could not extract readable chapters from "${file.name}". Please ensure the file is a valid EPUB, PDF, or text novel.`
+      );
     } catch (err) {
       setError('Failed to parse novel file: ' + (err.message || 'Unknown error'));
     } finally {

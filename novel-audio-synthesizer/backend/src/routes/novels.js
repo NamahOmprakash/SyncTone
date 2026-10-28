@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const child_process = require('child_process');
+const multer = require('multer');
 const { pool } = require('../db');
 const { Chapter } = require('../models');
 const { parseChapter } = require('../engine/textParser');
@@ -12,6 +13,21 @@ const router = Router();
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ALLOWED_CHANNELS = ['verified', 'community'];
+
+// Stream multipart file uploads directly to temporary files on disk
+const uploadStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '') || '.epub';
+    const unique = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}${ext}`;
+    cb(null, `book_upload_${unique}`);
+  },
+});
+
+const upload = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 350 * 1024 * 1024 }, // 350MB limit
+});
 
 /**
  * GET /api/novels
@@ -63,35 +79,46 @@ router.get('/novels', async (req, res) => {
 /**
  * POST /api/novels/parse-file
  * Parses an uploaded book file (EPUB, PDF, TXT, MD, HTML) into title, synopsis, and chapters.
+ * Supports both multipart/form-data ("file") and JSON ({ file_name, file_base64 }).
  * No authentication required to preview/parse within the upload modal.
  */
-router.post('/novels/parse-file', async (req, res) => {
+router.post('/novels/parse-file', upload.single('file'), async (req, res) => {
   let tmpPath = null;
+  let shouldUnlink = false;
   try {
-    const { file_name, file_base64 } = req.body;
-    if (!file_base64) {
-      return res.status(400).json({ error: 'file_base64 is required.' });
+    let originalName = 'book.epub';
+    if (req.file) {
+      tmpPath = req.file.path;
+      originalName = req.file.originalname || 'book.epub';
+      shouldUnlink = true;
+    } else if (req.body && req.body.file_base64) {
+      const ext = path.extname(req.body.file_name || 'book.txt').toLowerCase() || '.txt';
+      const tmpName = `book_upload_${Date.now()}_${Math.random().toString(36).slice(2, 9)}${ext}`;
+      tmpPath = path.join(os.tmpdir(), tmpName);
+      const base64Data = req.body.file_base64.includes(',')
+        ? req.body.file_base64.split(',')[1]
+        : req.body.file_base64;
+      fs.writeFileSync(tmpPath, Buffer.from(base64Data, 'base64'));
+      originalName = req.body.file_name || tmpName;
+      shouldUnlink = true;
+    } else {
+      return res.status(400).json({ error: 'No file provided. Send multipart form with "file" or JSON with "file_base64".' });
     }
 
-    const ext = path.extname(file_name || 'book.txt').toLowerCase() || '.txt';
-    const tmpName = `book_upload_${Date.now()}_${Math.random().toString(36).slice(2, 9)}${ext}`;
-    tmpPath = path.join(os.tmpdir(), tmpName);
-
-    // Support data URL prefix if sent from frontend FileReader: data:...;base64,XYZ
-    const base64Data = file_base64.includes(',') ? file_base64.split(',')[1] : file_base64;
-    const fileBuffer = Buffer.from(base64Data, 'base64');
-    fs.writeFileSync(tmpPath, fileBuffer);
-
     const scriptPath = path.resolve(__dirname, '../scripts/parseUploadedBook.py');
-    const pyOutput = child_process.execFileSync('python3', [scriptPath, tmpPath], {
+    const pyOutput = child_process.execFileSync('python3', [scriptPath, tmpPath, originalName], {
       maxBuffer: 50 * 1024 * 1024,
-      timeout: 30000,
+      timeout: 60000,
       encoding: 'utf-8',
     });
 
     const parsed = JSON.parse(pyOutput);
-    const defaultTitle = file_name
-      ? path.basename(file_name, ext).replace(/[_-]+/g, ' ').trim()
+    if (parsed.error && (!parsed.chapters || parsed.chapters.length === 0)) {
+      return res.status(500).json({ error: parsed.error });
+    }
+
+    const defaultTitle = originalName
+      ? path.basename(originalName, path.extname(originalName)).replace(/[_-]+/g, ' ').trim()
       : 'Imported Novel';
     const finalTitle =
       parsed.title && !parsed.title.toLowerCase().startsWith('book_upload') && !parsed.title.toLowerCase().startsWith('book upload')
@@ -108,7 +135,7 @@ router.post('/novels/parse-file', async (req, res) => {
     console.error('[Parse File Error]:', err.message);
     return res.status(500).json({ error: `Failed to parse uploaded book file: ${err.message}` });
   } finally {
-    if (tmpPath && fs.existsSync(tmpPath)) {
+    if (shouldUnlink && tmpPath && fs.existsSync(tmpPath)) {
       try {
         fs.unlinkSync(tmpPath);
       } catch (_) {}
