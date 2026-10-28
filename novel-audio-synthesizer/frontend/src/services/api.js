@@ -105,6 +105,12 @@ export const api = {
       }
       return api.post('/novels/parse-file', payload);
     },
+    uploadAsset: (payload) => {
+      if (typeof FormData !== 'undefined' && payload instanceof FormData) {
+        return request('/novels/upload-asset', { method: 'POST', body: payload });
+      }
+      return api.post('/novels/upload-asset', payload);
+    },
   },
 
   // Chapters & Synthesis Endpoints

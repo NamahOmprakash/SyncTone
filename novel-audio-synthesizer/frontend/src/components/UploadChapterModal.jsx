@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { api, ApiError } from '../services/api';
+import { sanitizeTextWithTtsDomCleaner } from '../utils/ttsSanitizer';
 import { IconUpload, IconX } from './icons';
 
 export default function UploadChapterModal({ isOpen, novel, onClose, onChapterUploaded }) {
   const [title, setTitle] = useState('');
   const [chapterNumber, setChapterNumber] = useState('');
   const [text, setText] = useState('');
+  const [useTtsSanitizer, setUseTtsSanitizer] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -22,9 +24,10 @@ export default function UploadChapterModal({ isOpen, novel, onClose, onChapterUp
 
     setIsSubmitting(true);
     try {
+      const chapterText = useTtsSanitizer ? sanitizeTextWithTtsDomCleaner(text) : text;
       const payload = {
         title: title.trim() || undefined,
-        text: text.trim(),
+        text: chapterText.trim(),
         chapter_number: chapterNumber ? parseInt(chapterNumber, 10) : undefined,
       };
 
@@ -113,6 +116,37 @@ export default function UploadChapterModal({ isOpen, novel, onClose, onChapterUp
               required
               className="w-full px-3.5 py-2.5 text-xs theme-card border rounded-xl placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-focus)] transition font-serif leading-relaxed"
             />
+          </div>
+
+          {/* TTS Sanitizer Toggle */}
+          <div className="p-3 rounded-xl theme-card border border-[var(--border-subtle)] flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold theme-heading">TTS DOM Sanitizer (tts-dom-cleaner)</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono uppercase bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                  Opt-in
+                </span>
+              </div>
+              <p className="text-[11px] theme-muted mt-0.5 leading-relaxed">
+                Strips hidden spam, watermarks, ASCII dividers, and deduplicates paragraphs.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              data-testid="chapter-tts-sanitizer-toggle"
+              aria-checked={useTtsSanitizer}
+              onClick={() => setUseTtsSanitizer((prev) => !prev)}
+              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                useTtsSanitizer ? 'bg-[var(--accent)]' : 'bg-white/20'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  useTtsSanitizer ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
 
           <div className="pt-2 flex justify-end gap-3">

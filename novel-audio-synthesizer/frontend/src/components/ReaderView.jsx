@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { getSpeakerColor } from '../utils/speakerColors';
 import { parseSegmentImage } from '../utils/segmentUtils';
 import { useTheme } from '../context/ThemeContext';
+import { sanitizeSegmentsWithTtsDomCleaner } from '../utils/ttsSanitizer';
 import { Button } from './primitives/Button';
 import OpenGLPageReader from './OpenGLPageReader';
 import {
@@ -55,6 +56,12 @@ export default function ReaderView({
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isTabVisible, setIsTabVisible] = useState(
     typeof document !== 'undefined' ? !document.hidden : true
+  );
+
+  const [useTtsSanitizer, setUseTtsSanitizer] = useState(false);
+  const effectiveSegments = React.useMemo(
+    () => (useTtsSanitizer ? sanitizeSegmentsWithTtsDomCleaner(segments) : segments),
+    [segments, useTtsSanitizer]
   );
 
   // Listen to Escape key to exit Focus Mode and toggle full-screen body class
@@ -493,6 +500,22 @@ export default function ReaderView({
             </button>
           </div>
 
+          {/* TTS Clean Sanitizer Toggle */}
+          <button
+            type="button"
+            data-testid="reader-tts-sanitizer-toggle"
+            aria-pressed={useTtsSanitizer}
+            onClick={() => setUseTtsSanitizer((prev) => !prev)}
+            title="Toggle tts-dom-cleaner sanitizer to strip hidden spam, ASCII dividers, and duplicate paragraphs"
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5 ${
+              useTtsSanitizer
+                ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md font-bold'
+                : 'theme-surface border-[var(--border-subtle)] theme-muted hover:text-[var(--text-main)]'
+            }`}
+          >
+            <span>TTS Clean</span>
+          </button>
+
           {/* Focus Mode Toggle */}
           <button
             type="button"
@@ -528,7 +551,7 @@ export default function ReaderView({
       {readerMode === 'opengl' ? (
         <div className="pt-6">
           <OpenGLPageReader
-            segments={segments}
+            segments={effectiveSegments}
             activeSegmentId={activeSegmentId}
             segmentProgress={segmentProgress}
             isPlaying={isPlaying}
@@ -551,7 +574,7 @@ export default function ReaderView({
           }`}
           style={{ fontSize: `${fontSize}px` }}
         >
-          {segments.map((seg) => {
+          {effectiveSegments.map((seg) => {
             const segId = seg.segment_id !== undefined ? seg.segment_id : seg.order;
             const isActive = segId === activeSegmentId;
             const isDialogue = seg.type === 'dialogue';

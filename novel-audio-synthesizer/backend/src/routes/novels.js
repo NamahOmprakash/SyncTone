@@ -144,6 +144,55 @@ router.post('/novels/parse-file', upload.single('file'), async (req, res) => {
 });
 
 /**
+ * POST /api/novels/upload-asset
+ * Saves an extracted cover image or rendered PDF page canvas to /static/covers/
+ * and returns a short relative URL (< 255 chars) safe for PostgreSQL novels.cover_object.
+ */
+router.post('/novels/upload-asset', upload.single('file'), async (req, res) => {
+  try {
+    const coversDirs = [
+      path.resolve(__dirname, '../../output/covers'),
+      path.resolve(__dirname, '../../../output/covers'),
+    ];
+    for (const dir of coversDirs) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    let ext = '.jpg';
+    let buffer = null;
+    if (req.file) {
+      ext = path.extname(req.file.originalname || '') || '.jpg';
+      buffer = fs.readFileSync(req.file.path);
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (_) {}
+    } else if (req.body && req.body.data_url) {
+      const m = String(req.body.data_url).match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+      if (m) {
+        ext = m[1] === 'png' ? '.png' : m[1] === 'webp' ? '.webp' : '.jpg';
+        buffer = Buffer.from(m[2], 'base64');
+      }
+    }
+
+    if (!buffer) {
+      return res.status(400).json({ error: 'Valid image file or data_url is required.' });
+    }
+
+    const fileName = `asset_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+    for (const dir of coversDirs) {
+      try {
+        fs.writeFileSync(path.join(dir, fileName), buffer);
+      } catch (_) {}
+    }
+
+    return res.json({ url: `/static/covers/${fileName}` });
+  } catch (err) {
+    console.error('[Upload Asset Error]:', err.message);
+    return res.status(500).json({ error: 'Failed to save asset.' });
+  }
+});
+
+/**
  * POST /api/novels
  * Inserts a new novel using specified fields: title, synopsis, channel, added_by
  * If `chapters` array is provided, automatically ingests up to 50 chapters into PostgreSQL & MongoDB!

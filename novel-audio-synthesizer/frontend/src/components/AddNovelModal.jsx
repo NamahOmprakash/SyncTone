@@ -1,6 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { api, ApiError } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { extractChaptersFromText, parseNovelFileClientSide } from '../utils/ebookParser';
+import { sanitizeChaptersWithTtsDomCleaner } from '../utils/ttsSanitizer';
 import {
   IconPlus,
   IconX,
@@ -33,7 +35,14 @@ export default function AddNovelModal({
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null); // { name, size, format, chapterCount }
   const [coverObject, setCoverObject] = useState(null);
-  const [parsedChapters, setParsedChapters] = useState([]); // [{ chapter_number, title, raw_text }]
+  const [rawParsedChapters, setRawParsedChapters] = useState([]); // [{ chapter_number, title, raw_text }]
+  const [useTtsSanitizer, setUseTtsSanitizer] = useState(false);
+
+  const parsedChapters = useMemo(
+    () => (useTtsSanitizer ? sanitizeChaptersWithTtsDomCleaner(rawParsedChapters) : rawParsedChapters),
+    [rawParsedChapters, useTtsSanitizer]
+  );
+
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const fileInputRef = useRef(null);
@@ -62,61 +71,6 @@ export default function AddNovelModal({
       reader.readAsText(file);
     });
 
-  // Client-side fallback chapter parser for .txt / .md / unparsed novels
-  const extractChaptersFromText = (rawText, novelTitle) => {
-    if (!rawText || !rawText.trim()) return [];
-
-    const chapterRegex =
-      /(?:^|\r?\n)(?:(?:Chapter|CHAPTER|Book|BOOK|Section|SECTION)\s+([0-9IVXLCDM]+|[A-Za-z]+)[\s:–-]*(.*?))(?=\r?\n|$)/gi;
-    const matches = [...rawText.matchAll(chapterRegex)];
-
-    if (matches.length > 0) {
-      const chapters = [];
-      for (let i = 0; i < matches.length; i++) {
-        const start = matches[i].index;
-        const end = i + 1 < matches.length ? matches[i + 1].index : rawText.length;
-        const chapterNum = i + 1;
-        const headingSub = (matches[i][2] || '').trim();
-        const chapterTitle = headingSub
-          ? `Chapter ${chapterNum}: ${headingSub}`
-          : `Chapter ${chapterNum}`;
-        const chapterText = rawText.slice(start, end).trim();
-
-        chapters.push({
-          chapter_number: chapterNum,
-          title: chapterTitle,
-          raw_text: chapterText,
-        });
-      }
-      return chapters;
-    }
-
-    // Fallback: chunk paragraphs if extensive text
-    const paragraphs = rawText.split(/\r?\n\s*\r?\n/).filter((p) => p.trim().length > 0);
-    if (paragraphs.length > 30) {
-      const chunkSize = 20;
-      const chapters = [];
-      for (let i = 0; i < paragraphs.length; i += chunkSize) {
-        const chNum = Math.floor(i / chunkSize) + 1;
-        chapters.push({
-          chapter_number: chNum,
-          title: `Chapter ${chNum}`,
-          raw_text: paragraphs.slice(i, i + chunkSize).join('\n\n'),
-        });
-      }
-      return chapters;
-    }
-
-    // Default to single chapter
-    return [
-      {
-        chapter_number: 1,
-        title: `Chapter 1: ${novelTitle || 'Introduction'}`,
-        raw_text: rawText.trim(),
-      },
-    ];
-  };
-
   // Process dropped or selected novel file
   const processFile = async (file) => {
     if (!file) return;
@@ -135,28 +89,47 @@ export default function AddNovelModal({
     try {
       let parsedResult = null;
 
-      // Strategy 1: Fast Multipart FormData stream to backend parser
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        parsedResult = await api.novels.parseFile(formData);
-      } catch (uploadErr) {
-        console.warn('[Upload Parse API Warning]:', uploadErr);
-        // Strategy 2: If multipart failed (e.g. proxy issue), try base64 fallback for files < 50MB
-        if (file.size < 50 * 1024 * 1024) {
+      // Strategy 0: Direct client-side parsing for MOBI, AZW3, KF8, FB2, FBZ
+      const clientSideOnlyExtensions = ['mobi', 'azw3', 'kf8', 'fb2', 'fbz'];
+      if (clientSideOnlyExtensions.includes(ext)) {
+        parsedResult = await parseNovelFileClientSide(file, {
+          uploadAsset: api.novels.uploadAsset,
+        });
+      } else {
+        // Strategy 1: Fast Multipart FormData stream to backend parser
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          parsedResult = await api.novels.parseFile(formData);
+        } catch (uploadErr) {
+          console.warn('[Upload Parse API Warning]:', uploadErr);
+          // Strategy 2: If multipart failed (e.g. proxy issue), try base64 fallback for files < 50MB
+          if (file.size < 50 * 1024 * 1024) {
+            try {
+              const base64 = await readFileAsBase64(file);
+              parsedResult = await api.novels.parseFile({
+                file_name: file.name,
+                file_base64: base64,
+              });
+            } catch (b64Err) {
+              console.error('[Base64 Parse Fallback Error]:', b64Err);
+            }
+          }
+        }
+
+        // Strategy 2.5: Fallback to client-side parsing if backend parsing fails or returns no chapters
+        if (!parsedResult || !parsedResult.chapters || parsedResult.chapters.length === 0) {
           try {
-            const base64 = await readFileAsBase64(file);
-            parsedResult = await api.novels.parseFile({
-              file_name: file.name,
-              file_base64: base64,
+            parsedResult = await parseNovelFileClientSide(file, {
+              uploadAsset: api.novels.uploadAsset,
             });
-          } catch (b64Err) {
-            console.error('[Base64 Parse Fallback Error]:', b64Err);
+          } catch (clientErr) {
+            console.warn('[Client-Side Fallback Parse Notice]:', clientErr);
           }
         }
       }
 
-      // Check if backend returned parsed chapters
+      // Check if backend or client-side returned parsed chapters
       if (parsedResult && parsedResult.chapters && parsedResult.chapters.length > 0) {
         const resolvedTitle = parsedResult.title || cleanTitle;
         const resolvedSynopsis = parsedResult.synopsis || `Imported from ${file.name}. Contains ${parsedResult.chapters.length} chapters ready for playback.`;
@@ -164,7 +137,7 @@ export default function AddNovelModal({
         setTitle(resolvedTitle);
         setSynopsis(resolvedSynopsis);
         setCoverObject(parsedResult.cover_object || null);
-        setParsedChapters(parsedResult.chapters);
+        setRawParsedChapters(parsedResult.chapters);
         setUploadedFile({
           name: file.name,
           size: `${(file.size / 1024).toFixed(1)} KB`,
@@ -186,7 +159,7 @@ export default function AddNovelModal({
           if (chapters && chapters.length > 0) {
             setTitle(cleanTitle);
             setSynopsis(textContent.slice(0, 200).trim() + '...');
-            setParsedChapters(chapters);
+            setRawParsedChapters(chapters);
             setUploadedFile({
               name: file.name,
               size: `${(file.size / 1024).toFixed(1)} KB`,
@@ -200,7 +173,7 @@ export default function AddNovelModal({
 
       // If we got here, parsing failed — report real error rather than generating 3 dummy lines!
       throw new Error(
-        `Could not extract readable chapters from "${file.name}". Please ensure the file is a valid EPUB, PDF, or text novel.`
+        `Could not extract readable chapters from "${file.name}". Please ensure the file is a valid EPUB, MOBI, AZW3, FB2, PDF, or text novel.`
       );
     } catch (err) {
       setError('Failed to parse novel file: ' + (err.message || 'Unknown error'));
@@ -247,7 +220,7 @@ export default function AddNovelModal({
   const handleRemoveFile = () => {
     setUploadedFile(null);
     setCoverObject(null);
-    setParsedChapters([]);
+    setRawParsedChapters([]);
     setPreviewOpen(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -411,14 +384,14 @@ export default function AddNovelModal({
           {/* ================================================================= */}
           <div className="space-y-2">
             <label className="block text-xs font-semibold theme-sub uppercase tracking-wider font-mono">
-              Novel File Dropzone (EPUB, PDF, TXT, MD, HTML)
+              Novel File Dropzone (EPUB, MOBI, AZW3, FB2, PDF, TXT, MD, HTML)
             </label>
 
             {/* Hidden native file input */}
             <input
               ref={fileInputRef}
               type="file"
-              accept=".epub,.pdf,.txt,.md,.html,application/epub+zip,application/pdf,text/plain,text/markdown,text/html"
+              accept=".epub,.pdf,.txt,.md,.html,.mobi,.azw3,.kf8,.fb2,.fbz,application/epub+zip,application/pdf,application/x-mobipocket-ebook,application/vnd.amazon.ebook,application/x-fictionbook+xml,text/plain,text/markdown,text/html"
               onChange={handleFileInputChange}
               className="hidden"
               data-testid="novel-file-input"
@@ -457,11 +430,11 @@ export default function AddNovelModal({
                         <span className="text-[var(--accent)] underline">Browse Files</span>
                       </p>
                       <p className="text-[11px] theme-muted mt-1">
-                        Supports EPUB, PDF, TXT, Markdown, and HTML files
+                        Supports EPUB, MOBI, AZW3, FB2, PDF, TXT, Markdown, and HTML files
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-                      {['EPUB', 'PDF', 'TXT', 'MD', 'HTML'].map((fmt) => (
+                      {['EPUB', 'MOBI', 'AZW3', 'FB2', 'PDF', 'TXT', 'MD', 'HTML'].map((fmt) => (
                         <span
                           key={fmt}
                           className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-white/5 border border-white/10 theme-muted"
@@ -545,6 +518,37 @@ export default function AddNovelModal({
                 )}
               </div>
             )}
+          </div>
+
+          {/* TTS DOM Sanitizer Toggle (Strictly Opt-In) */}
+          <div className="p-3.5 rounded-2xl theme-card border border-[var(--border-subtle)] flex items-start justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold theme-heading">TTS DOM Sanitizer (tts-dom-cleaner)</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono uppercase bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                  Opt-in
+                </span>
+              </div>
+              <p className="text-[11px] theme-muted leading-relaxed">
+                Optional: Strips hidden scraper watermarks, ASCII dividers (***), and duplicate paragraphs. Leave off if a novel has custom formatting.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              data-testid="tts-sanitizer-toggle"
+              aria-checked={useTtsSanitizer}
+              onClick={() => setUseTtsSanitizer((prev) => !prev)}
+              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                useTtsSanitizer ? 'bg-[var(--accent)]' : 'bg-white/20'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  useTtsSanitizer ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
 
           {/* Novel Title Input */}
