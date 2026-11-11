@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import NovelCover from '../NovelCover';
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -262,9 +263,11 @@ export default function BookShelf3D({
               onClick={() => onSelectNovel && onSelectNovel(selectedNovel.id)}
               title="Click to view full novel details"
             >
-              <img
-                src={selectedNovel.cover_object}
-                alt={selectedNovel.title}
+              <NovelCover
+                coverUrl={selectedNovel.cover_object}
+                title={selectedNovel.title}
+                author={selectedNovel.author_username}
+                id={selectedNovel.id}
                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
               {/* Spine highlight overlay */}

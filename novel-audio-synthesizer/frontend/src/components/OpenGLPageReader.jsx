@@ -822,7 +822,7 @@ export default function OpenGLPageReader({
                         <NovelCover
                           title={currentNovel?.title}
                           author={currentNovel?.author_username}
-                          coverUrl={null}
+                          coverUrl={currentNovel?.cover_object}
                           className="w-full h-full"
                         />
                       )}
@@ -831,7 +831,7 @@ export default function OpenGLPageReader({
                           <NovelCover
                             title={currentNovel?.title}
                             author={currentNovel?.author_username}
-                            coverUrl={null}
+                            coverUrl={currentNovel?.cover_object}
                             className="w-full h-full"
                           />
                         </div>

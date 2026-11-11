@@ -77,6 +77,31 @@ export const COVER_STYLES = {
   charcoal: EDITIONS[4],
 };
 
+export const CANONICAL_COVERS = {
+  'the little prince': '/covers/the-little-prince-cover.jpg',
+  'little prince': '/covers/the-little-prince-cover.jpg',
+  'harry potter and the philosopher\'s stone': '/covers/harry-potter-philosophers-stone-cover.jpg',
+  'harry potter': '/covers/harry-potter-philosophers-stone-cover.jpg',
+  'the adventures of sherlock holmes': '/covers/adventures-of-sherlock-holmes-cover.jpg',
+  'sherlock holmes': '/covers/adventures-of-sherlock-holmes-cover.jpg',
+  'a study in scarlet': '/covers/a-study-in-scarlet-cover.jpg',
+  'the great gatsby': '/covers/the-great-gatsby-cover.jpg',
+  'the hobbit': '/covers/the-hobbit-cover.jpg',
+  '1984': '/covers/1984-george-orwell-cover.jpg',
+  'pride and prejudice': '/covers/pride-and-prejudice-cover.jpg',
+  'alice\'s adventures in wonderland': '/covers/alices-adventures-in-wonderland-cover.jpg',
+  'alices adventures in wonderland': '/covers/alices-adventures-in-wonderland-cover.jpg',
+  'frankenstein': '/covers/frankenstein-mary-shelley-cover.jpg',
+  'dracula': '/covers/dracula-bram-stoker-cover.jpg',
+  'jane eyre': '/covers/jane-eyre-cover.jpg',
+  'moby-dick': '/covers/moby-dick-cover.jpg',
+  'moby dick': '/covers/moby-dick-cover.jpg',
+  'the picture of dorian gray': '/covers/picture-of-dorian-gray-cover.jpg',
+  'dorian gray': '/covers/picture-of-dorian-gray-cover.jpg',
+  'the count of monte cristo': '/covers/count-of-monte-cristo-cover.jpg',
+  'count of monte cristo': '/covers/count-of-monte-cristo-cover.jpg',
+};
+
 export function getCoverStyle(title = '', id = '', index = 0) {
   if (typeof index === 'number' && index >= 0) {
     return EDITIONS[index % EDITIONS.length];
@@ -96,21 +121,49 @@ export default function NovelCover({
   index = 0,
   hideEyebrow = false,
 }) {
-  const [imgError, setImgError] = useState(false);
   const displayTitle = typeof title === 'string' && title.trim() ? title : 'Untitled Novel';
   const displayAuthor = typeof author === 'string' ? author.trim() : '';
   const style = getCoverStyle(displayTitle, id, index);
 
-  useEffect(() => { setImgError(false); }, [coverUrl]);
+  const normalizedTitle = (displayTitle || '').toLowerCase().trim();
+  const canonicalFallback = CANONICAL_COVERS[normalizedTitle] ||
+    Object.entries(CANONICAL_COVERS).find(([k]) => normalizedTitle.includes(k))?.[1] ||
+    null;
 
-  if (coverUrl && !imgError) {
+  const initialSrc = coverUrl || canonicalFallback;
+  const [currentSrc, setCurrentSrc] = useState(initialSrc);
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    const nextSrc = coverUrl || canonicalFallback;
+    setCurrentSrc(nextSrc);
+    setImgError(false);
+  }, [coverUrl, canonicalFallback]);
+
+  const handleImageError = () => {
+    if (currentSrc && currentSrc.startsWith('/static/covers/')) {
+      setCurrentSrc(currentSrc.replace('/static/covers/', '/covers/'));
+      return;
+    }
+    if (currentSrc && currentSrc.endsWith('.webp')) {
+      setCurrentSrc(currentSrc.replace(/\.webp$/, '.jpg'));
+      return;
+    }
+    if (canonicalFallback && currentSrc !== canonicalFallback) {
+      setCurrentSrc(canonicalFallback);
+      return;
+    }
+    setImgError(true);
+  };
+
+  if (currentSrc && !imgError) {
     return (
       <div className={`relative overflow-hidden ${className}`}>
         <img
-          src={coverUrl}
-          alt={title}
+          src={currentSrc}
+          alt={displayTitle}
           className="volume-cover-img w-full h-full object-cover"
-          onError={() => setImgError(true)}
+          onError={handleImageError}
           loading="lazy"
         />
         <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-black/60 to-transparent pointer-events-none" />

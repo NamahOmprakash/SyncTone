@@ -5,6 +5,14 @@ import {
   createSpineTexture,
   createBackCoverTexture,
 } from './bookTextures';
+import { CANONICAL_COVERS } from '../NovelCover';
+
+function resolveCoverUrl(novel) {
+  if (novel?.cover_object) return novel.cover_object;
+  const normalized = (novel?.title || '').toLowerCase().trim();
+  return CANONICAL_COVERS[normalized] ||
+    Object.entries(CANONICAL_COVERS).find(([k]) => normalized.includes(k))?.[1] || null;
+}
 
 /**
  * Procedural Contact Shadow Texture
@@ -168,10 +176,11 @@ export default function FeaturedBook3D({
       metalness: 0.12,
     });
 
-    // Front cover texture loaded from novel.cover_object
+    // Front cover texture loaded from resolved cover URL
     const textureLoader = new THREE.TextureLoader();
-    const frontCoverTexture = novel?.cover_object
-      ? textureLoader.load(novel.cover_object)
+    const coverUrl = resolveCoverUrl(novel);
+    const frontCoverTexture = coverUrl
+      ? textureLoader.load(coverUrl)
       : spineTexture;
     frontCoverTexture.colorSpace = THREE.SRGBColorSpace;
 
@@ -326,8 +335,9 @@ export default function FeaturedBook3D({
 
     // Load new front cover texture
     const textureLoader = new THREE.TextureLoader();
-    if (novel.cover_object) {
-      textureLoader.load(novel.cover_object, (texture) => {
+    const coverUrl = resolveCoverUrl(novel);
+    if (coverUrl) {
+      textureLoader.load(coverUrl, (texture) => {
         texture.colorSpace = THREE.SRGBColorSpace;
         if (materials[4]) {
           if (materials[4].map) materials[4].map.dispose();
@@ -428,7 +438,7 @@ export default function FeaturedBook3D({
         title={novel?.title}
       >
         <img
-          src={novel?.cover_object}
+          src={resolveCoverUrl(novel)}
           alt={novel?.title}
           className="w-full h-full object-cover rounded-xl"
         />
