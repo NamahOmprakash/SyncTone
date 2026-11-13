@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncTone — Noir Monochrome Concept Preview (Phase 2)</title>
+  <link rel="stylesheet" href="css/noir-mono.css">
+  <style>
+    /* Preview Showcase Specific Tweaks */
+    .preview-section-anchor {
+      scroll-margin-top: 100px;
+    }
+    .screen-divider-bar {
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-strong);
+      border-bottom: 1px solid var(--border-strong);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--text-main);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =========================================================================
+       CONCEPT PREVIEW HARNESS (STICKY TOP CONTROL BAR)
+       ========================================================================= -->
+  <div class="preview-harness-bar">
+    <div class="preview-badge-brand">
+      <span class="brand-symbol"></span>
+      <span>SYNCTONE // NOIR MONOCHROME // PHASE 2 CONCEPT PREVIEW</span>
+    </div>
+
+    <div class="preview-nav-tabs">
+      <button class="preview-tab-pill active" data-screen="home">01 HOME STAGE</button>
+      <button class="preview-tab-pill" data-screen="detail">02 NOVEL DETAIL</button>
+      <button class="preview-tab-pill" data-screen="reader">03 READER CANVAS</button>
+      <button class="preview-tab-pill" data-screen="audio">04 AUDIO DOCK</button>
+      <button class="preview-tab-pill" data-screen="studio">05 VOICE STUDIO</button>
+      <button class="preview-tab-pill" data-screen="all">ALL SCREENS</button>
+    </div>
+
+    <div class="preview-controls-right">
+      <button id="btn-vp-desktop" class="preview-tab-pill active" title="Desktop Viewport 1440x900">1440×900</button>
+      <button id="btn-vp-mobile" class="preview-tab-pill" title="Mobile Viewport 390x844">390×844</button>
+      <button id="harness-theme-toggle" class="preview-tab-pill" style="font-weight: 700; background: #27272A; color: #FFF;">● DARK MODE</button>
+    </div>
+  </div>
+
+  <!-- STAGE CONTAINER (Responsive Wrapper) -->
+  <div class="preview-stage-container">
+
+    <!-- =======================================================================
+         SHARED APP SHELL HEADER
+         ======================================================================= -->
+    <header class="top-header">
+      <div class="brand-logo">
+        <span class="brand-symbol"></span>
+        <span>SYNCTONE</span>
+      </div>
+
+      <nav class="nav-links">
+        <a href="#screen-home" class="nav-link active" onclick="window.SyncTonePreview.showScreen('home'); return false;">+ LIBRARY</a>
+        <a href="#screen-detail" class="nav-link" onclick="window.SyncTonePreview.showScreen('detail'); return false;">+ ARCHIVE</a>
+        <a href="#screen-studio" class="nav-link" onclick="window.SyncTonePreview.showScreen('studio'); return false;">+ VOICES</a>
+        <a href="#screen-reader" class="nav-link" onclick="window.SyncTonePreview.showScreen('reader'); return false;">+ READER</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="btn btn-sm theme-toggle-btn">
+          <span class="dot"></span> THEME: DARK
+        </button>
+        <button class="btn btn-sm btn-primary">
+          <span class="dot"></span> SIGN IN
+        </button>
+      </div>
+    </header>
+
+    <!-- =======================================================================
+         SCREEN 1: HOME STAGE & CATALOG
+         ======================================================================= -->
+    <section id="screen-home" class="preview-screen-view">
+      <div class="home-stage">
+        
+        <!-- Eyebrow -->
+        <div class="hero-eyebrow">
+          <span class="badge badge-active">
+            <span class="signal-dot"></span> ARCHIVE VOLUME 08 // PRODUCTION SYSTEM
+          </span>
+        </div>
+
+        <!-- Giant Headline with Skewed Italic Fade -->
+        <div class="hero-headline-container">
+          <h1 class="hero-display-title">
+            <span class="hero-gradient-text">STORIES</span>
+            <span class="hero-gradient-text hero-skew-italic">TOLD IN SOUND</span>
+          </h1>
+        </div>
+
+        <!-- Hero Object Triad: Left Credits, Center 3D Book, Right Sans Blurb -->
+        <div class="hero-triad-grid">
+          
+          <!-- Left Column: Mono Metadata Credits -->
+          <div class="hero-meta-left">
+            <div class="hero-meta-item">
+              <span class="hero-meta-label">FEATURED TITLE</span>
+              <span class="hero-meta-val">THE ADVENTURES OF SHERLOCK HOLMES</span>
+            </div>
+            <div class="hero-meta-item">
+              <span class="hero-meta-label">AUTHOR</span>
+              <span class="hero-meta-val">SIR ARTHUR CONAN DOYLE</span>
+            </div>
+            <div class="hero-meta-item">
+              <span class="hero-meta-label">NEURAL VOICE CAST</span>
+              <span class="hero-meta-val">5 CAST // DR. WATSON LEAD</span>
+            </div>
+            <div class="hero-meta-item">
+              <span class="hero-meta-label">RUNTIME & SCOPE</span>
+              <span class="hero-meta-val">08H 42M // 24 CHAPTERS</span>
+            </div>
+            <div class="hero-meta-item">
+              <span class="hero-meta-label">ACOUSTIC PIPELINE</span>
+              <span class="hero-meta-val">LOSSLESS 48KHZ // DUAL-CHANNEL</span>
+            </div>
+          </div>
+
+          <!-- Center Column: 3D Tilted Novel Showcase -->
+          <div class="hero-book-stage">
+            <div class="book-3d" onclick="window.SyncTonePreview.showScreen('detail');">
+              <div class="book-jacket">
+                <div class="book-jacket-header">
+                  <span class="book-volume-stamp">VOL. 01</span>
+                  <span class="mono-xs">SYNCTONE</span>
+                </div>
+
+                <div class="book-center-graphic">
+                  <div class="book-geometry-icon">
+                    <span class="mono-xs" style="color: #A9A9AF;">▲</span>
+                  </div>
+                  <h2 class="book-jacket-title">SHERLOCK<br>HOLMES</h2>
+                  <div class="book-jacket-author">A. CONAN DOYLE</div>
+                </div>
+
+                <div class="book-jacket-footer">
+                  <span>NEURAL AUDIO</span>
+                  <span>48KHZ DUAL</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Editorial Sans Blurb & CTA Box -->
+          <div class="hero-blurb-right">
+            <p class="hero-editorial-blurb">
+              SyncTone re-engineers classic literature into neural multi-speaker drama. Every sentence is dynamically assigned to character voices, scored with generative ambient soundscapes, and synchronized to the reading canvas in real time.
+            </p>
+
+            <!-- Scrim box for mathematical WCAG AAA contrast -->
+            <div class="hero-cta-scrim-box">
+              <div class="cta-button-cluster">
+                <button class="btn btn-lg btn-primary" onclick="window.SyncTonePreview.showScreen('detail');">
+                  <span class="dot"></span> LISTEN NOW
+                </button>
+                <button class="btn btn-lg" onclick="window.SyncTonePreview.showScreen('reader');">
+                  <span class="signal-dot"></span> PLAY SAMPLE & READ
+                </button>
+              </div>
+
+              <div class="mono-xs" style="color: var(--text-muted); display: flex; justify-content: space-between;">
+                <span>STATUS: NEURAL READY</span>
+                <span>ZERO COMPRESSION</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Catalog Section -->
+        <div class="catalog-section">
+          <div class="section-header-row">
+            <div class="section-heading-cluster">
+              <span class="mono-xs" style="color: var(--text-muted);">// ARCHIVE CATALOG</span>
+              <h2 style="font-family: var(--font-sans); font-size: 22px; font-weight: 800; letter-spacing: -0.02em; text-transform: uppercase;">
+                LITERARY VOLUMES IN REPERTORY
+              </h2>
+            </div>
+            <div class="mono-xs" style="display: flex; gap: 8px;">
+              <span class="badge badge-active">[ ALL VOLUMES ]</span>
+              <span class="badge">[ MYSTERY ]</span>
+              <span class="badge">[ SCI-FI ]</span>
+              <span class="badge">[ PHILOSOPHY ]</span>
+            </div>
+          </div>
+
+          <!-- Sharp Cards Grid -->
+          <div class="catalog-grid">
+            
+            <!-- Card 1 -->
+            <article class="volume-card" onclick="window.SyncTonePreview.showScreen('detail');">
+              <div class="volume-cover-wrapper">
+                <div class="card-top-tag">
+                  <span class="badge">VOL. 01</span>
+                  <span class="badge badge-active"><span class="signal-dot"></span> READY</span>
+                </div>
+                <div class="volume-cover-art-center">
+                  <div class="volume-num">ARTHUR CONAN DOYLE</div>
+                  <div class="volume-title">THE ADVENTURES OF SHERLOCK HOLMES</div>
+                </div>
+                <div class="card-specs-row">
+                  <span class="mono-xs" style="color: #898992;">08H 42M</span>
+                  <span class="mono-xs" style="color: #898992;">5 CAST</span>
+                </div>
+              </div>
+              <div class="volume-content-meta">
+                <div class="card-title-row">
+                  <h3 class="card-book-title">The Adventures of Sherlock Holmes</h3>
+                  <span class="card-book-author">Sir Arthur Conan Doyle (1892)</span>
+                </div>
+                <div class="card-specs-row">
+                  <span class="badge">+ MYSTERY</span>
+                  <span class="badge">+ 24 CHAPTERS</span>
+                  <span class="badge">+ 48KHZ</span>
+                </div>
+                <button class="btn btn-sm btn-primary" style="margin-top: 8px; width: 100%;">
+                  <span class="dot"></span> OPEN VOLUME
+                </button>
+              </div>
+            </article>
+
+            <!-- Card 2 -->
+            <article class="volume-card" onclick="window.SyncTonePreview.showScreen('detail');">
+              <div class="volume-cover-wrapper">
+                <div class="card-top-tag">
+                  <span class="badge">VOL. 02</span>
+                  <span class="badge badge-active"><span class="signal-dot"></span> SYNTH 82%</span>
+                </div>
+                <div class="volume-cover-art-center">
+                  <div class="volume-num">WILLIAM GIBSON</div>
+                  <div class="volume-title">NEUROMANCER: CHRONICLE</div>
+                </div>
+                <div class="card-specs-row">
+                  <span class="mono-xs" style="color: #898992;">09H 15M</span>
+                  <span class="mono-xs" style="color: #898992;">6 CAST</span>
+                </div>
+              </div>
+              <div class="volume-content-meta">
+                <div class="card-title-row">
+                  <h3 class="card-book-title">Neuromancer</h3>
+                  <span class="card-book-author">William Gibson (1984)</span>
+                </div>
+                <div class="card-specs-row">
+                  <span class="badge">+ CYBERPUNK</span>
+                  <span class="badge">+ 24 CHAPTERS</span>
+                  <span class="badge">+ AMBIENT SCORE</span>
+                </div>
+                <button class="btn btn-sm" style="margin-top: 8px; width: 100%;">
+                  <span class="dot"></span> OPEN VOLUME
+                </button>
+              </div>
+            </article>
+
+            <!-- Card 3 -->
+            <article class="volume-card" onclick="window.SyncTonePreview.showScreen('detail');">
+              <div class="volume-cover-wrapper">
+                <div class="card-top-tag">
+                  <span class="badge">VOL. 03</span>
+                  <span class="badge badge-active"><span class="signal-dot"></span> READY</span>
+                </div>
+                <div class="volume-cover-art-center">
+                  <div class="volume-num">MARY SHELLEY</div>
+                  <div class="volume-title">FRANKENSTEIN; OR PROMETHEUS</div>
+                </div>
+                <div class="card-specs-row">
+                  <span class="mono-xs" style="color: #898992;">07H 20M</span>
+                  <span class="mono-xs" style="color: #898992;">4 CAST</span>
+                </div>
+              </div>
+              <div class="volume-content-meta">
+                <div class="card-title-row">
+                  <h3 class="card-book-title">Frankenstein</h3>
+                  <span class="card-book-author">Mary Wollstonecraft Shelley (1818)</span>
+                </div>
+                <div class="card-specs-row">
+                  <span class="badge">+ GOTHIC</span>
+                  <span class="badge">+ 24 CHAPTERS</span>
+                  <span class="badge">+ 48KHZ</span>
+                </div>
+                <button class="btn btn-sm" style="margin-top: 8px; width: 100%;">
+                  <span class="dot"></span> OPEN VOLUME
+                </button>
+              </div>
+            </article>
+
+            <!-- Card 4 -->
+            <article class="volume-card" onclick="window.SyncTonePreview.showScreen('detail');">
+              <div class="volume-cover-wrapper">
+                <div class="card-top-tag">
+                  <span class="badge">VOL. 04</span>
+                  <span class="badge badge-active"><span class="signal-dot"></span> READY</span>
+                </div>
+                <div class="volume-cover-art-center">
+                  <div class="volume-num">OSCAR WILDE</div>
+                  <div class="volume-title">THE PICTURE OF DORIAN GRAY</div>
+                </div>
+                <div class="card-specs-row">
+                  <span class="mono-xs" style="color: #898992;">06H 50M</span>
+                  <span class="mono-xs" style="color: #898992;">3 CAST</span>
+                </div>
+              </div>
+              <div class="volume-content-meta">
+                <div class="card-title-row">
+                  <h3 class="card-book-title">The Picture of Dorian Gray</h3>
+                  <span class="card-book-author">Oscar Wilde (1890)</span>
+                </div>
+                <div class="card-specs-row">
+                  <span class="badge">+ PHILOSOPHICAL</span>
+                  <span class="badge">+ 20 CHAPTERS</span>
+                  <span class="badge">+ 48KHZ</span>
+                </div>
+                <button class="btn btn-sm" style="margin-top: 8px; width: 100%;">
+                  <span class="dot"></span> OPEN VOLUME
+                </button>
+              </div>
+            </article>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         SCREEN 2: NOVEL DETAIL VIEW
+         ======================================================================= -->
+    <section id="screen-detail" class="preview-screen-view" style="display: none;">
+      <div class="detail-stage">
+        
+        <!-- Breadcrumb & Back -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+          <a href="#" class="mono-xs" onclick="window.SyncTonePreview.showScreen('home'); return false;" style="color: var(--text-sub);">
+            ← BACK TO ARCHIVE CATALOG
+          </a>
+          <span class="mono-xs" style="color: var(--text-muted);">
+            CATALOG // CLASSICS // VOL. 01 // ID: SH-1892
+          </span>
+        </div>
+
+        <!-- Full-Bleed Stage Header -->
+        <div class="detail-stage-header">
+          <span class="badge badge-active" style="width: fit-content;">
+            <span class="signal-dot"></span> NEURAL SYNTHESIS COMPLETE // 48KHZ MASTER
+          </span>
+
+          <h1 class="detail-giant-title">
+            THE ADVENTURES OF<br>SHERLOCK HOLMES
+          </h1>
+
+          <div class="detail-metadata-bar">
+            <span>AUTHOR: SIR ARTHUR CONAN DOYLE</span>
+            <span>•</span>
+            <span>DURATION: 08H 42M 16S</span>
+            <span>•</span>
+            <span>CHAPTERS: 24 TRACKS</span>
+            <span>•</span>
+            <span>VOICES: 5 NEURAL CAST</span>
+            <span>•</span>
+            <span>FORMAT: STEREO BINAURAL</span>
+          </div>
+
+          <div class="detail-actions-cluster">
+            <button class="btn btn-lg btn-primary" onclick="window.SyncTonePreview.showScreen('reader');">
+              <span class="dot"></span> LISTEN TO NOVEL
+            </button>
+            <button class="btn btn-lg" onclick="window.SyncTonePreview.showScreen('reader');">
+              <span class="dot"></span> OPEN READER
+            </button>
+            <button class="btn btn-lg" onclick="window.SyncTonePreview.showScreen('studio');">
+              <span class="signal-dot"></span> VOICE STUDIO
+            </button>
+          </div>
+        </div>
+
+        <!-- Boxed Mono Tab Bar -->
+        <div class="tabs-bar" style="margin-bottom: 24px;">
+          <button class="tab-btn active" data-tab="overview">OVERVIEW</button>
+          <button class="tab-btn" data-tab="cast">CAST ROSTER (5)</button>
+          <button class="tab-btn" data-tab="chapters">CHAPTERS (24)</button>
+          <button class="tab-btn" data-tab="details">TECHNICAL DETAILS</button>
+          <button class="tab-btn" data-tab="score">ATMOSPHERIC SCORE</button>
+        </div>
+
+        <!-- Tab 1: Overview Panel -->
+        <div id="tab-panel-overview" class="tab-content-panel">
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 32px;">
+            <div>
+              <h3 class="mono-sm" style="margin-bottom: 12px; color: var(--text-muted);">// SYNOPSIS</h3>
+              <p style="font-size: 15px; line-height: 1.7; color: var(--text-main); margin-bottom: 24px;">
+                The Adventures of Sherlock Holmes is a collection of twelve short stories by Arthur Conan Doyle, first published on 14 October 1892. It contains the earliest short stories featuring the consulting detective Sherlock Holmes, beginning with "A Scandal in Bohemia".
+              </p>
+              <p style="font-size: 15px; line-height: 1.7; color: var(--text-sub);">
+                In this SyncTone production, Dr. John Watson’s intimate narrative voice frames every inquiry, while Holmes’ sharp analytical cadence pierces through Victorian London’s foggy thoroughfares. Synthesized using multi-channel neural models with bespoke 19th-century phoneme dictionaries.
+              </p>
+            </div>
+            <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+              <span class="mono-xs" style="color: var(--text-muted);">// SYNTHESIS MATRIX</span>
+              <div style="display: flex; justify-content: space-between;" class="mono-xs">
+                <span style="color: var(--text-sub);">NEURAL MODEL</span>
+                <span style="color: var(--text-main);">SYNCTONE V3.2</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;" class="mono-xs">
+                <span style="color: var(--text-sub);">DIALOGUE SEGMENTS</span>
+                <span style="color: var(--text-main);">1,920 BLOCKS</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;" class="mono-xs">
+                <span style="color: var(--text-sub);">SAMPLE ACCURACY</span>
+                <span style="color: var(--text-main);">48KHZ / 24-BIT</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;" class="mono-xs">
+                <span style="color: var(--text-sub);">SYNC DRIFT</span>
+                <span style="color: var(--text-main);">&lt; 12MS JITTER</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Chapters Panel (Directory) -->
+        <div id="tab-panel-chapters" class="tab-content-panel" style="display: none;">
+          <div class="chapters-directory-list">
+            <div class="chapter-row-item">
+              <span class="chapter-idx">CH. 01</span>
+              <span class="chapter-title">A Scandal in Bohemia</span>
+              <span class="chapter-duration">38:14</span>
+              <span class="badge badge-active"><span class="signal-dot"></span> SYNTHESIZED</span>
+              <button class="btn btn-sm btn-primary"><span class="dot"></span> PLAY</button>
+            </div>
+            <div class="chapter-row-item">
+              <span class="chapter-idx">CH. 02</span>
+              <span class="chapter-title">The Red-Headed League</span>
+              <span class="chapter-duration">42:05</span>
+              <span class="badge badge-active"><span class="signal-dot"></span> SYNTHESIZED</span>
+              <button class="btn btn-sm"><span class="dot"></span> PLAY</button>
+            </div>
+            <div class="chapter-row-item">
+              <span class="chapter-idx">CH. 03</span>
+              <span class="chapter-title">A Case of Identity</span>
+              <span class="chapter-duration">31:50</span>
+              <span class="badge badge-active"><span class="signal-dot"></span> SYNTHESIZED</span>
+              <button class="btn btn-sm"><span class="dot"></span> PLAY</button>
+            </div>
+            <div class="chapter-row-item">
+              <span class="chapter-idx">CH. 04</span>
+              <span class="chapter-title">The Boscombe Valley Mystery</span>
+              <span class="chapter-duration">45:20</span>
+              <span class="badge badge-active"><span class="signal-dot"></span> SYNTHESIZED</span>
+              <button class="btn btn-sm"><span class="dot"></span> PLAY</button>
+            </div>
+            <div class="chapter-row-item">
+              <span class="chapter-idx">CH. 05</span>
+              <span class="chapter-title">The Five Orange Pips</span>
+              <span class="chapter-duration">33:40</span>
+              <span class="badge badge-active"><span class="signal-dot"></span> SYNTHESIZED</span>
+              <button class="btn btn-sm"><span class="dot"></span> PLAY</button>
+            </div>
+            <div class="chapter-row-item">
+              <span class="chapter-idx">CH. 06</span>
+              <span class="chapter-title">The Man with the Twisted Lip</span>
+              <span class="chapter-duration">39:15</span>
+              <span class="badge badge-active"><span class="signal-dot"></span> SYNTHESIZED</span>
+              <button class="btn btn-sm"><span class="dot"></span> PLAY</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Cast Panel -->
+        <div id="tab-panel-cast" class="tab-content-panel" style="display: none;">
+          <div class="roster-grid">
+            <div class="character-card">
+              <div class="char-header-row">
+                <span class="char-name">Dr. John Watson</span>
+                <span class="char-role-badge">SPEAKER B (LEAD)</span>
+              </div>
+              <div class="char-traits-list">
+                <span>ROLE: First-person Narrator & Chronicler</span>
+                <span>TIMBRE: Warm British Tenor // 45–50 yo</span>
+                <span>CADENCE: Observant, companionable</span>
+              </div>
+            </div>
+            <div class="character-card">
+              <div class="char-header-row">
+                <span class="char-name">Sherlock Holmes</span>
+                <span class="char-role-badge">SPEAKER A</span>
+              </div>
+              <div class="char-traits-list">
+                <span>ROLE: Consulting Detective</span>
+                <span>TIMBRE: Sharp RP Analytical // 35–40 yo</span>
+                <span>CADENCE: Incisive, staccato deductions</span>
+              </div>
+            </div>
+            <div class="character-card">
+              <div class="char-header-row">
+                <span class="char-name">Inspector Lestrade</span>
+                <span class="char-role-badge">SPEAKER C</span>
+              </div>
+              <div class="char-traits-list">
+                <span>ROLE: Scotland Yard Detective</span>
+                <span>TIMBRE: Raspy Cockney Undertone</span>
+                <span>CADENCE: Brusque, hurried inquiries</span>
+              </div>
+            </div>
+            <div class="character-card">
+              <div class="char-header-row">
+                <span class="char-name">Mrs. Hudson</span>
+                <span class="char-role-badge">SPEAKER D</span>
+              </div>
+              <div class="char-traits-list">
+                <span>ROLE: 221B Baker Street Landlady</span>
+                <span>TIMBRE: Gentle Scottish Lilt // 60+ yo</span>
+                <span>CADENCE: Polite, maternal patience</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         SCREEN 3: READER CANVAS
+         ======================================================================= -->
+    <section id="screen-reader" class="preview-screen-view" style="display: none;">
+      <div class="reader-canvas-container">
+        
+        <!-- Monospace Floating Toolbar -->
+        <div class="reader-floating-toolbar">
+          <div class="reader-toolbar-group">
+            <span class="mono-xs" style="color: var(--text-muted);">// READER CONTROL</span>
+            <button id="btn-font-minus" class="btn btn-sm">A−</button>
+            <button id="btn-font-plus" class="btn btn-sm">A+</button>
+            <button id="btn-toggle-font" class="btn btn-sm">NEWSREADER SERIF</button>
+          </div>
+
+          <div class="reader-toolbar-group">
+            <span class="mono-xs" style="color: var(--text-sub);">PAGE 14 OF 342 // 4.1%</span>
+            <span class="badge badge-active"><span class="signal-dot"></span> AUDIO SYNC ACTIVE</span>
+          </div>
+
+          <div class="reader-toolbar-group">
+            <button class="btn btn-sm" onclick="window.SyncTonePreview.showScreen('detail');">CLOSE READER [×]</button>
+          </div>
+        </div>
+
+        <!-- Outer Gutter Chevrons -->
+        <button class="gutter-chevron gutter-chevron-left" title="Previous Page">‹</button>
+        <button class="gutter-chevron gutter-chevron-right" title="Next Page">›</button>
+
+        <!-- Reading Content: Strictly 60-75ch Measure -->
+        <main class="reader-content-stage">
+          <header class="reader-book-header">
+            <div class="mono-xs" style="color: var(--text-muted); margin-bottom: 8px;">
+              THE ADVENTURES OF SHERLOCK HOLMES // SIR ARTHUR CONAN DOYLE
+            </div>
+            <h1 class="reader-chapter-title">Chapter I. A Scandal in Bohemia</h1>
+            <div class="mono-xs" style="color: var(--text-sub);">
+              TIMECODE: 04:12.84 // NARRATED BY DR. JOHN WATSON
+            </div>
+          </header>
+
+          <article class="reader-body-text">
+            <p>
+              <span class="drop-cap">T</span>o Sherlock Holmes she is always <em>the</em> woman. I have seldom heard him mention her under any other name. In his eyes she eclipses and predominates the whole of her sex. It was not that he felt any emotion akin to love for Irene Adler. All emotions, and that one particularly, were abhorrent to his cold, precise but admirably balanced mind. He was, I take it, the most perfect reasoning and observing machine that the world has seen, but as a lover he would have placed himself in a false position.
+            </p>
+
+            <p>
+              He never spoke of the softer passions, save with a gibe and a sneer. They were admirable things for the observer—excellent for drawing the veil from men’s motives and actions. But for the trained reasoner to admit such intrusions into his own delicate and finely adjusted temperament was to introduce a distracting factor which might throw a doubt upon all his mental results.
+            </p>
+
+            <!-- Synchronized Active Spoken Paragraph -->
+            <p class="reader-sync-active-para">
+              <span class="mono-xs" style="display: block; margin-bottom: 6px; color: var(--text-sub);">
+                [● AUDIO SYNC 04:12.84 — SPEAKER B (WATSON)]
+              </span>
+              “I had seen little of Holmes lately. My marriage had drifted us away from each other. My own complete happiness, and the home-centred interests which rise up around the man who first finds himself master of his own establishment, were sufficient to absorb all my attention; while Holmes, who loathed every form of society with his whole Bohemian soul, remained in our lodgings in Baker Street, buried among his old books, and alternating from week to week between cocaine and ambition, the drowsiness of the drug, and the fierce energy of his own keen nature.”
+            </p>
+
+            <p>
+              He was still, as ever, deeply attracted by the study of crime, and occupied his immense faculties and extraordinary powers of observation in following out those clues, and clearing up those mysteries which had been abandoned as hopeless by the official police. From time to time I heard some vague account of his doings: of his summons to Odessa in the case of the Trepoff murder, of his clearing up of the singular tragedy of the Atkinson brothers at Trincomalee, and finally of the mission which he had accomplished so delicately and successfully for the reigning family of Holland.
+            </p>
+          </article>
+        </main>
+
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         SCREEN 5: VOICE STUDIO
+         ======================================================================= -->
+    <section id="screen-studio" class="preview-screen-view" style="display: none;">
+      <div class="studio-sheet-wrapper">
+        <div class="studio-card-container">
+          
+          <div class="studio-header">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span class="brand-symbol"></span>
+              <span class="mono" style="font-size: 13px; font-weight: 700;">VOICE SYNTHESIS STUDIO // ENGINE V3.2</span>
+            </div>
+            <button class="btn btn-sm" onclick="window.SyncTonePreview.showScreen('detail');">CLOSE [×]</button>
+          </div>
+
+          <div class="tabs-bar">
+            <button class="tab-btn active" data-tab="studio-cast">CAST ROSTER</button>
+            <button class="tab-btn" data-tab="studio-voices">NEURAL VOICES</button>
+            <button class="tab-btn" data-tab="studio-settings">TIMBRE SETTINGS</button>
+            <button class="tab-btn" data-tab="studio-pipeline">SYNTHESIS PIPELINE</button>
+          </div>
+
+          <div class="studio-body">
+            
+            <!-- Synthesis Progress Indicator Banner -->
+            <div class="synthesis-banner-box">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="mono-xs" style="color: var(--text-main); font-weight: 600;">
+                  SYNTHESIZING CHAPTER 02: THE RED-HEADED LEAGUE
+                </span>
+                <span class="badge badge-active">
+                  <span class="signal-dot"></span> GENERATING AUDIO BLOCKS
+                </span>
+              </div>
+
+              <div class="synthesis-progress-track">
+                <div class="synthesis-progress-fill"></div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center;" class="mono-xs">
+                <span style="color: var(--text-muted);">
+                  PROGRESS: 74% COMPLETE // 1,420 OF 1,920 BLOCKS
+                </span>
+                <span style="color: var(--text-main);">
+                  ESTIMATED REMAINING: 01M 14S // 48KHZ PCM
+                </span>
+              </div>
+            </div>
+
+            <!-- Character Cast Roster Grid -->
+            <div>
+              <div class="section-header-row" style="margin-bottom: 16px;">
+                <span class="mono-xs" style="color: var(--text-muted);">// CHARACTER VOICE ASSIGNMENTS</span>
+                <button class="btn btn-sm"><span class="dot"></span> + ADD CHARACTER</button>
+              </div>
+
+              <div class="roster-grid">
+                
+                <div class="character-card">
+                  <div class="char-header-row">
+                    <span class="char-name">Narrator / Chronicler</span>
+                    <span class="badge">NARRATOR</span>
+                  </div>
+                  <div class="char-traits-list">
+                    <span>MODEL: Neural-Docu-UK-M</span>
+                    <span>PITCH OFFSET: +0.00 ST</span>
+                    <span>CADENCE PACE: 1.00×</span>
+                    <span>STATUS: <span style="color: var(--text-main);">● ASSIGNED &amp; LOCKED</span></span>
+                  </div>
+                </div>
+
+                <div class="character-card">
+                  <div class="char-header-row">
+                    <span class="char-name">Sherlock Holmes</span>
+                    <span class="badge badge-active">SPEAKER A</span>
+                  </div>
+                  <div class="char-traits-list">
+                    <span>MODEL: Neural-Analytical-Male-V2</span>
+                    <span>PITCH OFFSET: -0.05 ST</span>
+                    <span>CADENCE PACE: 1.05×</span>
+                    <span>STATUS: <span style="color: var(--text-main);">● ASSIGNED &amp; LOCKED</span></span>
+                  </div>
+                </div>
+
+                <div class="character-card">
+                  <div class="char-header-row">
+                    <span class="char-name">Dr. John Watson</span>
+                    <span class="badge badge-active">SPEAKER B</span>
+                  </div>
+                  <div class="char-traits-list">
+                    <span>MODEL: Neural-Warm-Male-UK</span>
+                    <span>PITCH OFFSET: +0.02 ST</span>
+                    <span>CADENCE PACE: 0.98×</span>
+                    <span>STATUS: <span style="color: var(--text-main);">● ASSIGNED &amp; LOCKED</span></span>
+                  </div>
+                </div>
+
+                <div class="character-card">
+                  <div class="char-header-row">
+                    <span class="char-name">Inspector Lestrade</span>
+                    <span class="badge">SPEAKER C</span>
+                  </div>
+                  <div class="char-traits-list">
+                    <span>MODEL: Neural-Cockney-Male</span>
+                    <span>PITCH OFFSET: +0.10 ST</span>
+                    <span>CADENCE PACE: 1.10×</span>
+                    <span>STATUS: <span style="color: var(--text-main);">● ASSIGNED &amp; LOCKED</span></span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Timbre Parameters -->
+            <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 20px;">
+              <span class="mono-xs" style="color: var(--text-muted); display: block; margin-bottom: 16px;">
+                // SYNTHESIS TIMBRE PARAMETERS
+              </span>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                <div>
+                  <label class="mono-xs" style="color: var(--text-sub); display: block; margin-bottom: 6px;">
+                    EMOTIONAL RANGE [78%]
+                  </label>
+                  <input type="range" min="0" max="100" value="78" style="width: 100%; accent-color: var(--text-main);">
+                </div>
+                <div>
+                  <label class="mono-xs" style="color: var(--text-sub); display: block; margin-bottom: 6px;">
+                    BREATH PHONEME RATE [42%]
+                  </label>
+                  <input type="range" min="0" max="100" value="42" style="width: 100%; accent-color: var(--text-main);">
+                </div>
+                <div>
+                  <label class="mono-xs" style="color: var(--text-sub); display: block; margin-bottom: 6px;">
+                    ACOUSTIC REVERB [15%]
+                  </label>
+                  <input type="range" min="0" max="100" value="15" style="width: 100%; accent-color: var(--text-main);">
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =======================================================================
+         SCREEN 4: DOCKED BOTTOM AUDIO PLAYER BAR
+         ======================================================================= -->
+    <footer class="audio-player-dock">
+      
+      <!-- Left Track Info -->
+      <div class="audio-track-info">
+        <div class="audio-track-art">
+          <span>VOL.01</span>
+        </div>
+        <div class="audio-track-text">
+          <div class="audio-track-title">A Scandal in Bohemia — Ch. 01</div>
+          <div class="audio-track-sub">Arthur Conan Doyle • Dr. Watson (Speaker B)</div>
+          <div class="audio-track-timecode">04:12.84 / 38:14.00</div>
+        </div>
+      </div>
+
+      <!-- Center Scrubber & Boxed Controls -->
+      <div class="audio-central-cluster">
+        <div class="audio-control-buttons">
+          <button class="btn btn-sm" title="Skip Backward 10s">◀◀ 10s</button>
+          <button id="btn-play-pause" class="btn btn-sm btn-primary">⏸ PAUSE</button>
+          <button class="btn btn-sm" title="Skip Forward 10s">10s ▶▶</button>
+        </div>
+
+        <div class="audio-scrubber-row">
+          <span class="mono-xs scrubber-current-time" style="color: var(--text-muted); min-width: 38px;">04:12</span>
+          <div class="scrubber-track-bar">
+            <div class="scrubber-buffered-fill"></div>
+            <div class="scrubber-played-fill"></div>
+            <div class="scrubber-thumb"></div>
+          </div>
+          <span class="mono-xs" style="color: var(--text-muted); min-width: 38px;">38:14</span>
+        </div>
+      </div>
+
+      <!-- Right Status Cluster & Signal Dot -->
+      <div class="audio-right-cluster">
+        <span class="signal-dot" title="Active Playback Stream"></span>
+        <span class="mono-xs" style="color: var(--text-main); font-weight: 600;">LIVE SYNC</span>
+        <button class="btn btn-sm mono-xs" title="Playback Speed">1.0×</button>
+        <button class="btn btn-sm mono-xs" onclick="window.SyncTonePreview.showScreen('reader');" title="Expand Reader">📖</button>
+      </div>
+
+    </footer>
+
+  </div>
+
+  <script src="js/noir-mono.js"></script>
+</body>
+</html>

@@ -176,11 +176,12 @@ describe('Milestone 2 — Novel Catalog & Details', () => {
       const billboard = screen.getByLabelText(/Featured Novel Billboard/i);
       expect(billboard).toHaveTextContent('The Adventures of Sherlock Holmes');
 
-      // Hovering pauses the billboard
-      fireEvent.mouseEnter(billboard);
+      // Hovering specifically on the book pauses the billboard
+      const bookStage = screen.getByTestId('featured-book-stage');
+      fireEvent.mouseEnter(bookStage);
       expect(screen.getByText('Paused')).toBeInTheDocument();
 
-      fireEvent.mouseLeave(billboard);
+      fireEvent.mouseLeave(bookStage);
       expect(screen.queryByText('Paused')).not.toBeInTheDocument();
     });
   });

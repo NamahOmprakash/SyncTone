@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { LazyMotion, domAnimation, m, useReducedMotion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import NovelCover from './NovelCover';
 import {
+  IconSyncToneLogo,
   IconSoundwave,
   IconX,
   IconUser,
@@ -23,6 +25,13 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
 
   const modalRef = useRef(null);
   const emailInputRef = useRef(null);
+  const triggerRef = useRef(null);
+  const prefersReduced = useReducedMotion();
+
+  const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
+  const panelVariants = prefersReduced
+    ? { hidden: { opacity: 0 }, visible: { opacity: 1 } }
+    : { hidden: { opacity: 0, scale: 0.95 }, visible: { opacity: 1, scale: 1 } };
 
   const handleClose = () => {
     setEmail('');
@@ -32,7 +41,18 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
     setValidationError('');
     clearError();
     onClose();
+    // Return focus to the element that opened the modal
+    if (triggerRef.current) {
+      triggerRef.current.focus();
+    }
   };
+
+  // Store the trigger element when the modal opens
+  useEffect(() => {
+    if (isOpen) {
+      triggerRef.current = document.activeElement;
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     setMode(initialMode);
@@ -56,9 +76,9 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
         handleClose();
       }
     }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isSubmitting, onClose]);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, isSubmitting]);
 
   if (!isOpen) return null;
 
@@ -108,27 +128,38 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
   const displayError = validationError || error;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md modal-scrim-enter"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="auth-modal-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isSubmitting) handleClose();
-      }}
-    >
-      <div
-        ref={modalRef}
-        className="w-full max-w-md md:max-w-3xl theme-surface rounded-3xl shadow-2xl border overflow-hidden flex flex-col md:flex-row modal-panel-enter"
+    <LazyMotion features={domAnimation}>
+      <m.div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-modal-title"
+        variants={backdropVariants}
+        initial="hidden"
+        animate="visible"
+        exit="hidden"
+        transition={{ duration: 0.2 }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !isSubmitting) handleClose();
+        }}
       >
+        <m.div
+          ref={modalRef}
+          className="w-full max-w-md md:max-w-3xl theme-surface rounded-3xl shadow-2xl border overflow-hidden flex flex-col md:flex-row"
+          variants={panelVariants}
+          initial="hidden"
+          animate="visible"
+          exit="hidden"
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+        >
         {/* Left Column: Accessible Authentication Form */}
         <div className="w-full md:w-1/2 p-6 sm:p-8 flex flex-col justify-between">
           <div>
             {/* Header with Brand Logo & Close Button */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-[var(--accent)] text-white flex items-center justify-center font-bold shadow-sm">
-                  <IconSoundwave className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-xl bg-[var(--accent)] text-[var(--on-accent)] flex items-center justify-center font-bold shadow-sm">
+                  <IconSyncToneLogo className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold theme-heading font-display">SyncTone</h3>
@@ -159,7 +190,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
 
             {/* Error Message Box */}
             {displayError && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold">
+              <div className="mb-4 p-3 rounded-xl bg-[var(--danger)]/10 border border-[var(--danger)]/20 text-[var(--danger)] text-xs font-semibold">
                 {displayError}
               </div>
             )}
@@ -238,7 +269,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)] font-bold rounded-xl shadow-md text-xs transition min-h-[44px] cursor-pointer disabled:opacity-50 select-none"
+                className="w-full py-3 px-6 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)] font-bold rounded-full shadow-md text-xs transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.96] min-h-[44px] cursor-pointer disabled:opacity-50 select-none"
               >
                 {isSubmitting
                   ? 'Connecting...'
@@ -257,7 +288,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
                 <button
                   type="button"
                   onClick={() => setMode('register')}
-                  className="text-[var(--accent)] hover:underline font-bold cursor-pointer"
+                  className="text-[var(--accent-text)] hover:underline font-bold cursor-pointer"
                 >
                   Create Account
                 </button>
@@ -268,7 +299,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
                 <button
                   type="button"
                   onClick={() => setMode('login')}
-                  className="text-[var(--accent)] hover:underline font-bold cursor-pointer"
+                  className="text-[var(--accent-text)] hover:underline font-bold cursor-pointer"
                 >
                   Sign In
                 </button>
@@ -317,7 +348,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </m.div>
+    </m.div>
+  </LazyMotion>
   );
 }

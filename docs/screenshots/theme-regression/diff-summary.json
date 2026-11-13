@@ -1,0 +1,82 @@
+{
+  "home-dark": {
+    "diffCount": 92814,
+    "totalPixels": 1296000,
+    "diffPercent": "7.16%"
+  },
+  "home-light": {
+    "diffCount": 120285,
+    "totalPixels": 1296000,
+    "diffPercent": "9.28%"
+  },
+  "novel-detail-dark": {
+    "diffCount": 56860,
+    "totalPixels": 1296000,
+    "diffPercent": "4.39%"
+  },
+  "novel-detail-light": {
+    "diffCount": 72076,
+    "totalPixels": 1296000,
+    "diffPercent": "5.56%"
+  },
+  "reader-normal-dark": {
+    "diffCount": 51820,
+    "totalPixels": 1296000,
+    "diffPercent": "4.00%"
+  },
+  "reader-normal-light": {
+    "diffCount": 53450,
+    "totalPixels": 1296000,
+    "diffPercent": "4.12%"
+  },
+  "reader-3d-dark": {
+    "diffCount": 45508,
+    "totalPixels": 1296000,
+    "diffPercent": "3.51%"
+  },
+  "reader-3d-light": {
+    "diffCount": 49428,
+    "totalPixels": 1296000,
+    "diffPercent": "3.81%"
+  },
+  "settings-dark": {
+    "diffCount": 78562,
+    "totalPixels": 1296000,
+    "diffPercent": "6.06%"
+  },
+  "settings-light": {
+    "diffCount": 123193,
+    "totalPixels": 1296000,
+    "diffPercent": "9.51%"
+  },
+  "auth-dark": {
+    "diffCount": 6093,
+    "totalPixels": 1296000,
+    "diffPercent": "0.47%"
+  },
+  "auth-light": {
+    "diffCount": 7314,
+    "totalPixels": 1296000,
+    "diffPercent": "0.56%"
+  },
+  "add-novel-dark": {
+    "diffCount": 22207,
+    "totalPixels": 1296000,
+    "diffPercent": "1.71%"
+  },
+  "add-novel-light": {
+    "diffCount": 31915,
+    "totalPixels": 1296000,
+    "diffPercent": "2.46%"
+  },
+  "profile-dark": {
+    "diffCount": 713969,
+    "totalPixels": 1296000,
+    "diffPercent": "55.09%"
+  },
+  "profile-light": {
+    "diffCount": 908183,
+    "totalPixels": 1296000,
+    "diffPercent": "70.08%"
+  }
+}

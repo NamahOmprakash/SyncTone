@@ -58,18 +58,28 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+test-results/
+playwright-report/
 dist/
 dist-ssr/
+dev-dist/
 *.local
 .tsbuildinfo
 
 # Model Weights, Checkpoints & TTS Voice Caches (Large Binaries)
-models_cache/*
-!models_cache/.gitkeep
+**/models_cache/*
+!**/models_cache/.gitkeep
 /models/
 !novel-audio-synthesizer/backend/src/models/
+*.onnx
+*.bin
+*.pth
 kokoro-v0_19.onnx
-voices.bin
+voices*.bin
+paradee*.json
+*.tmp
+caddy_data/
+caddy_config/
 
 # Audio Buffers, Raw PCM Caches & Synthesized Outputs
 output/
@@ -106,10 +116,19 @@ swift_data/
 scratch/
 logs/
 *.log
+docs/screenshots/editorial-orange/
+docs/screenshots/theme-diff/
+docs/screenshots/theme-restore/
+docs/screenshots/orange-preview/
+docs/screenshots/palette-history/
+docs/screenshots/honest-pixel-proof/
+docs/theme-restore-report.md
+scripts/verify-*.mjs
 
 # Private Team Development, Agent Prompts & Planning Artifacts
 private/
 .internal/
+.agents/
 PARTNER_*.md
 docs/*.pdf
 scripts/generate_partner_plan_pdf.py

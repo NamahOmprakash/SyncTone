@@ -42,7 +42,41 @@ const REQUIRED_VOICES = [
   { id: 'am_george', label: 'George (Deep & Mature)', gender: 'male', age_band: 'elder', language: 'en-us', reserved_narrator: false },
   { id: 'am_onyx', label: 'Onyx (Deep Male)', gender: 'male', age_band: 'adult', language: 'en-us', reserved_narrator: false },
   { id: 'af_sky', label: 'Sky (Calm Female)', gender: 'female', age_band: 'adult', language: 'en-us', reserved_narrator: false },
+  // Paradee-8M-v1.2 Neural Voices
+  { id: 'bm_fable', label: 'Fable (Paradee-8M British Male Narrator)', gender: 'male', age_band: 'adult', language: 'en-gb', reserved_narrator: true },
+  { id: 'bf_isabella', label: 'Isabella (Paradee-8M British Female Lead)', gender: 'female', age_band: 'adult', language: 'en-gb', reserved_narrator: false },
+  { id: 'am_puck', label: 'Puck (Paradee-8M American Dynamic Male)', gender: 'male', age_band: 'young', language: 'en-us', reserved_narrator: false },
+  // Machine-TTS Extra Voices (Slots 5+ Overflow & Explicit Selection)
+  { id: 'mac_daniel', label: 'Daniel (Machine British Male)', gender: 'male', age_band: 'adult', language: 'en-gb', reserved_narrator: false },
+  { id: 'mac_serena', label: 'Serena (Machine British Female)', gender: 'female', age_band: 'adult', language: 'en-gb', reserved_narrator: false },
+  { id: 'mac_reed', label: 'Reed (Machine Warm Male)', gender: 'male', age_band: 'adult', language: 'en-us', reserved_narrator: false },
+  { id: 'mac_rocko', label: 'Rocko (Machine Deep Male)', gender: 'male', age_band: 'adult', language: 'en-us', reserved_narrator: false },
+  { id: 'mac_shelley', label: 'Shelley (Machine Clear Female)', gender: 'female', age_band: 'adult', language: 'en-us', reserved_narrator: false },
+  { id: 'mac_grandpa', label: 'Grandpa (Machine Elder Male)', gender: 'male', age_band: 'elder', language: 'en-us', reserved_narrator: false },
+  { id: 'mac_flo', label: 'Flo (Machine Elder Female)', gender: 'female', age_band: 'elder', language: 'en-us', reserved_narrator: false },
+  { id: 'mac_moira', label: 'Moira (Machine Irish Female)', gender: 'female', age_band: 'adult', language: 'en-ie', reserved_narrator: false },
 ];
+
+/**
+ * Idempotently upserts all REQUIRED_VOICES into PostgreSQL `voices` table.
+ */
+async function ensureVoiceCatalog(pgPool = pool) {
+  for (const v of REQUIRED_VOICES) {
+    await pgPool.query(
+      `
+      INSERT INTO voices (id, label, gender, age_band, language, reserved_narrator)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (id) DO UPDATE SET
+        label = EXCLUDED.label,
+        gender = EXCLUDED.gender,
+        age_band = EXCLUDED.age_band,
+        language = EXCLUDED.language,
+        reserved_narrator = EXCLUDED.reserved_narrator;
+    `,
+      [v.id, v.label, v.gender, v.age_band, v.language, v.reserved_narrator]
+    );
+  }
+}
 
 /**
  * Ensures a valid demo audio file exists for the chapter.
@@ -1416,8 +1450,12 @@ async function seedDemos({ closeConnections = false } = {}) {
 
 module.exports = {
   seedDemos,
+  REQUIRED_VOICES,
+  ensureVoiceCatalog,
 };
 module.exports.seedDemos = seedDemos;
+module.exports.REQUIRED_VOICES = REQUIRED_VOICES;
+module.exports.ensureVoiceCatalog = ensureVoiceCatalog;
 module.exports.default = seedDemos;
 
 if (require.main === module) {

@@ -1,360 +1,190 @@
-# SyncTone — Multi-Voice Novel Synthesizer System Architecture
+# Project: SyncTone AI-Powered Multi-Character Audiobook Synthesis System
 
-SyncTone is an enterprise-grade, polyglot AI-assisted novel audiobook synthesis platform. It transforms plain narrative text into multi-voice dramatized audiobooks with sample-accurate, 60fps-synchronized reading highlighted in real time.
-
----
-
-## 1. Tech Stack & System Infrastructure
-
-SyncTone is deployed as a 6-service polyglot architecture orchestrated via Docker Compose:
-
-| Layer | Technology | Version / Spec | Role & Academic / Engineering Justification |
-|---|---|---|---|
-| **Frontend Web Client** | **React 18 + Vite 5** | Pure JS (ES2022+), Tailwind CSS 3 | High-performance reactive Single-Page Application (SPA) designed for responsive webnovel reading (WTR-Lab style). Employs a zero-stutter 60fps `requestAnimationFrame` polling loop coupled with a binary-search `useAudioSync` hook for continuous audio-to-text highlight synchronization. Consumes live synthesis progress via WebSocket. |
-| **Input Sanitization** | **`tts-dom-cleaner`** | npm package | Client-side DOM and text cleaner that strips web novel artifacts (site navigation, author notes, sponsor links, ruby tags) before server submission. |
-| **API Gateway & Primary Synthesis** | **Node.js 20+ & Express.js** | CommonJS + Prisma ORM | High-throughput asynchronous REST API Gateway and primary orchestration engine. Implements `httpOnly` cookie JWT authentication with `pgcrypto` bcrypt hashing, role-based access control (RBAC: `reader`, `writer`, `admin`), **Prisma ORM** (`prisma/schema.prisma` + `@prisma/client`) layered over PostgreSQL alongside connection-pooled queries (`pg`), MongoDB ODM (`mongoose`), dialogue parsing (`textParser.js`), speaker attribution (`attribution.js`), voice profiling (`voiceProfiler.js`), audio stitching (`audioStitcher.js`), and RFC 7233 OpenStack Swift Range Streaming Proxy. |
-| **Primary Cloud TTS Engine** | **Microsoft Edge Neural TTS** | `msedge-tts` (24kHz 48kbps MP3) | Primary multi-voice neural synthesis engine providing authentic, expressive character casting (e.g., British voices for Harry Potter: `en-GB-ThomasNeural`, `en-GB-LibbyNeural`, `en-GB-AlfieNeural`, `en-GB-ArthurNeural`, `en-GB-NoahNeural`, `en-GB-RyanNeural`). Yields natural prosody with sub-second per-segment latency. |
-| **Offline Worker Daemon & Schema Authority** | **Python 3.11 (`kokoro-tts-backend`)** | SQLAlchemy 2.0, Alembic, SpaCy | Decoupled background worker daemon and authoritative schema migration runner (`0001_initial_schema.py` $\rightarrow$ `0003_enforce_4nf.py`). Uses SpaCy (`en_core_web_sm`) dependency parsing for offline speaker resolution and Kokoro-82M ONNX / PyTorch TTS for zero-network, local harmonic fallback synthesis. Worker claims background jobs atomically via `SELECT ... FOR UPDATE SKIP LOCKED`. |
-| **Relational Database (Core Authority)** | **PostgreSQL 16 (`synctone-postgres`)** | Alpine Docker container, Port 5432 | **Strict Fourth Normal Form (4NF)** relational DBMS (12 normalized tables) serving as the authoritative single source of truth for identity, RBAC, novel catalog metadata, character portfolios, aliases, voice catalog (20 seeded voices: 12 Kokoro + 8 Edge Neural), subtype-decomposed transactional job queue (`synthesis_jobs`, `novel_profile_job_targets`, `chapter_synthesis_job_targets`), LRU segment audio cache (`segment_audio_cache`), and decomposed atomic playback resume (`playback_history` + `playback_positions` + `reading_progress` view). |
-| **Document Database (Chapter Prose & Timelines)** | **MongoDB 7.0 (`synctone-mongo`)** | Official Docker container, Port 27017 | High-performance document store (`chapters` collection via Mongoose `Chapter` model) linked to PostgreSQL via `pg_chapter_id` (UUID unique index). Stores full raw prose, attributed dialogue/narration segment arrays (with `order`, `segment_id`, `type`, `text`, `character_id`, `speaker_id`, `speaker_name`, `voice_id`, `confidence`, `source`, `needs_review`), and pre-calculated playback manifest timelines (`total_duration_ms`, `audio_url`, `timeline[]`). |
-| **Distributed Object Storage** | **OpenStack Swift (`synctone-swift`)** | `bouncestorage/swift-aio`, Port 8080 | Multi-tenant distributed object store managing binary audio blobs in container `novel-chapters` and book artwork in `novel-covers`. Streamed directly to browser `<audio>` elements via the Express Range Proxy (`GET /api/chapters/:id/audio` and `GET /api/stream/:chapter_id`) with HTTP 206 Partial Content, automatic 401 token refresh retry, and 416 range validation. |
+## Architecture
+SyncTone is a polyglot system integrating an Express.js API gateway, a PostgreSQL 16 Strict 4NF relational database, MongoDB 7.0 document store, Python processing engines, and a React 18 + Vite client:
+- **API & Orchestration Gateway (`novel-audio-synthesizer/backend`)**: Express.js server providing REST and WebSocket interfaces for novel ingestion, chapter management, character casting, asynchronous synthesis queue dispatch, and RFC 7233 byte-range audio streaming.
+- **Data Tier**:
+  - PostgreSQL 16 (Strict 4NF): Authoritative store for users, novels, chapters, characters, character aliases, character age stages, timeline anchors, pronunciation dictionaries, synthesis jobs, and segment audio cache.
+  - MongoDB 7.0: Aggregate document store for chapter manuscripts, structured dialogue/narration segments with source offsets, and pre-computed audio playback timelines with word/segment timestamps.
+- **Novel Understanding Engine**: Ingestion pipeline supporting EPUB, PDF, and TXT with exact source offset preservation, verbatim text retention, multi-stage character entity resolution and alias clustering, literary dialogue detection (handling em-dashes, nested quotes, and multiline speeches), and confidence-scored speaker attribution with interactive review flagging.
+- **Age Progression & Voice Casting Engine**: Chronological story timeline engine tracking character age stages (child, teen, adult, older adult), flashbacks, and time jumps independent of raw chapter order. Preserves acoustic identity across age stages via controlled prosody modulation. Provides persistent scoped cast management and pronunciation dictionaries.
+- **Synthesis Pipeline & Audio Assembly**: Asynchronous segment-level TTS synthesis using Edge-TTS, Kokoro, Paradee, and local engines (with OpenAI/ElevenLabs configuration support), segment-level caching (`segment_audio_cache`), seamless PCM/WAV stitching with 10ms crossfade, natural pause insertion, word boundary alignment capture, and reader synchronization guards.
+- **Background Worker Engine**: Persistent queue worker claiming `synthesis_jobs` via `FOR UPDATE SKIP LOCKED`, reporting real-time progress over WebSocket, supporting idempotent retries, exponential backoff, and job cancellation.
 
 ---
 
-## 2. Verified Entity-Relationship (ER) Diagram (Strict 4NF)
+## Feature Inventory
 
-The data layer follows a **Polyglot Persistence Model** with a strict boundary between relational metadata in PostgreSQL and rich hierarchical documents in MongoDB:
-* **PostgreSQL 16** enforces **12 normalized Strict 4NF tables** with referential integrity, foreign key cascading, subtype target decomposition, and row-level locking.
-* **MongoDB 7.0** encapsulates ordered, multi-second segment arrays and playback manifests per chapter, avoiding relational join overhead and high-frequency lock contention.
+Every requirement feature from R1 to R8 is enumerated below, assigned to a specific implementation milestone:
 
-```mermaid
-erDiagram
-    USERS ||--o{ NOVELS : "adds (1:N)"
-    USERS ||--o{ SYNTHESIS_JOBS : "requests (1:N)"
-    USERS ||--o{ PLAYBACK_HISTORY : "maintains (1:N)"
+| # | Feature | Description | Milestone | Source |
+|---|---------|-------------|-----------|--------|
+| 1 | Comprehensive Technical Audit | Complete P0-P3 technical audit of backend architecture, database, APIs, storage, TTS, queues, security, and tests | M1 | R1, Survey |
+| 2 | Existing Test Suite Preservation | Maintain 100% pass on existing backend suites (`test_sprint1.js`, `test_de_integrity.js`, etc.) and frontend Vitest suite | M1 | R1, Survey |
+| 3 | Strict 4NF Schema Migration | Add `character_age_stages`, `chapter_timeline_anchors`, `pronunciation_dictionaries`, and update `synthesis_jobs` status enum | M1 | R1, R8, Survey |
+| 4 | Asynchronous Node.js Queue Worker | Background daemon claiming jobs via `FOR UPDATE SKIP LOCKED`, tracking progress, supporting retries and stale lock recovery | M1 | R8, Survey |
+| 5 | Job Cancellation API & Logic | API route `/api/jobs/:id/cancel` and cancellation tokens during segment synthesis | M1 | R8, Survey |
+| 6 | Fix Python `.venv` & Executable Guard | Install or fallback gracefully for `pypdf`, eliminating crash on uploaded PDF ingestion | M1 | R1, R2, Survey |
+| 7 | Novel-Scoped Voice Profiler | Replace global flat `voice_registry.json` with novel-scoped voice persistence in PostgreSQL | M1 | R5, Survey |
+| 8 | Fix Fake Chapter Ingestion Status | Ensure uploaded chapters enter `'draft'` status instead of fake `'completed'` before audio is synthesized | M1 | R6, R8, Survey |
+| 9 | Exact Source Offset Tracking | Extract and preserve exact `source_char_start` and `source_char_end` for all paragraphs and segments | M2 | R2, Survey |
+| 10 | Verbatim Text Preservation | Prevent prose deletion in Python and Node parsers; preserve dialogue tags and narration intact | M2 | R2, Survey |
+| 11 | Multi-Format Ingestion Service | Robust EPUB, PDF, and TXT parsing without hardcoded novel bypasses, with scene boundary detection | M2 | R2, Survey |
+| 12 | Canonical Character Extraction & Disambiguation | Multi-stage character extraction without conflating distinct characters sharing common names | M2 | R2, Survey |
+| 13 | Active `character_aliases` Population | Populate and query alias clusters during entity resolution and speaker attribution | M2 | R2, Survey |
+| 14 | Chunked Manuscript Processing | Bounded-window chunked analysis replacing single-shot LLM prompts to prevent token overflow | M2 | R2, Survey |
+| 15 | Literary Punctuation & Dialogue Segmenter | Dialogue parser handling double quotes, curly quotes, em-dashes (`—`), guillemets, and multiline speeches | M3 | R3, Survey |
+| 16 | Narrative, Dialogue & Internal Monologue Split | Accurate separation of spoken dialogue, narration, and internal thoughts/monologue | M3 | R3, Survey |
+| 17 | Intra-Paragraph Multi-Turn Attribution | Independent speaker attribution for multiple dialogue segments within a single paragraph | M3 | R3, Survey |
+| 18 | Multi-Party Conversational Tracking | Context tracking supporting >2 participants and LLM sliding-window attribution | M3 | R3, Survey |
+| 19 | Confidence Scoring & Review Flagging | Calibrated confidence scores; set `needs_review: true` when confidence < 0.70; avoid random fallback speaker | M3 | R3, Survey |
+| 20 | Interactive Speaker Review API | Endpoint `PATCH /api/chapters/:id/segments/:seg_id/speaker` to reassign flagged dialogue segments | M3 | R3, Survey |
+| 21 | Chronological Story Timeline Engine | Model and track character age stages, story timeline positions, flashbacks, and time jumps | M4 | R4, Survey |
+| 22 | Acoustic Voice Identity Preservation | Modulate character pitch/rate across age stages (child, teen, adult, older adult) while preserving core voice | M4 | R4, Survey |
+| 23 | Distinct Character Voice Casting | Automated distinct voice assignment for major characters and dedicated narrator voice | M4 | R5, Survey |
+| 24 | Persistent Cast Management API | APIs for voice assignment, voice previews, age-stage adjustments, and re-analysis persistence | M4 | R5, Survey |
+| 25 | Pronunciation Dictionaries | Data store and text/SSML pre-processing for novel-scoped pronunciation and phonetic overrides | M4 | R5, Survey |
+| 26 | TTS Provider Integrations & Fallback | Robust Edge-TTS, Kokoro, Paradee, and local engines, with OpenAI/ElevenLabs config readiness | M5 | R6, Survey |
+| 27 | Lossless Linear PCM Audio Assembly | Transcode segments to uniform PCM/WAV, stitch with 10ms crossfade, and atomic file write (`.tmp` -> rename) | M5 | R6, Survey |
+| 28 | Natural Pause Cadence Insertion | Dynamic pauses between distinct speakers, continuous flow for same speaker/narrator | M5 | R6, Survey |
+| 29 | Segment Audio Caching | Query and populate `segment_audio_cache` for segment-level idempotency and fast retries | M5 | R6, R8, Survey |
+| 30 | Word-Level Alignment Capture | Enable `wordBoundaryEnabled: true` in TTS, store word timestamps in manifest | M5 | R7, Survey |
+| 31 | Reader Active Speaker & Highlight Sync | Synchronized active speaker display, sentence/word highlighting without view jumping | M5 | R7, Survey |
+| 32 | Frontend Bundle Size Remediation | Code-split `FeaturedBook3D.jsx` (Three.js) to resolve cold-load bundle budget regression | M5 | R1, Survey |
+| 33 | 100% E2E Test Certification | Pass 100% of E2E test suites (Tiers 1-4) on the multi-chapter verification novel | M-Final | Acceptance |
+| 34 | Adversarial Coverage Hardening | White-box adversarial testing (Tier 5) closing all edge cases, race conditions, and error paths | M-Final | Acceptance |
 
-    NOVELS ||--o{ CHAPTERS : "contains (1:N)"
-    NOVELS ||--o{ CHARACTERS : "defines cast (1:N)"
-    NOVELS ||--o{ NOVEL_PROFILE_JOB_TARGETS : "targets (1:N)"
-    NOVELS ||--o{ PLAYBACK_HISTORY : "tracked in (1:N)"
+---
 
-    CHARACTERS ||--o{ CHARACTER_ALIASES : "known as (1:N)"
-    VOICES ||--o{ CHARACTERS : "assigned to (1:N)"
+## Milestones
 
-    CHAPTERS ||--o{ CHAPTER_SYNTHESIS_JOB_TARGETS : "targets (1:N)"
-    CHAPTERS ||--o{ PLAYBACK_POSITIONS : "current chapter (1:N)"
-    CHAPTERS ||..|| MONGO_CHAPTER_DOC : "content link [pg_chapter_id] (1:1)"
+| # | Name | Scope | Dependencies | Status |
+|---|------|-------|-------------|--------|
+| M1 | Database Schema, Background Queue & Defect Remediation | Features 1, 2, 3, 4, 5, 6, 7, 8: PostgreSQL 4NF migrations (`character_age_stages`, `chapter_timeline_anchors`, `pronunciation_dictionaries`, `synthesis_jobs.status` enum update), Node.js async queue worker (`SKIP LOCKED`), job cancellation endpoint, novel-scoped voice registry, fix fake novel completion, fix `.venv` dependency fallback, preserve existing tests | None | PLANNED |
+| M2 | AI Novel Understanding & Ingestion Engine | Features 9, 10, 11, 12, 13, 14: EPUB/PDF/TXT ingestion with exact character offset preservation (`source_char_start`/`end`), verbatim text retention, scene boundary detection, canonical character extraction, active `character_aliases` population and disambiguation, chunked manuscript processing | M1 | PLANNED |
+| M3 | Context-Aware Dialogue Detection & Speaker Attribution | Features 15, 16, 17, 18, 19, 20: Literary punctuation parser (em-dashes, guillemets, nested quotes, multiline speeches), thoughts vs speech distinction, intra-paragraph multi-turn attribution, multi-party context graph, confidence scoring with `needs_review: true` flagging, interactive review API | M2 | PLANNED |
+| M4 | Character Age Progression & Voice Casting Engine | Features 21, 22, 23, 24, 25: Chronological story timeline engine (age stages, flashbacks, time jumps), acoustic voice identity preservation formulas (pitch/rate modulation per stage), automated distinct voice casting, persistent cast management API, pronunciation dictionary data store and replacement pre-processor | M1, M3 | PLANNED |
+| M5 | Multi-Voice TTS Synthesis Pipeline, Audio Assembly & Reader Sync | Features 26, 27, 28, 29, 30, 31, 32: Asynchronous segment synthesis with fallback chain and OpenAI/ElevenLabs config, PCM audio stitching with crossfade and natural pauses, atomic file write, `segment_audio_cache` integration, word-level alignment metadata capture, Reader view-jumping guard, frontend bundle budget fix | M1, M4 | PLANNED |
+| M-Final | E2E Test Certification & Adversarial Coverage Hardening | Features 33, 34: Phase 1: Pass 100% of E2E tests (Tiers 1-4) published by E2E Testing Track on the multi-chapter verification novel. Phase 2: Adversarial coverage hardening (Tier 5) via Challenger -> Worker -> Reviewer loop | M5, TEST_READY | PLANNED |
 
-    PLAYBACK_HISTORY ||--o| PLAYBACK_POSITIONS : "tracks offset (1:0..1)"
-    SYNTHESIS_JOBS ||--o| NOVEL_PROFILE_JOB_TARGETS : "novel subtype (1:0..1)"
-    SYNTHESIS_JOBS ||--o| CHAPTER_SYNTHESIS_JOB_TARGETS : "chapter subtype (1:0..1)"
+---
 
-    USERS {
-        uuid id PK "gen_random_uuid()"
-        varchar username UK "unique username"
-        varchar email UK "unique email"
-        varchar password_hash "bcrypt / pgcrypto"
-        varchar role "reader, writer, admin"
-        timestamptz created_at
-        timestamptz updated_at
-    }
+## Interface Contracts
 
-    VOICES {
-        varchar id PK "e.g. en-GB-ThomasNeural, am_adam"
-        varchar label "Human-readable label"
-        varchar gender "male, female"
-        varchar age_band "child, young, adult, elder"
-        varchar language "en-us, en-gb"
-        boolean reserved_narrator "true for default narrator"
-        timestamptz created_at
-    }
+### 1. Novel Engine $\leftrightarrow$ Storage / Database
+- **`TextSegment` Object Structure (stored in MongoDB `Chapter.segments[]`)**:
+  ```typescript
+  interface TextSegment {
+    order: number;
+    type: 'narration' | 'dialogue' | 'thought' | 'scene_break';
+    text: string;
+    source_char_start: number;
+    source_char_end: number;
+    speaker_id: string; // UUID of Character or 'narrator' or 'unresolved'
+    speaker_name: string; // Canonical name or 'Narrator' or 'Unresolved'
+    attribution_confidence: number; // 0.0 to 1.0
+    needs_review: boolean; // true if confidence < 0.70
+    suggested_speakers?: Array<{ character_id: string; name: string; score: number }>;
+  }
+  ```
 
-    NOVELS {
-        uuid id PK "gen_random_uuid()"
-        uuid added_by FK "references users(id)"
-        varchar title "Novel title"
-        text synopsis "Description / blurb"
-        varchar channel "verified, community"
-        varchar status "draft, profiling, published, archived"
-        varchar global_tone "whimsical, dark, epic, etc."
-        varchar portfolio_source "manual, ai"
-        varchar cover_object "Swift object key"
-        timestamptz created_at
-        timestamptz updated_at
-    }
+### 2. Character Age Progression $\leftrightarrow$ Voice Engine
+- **`CharacterAgeStage` & `TimelineAnchor` (PostgreSQL Schema)**:
+  ```sql
+  CREATE TABLE character_age_stages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    stage_name VARCHAR(50) NOT NULL, -- 'child', 'early_teen', 'late_teen', 'adult', 'elder'
+    approx_age_min INT,
+    approx_age_max INT,
+    base_voice_id VARCHAR(64) NOT NULL REFERENCES voices(id),
+    pitch_adjustment VARCHAR(10) NOT NULL DEFAULT '+0%', -- e.g. '+15%', '-8%'
+    rate_adjustment VARCHAR(10) NOT NULL DEFAULT '+0%',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_character_age_stage UNIQUE (character_id, stage_name)
+  );
 
-    CHAPTERS {
-        uuid id PK "gen_random_uuid()"
-        uuid novel_id FK "references novels(id)"
-        int chapter_number "Composite UK (novel_id, chapter_number)"
-        varchar title "Chapter title"
-        varchar status "draft, parsed, synthesizing, completed, outdated, failed"
-        int audio_version "Monotonic audio version"
-        varchar swift_audio_object "Path in Swift novel-chapters"
-        int total_duration_ms "Authoritative audio duration"
-        timestamptz created_at
-        timestamptz updated_at
-    }
+  CREATE TABLE chapter_timeline_anchors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chapter_id UUID NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
+    story_order INT NOT NULL,
+    story_year NUMERIC(8, 2),
+    is_flashback BOOLEAN NOT NULL DEFAULT false,
+    is_time_jump BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_chapter_timeline_anchor UNIQUE (chapter_id)
+  );
+  ```
 
-    CHARACTERS {
-        uuid id PK "gen_random_uuid()"
-        uuid novel_id FK "references novels(id)"
-        varchar canonical_name "Composite UK (novel_id, canonical_name)"
-        varchar gender "male, female, unknown"
-        varchar age_band "child, young, adult, elder"
-        varchar temperament "Character personality"
-        text sample_quote "Verbatim grounded quote"
-        varchar voice_id FK "references voices(id)"
-        real speed_multiplier "0.5 to 2.0"
-        boolean is_narrator "Partial UK on novel_id WHERE is_narrator"
-        boolean needs_review "Flagged for human inspection"
-        varchar source "manual, ai"
-        timestamptz created_at
-        timestamptz updated_at
-    }
+- **`VoiceProfiler.resolveVoiceForSegment(characterId, chapterId, context)`**:
+  - Resolves active character age stage from `chapter_timeline_anchors` and `character_age_stages`.
+  - Returns `{ voice_id: string, pitch_adjustment: string, rate_adjustment: string, speed_multiplier: number }`.
 
-    CHARACTER_ALIASES {
-        uuid id PK "gen_random_uuid()"
-        uuid character_id FK "references characters(id)"
-        varchar alias "Composite UK (character_id, alias)"
-    }
+### 3. Queue Worker $\leftrightarrow$ Synthesis Pipeline
+- **`synthesis_jobs` Status Contract**:
+  - Valid statuses: `'queued'`, `'processing'`, `'completed'`, `'failed'`, `'cancelled'`, `'dead_letter'`.
+  - Claim query: `SELECT id FROM synthesis_jobs WHERE status = 'queued' AND run_after <= now() AND attempts < max_attempts ORDER BY created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1`.
+  - Progress updates broadcast via WebSocket `/api/ws/progress/:chapter_id` with `{ job_id, chapter_id, progress_pct, current_segment, total_segments, status }`.
 
-    SYNTHESIS_JOBS {
-        uuid id PK "gen_random_uuid()"
-        uuid requested_by FK "references users(id) [nullable]"
-        varchar job_type "profile_novel, synthesize_chapter"
-        varchar status "queued, processing, completed, failed"
-        real progress_pct "0.0 to 100.0"
-        int attempts "Retry count"
-        int max_attempts "Default: 3"
-        timestamptz run_after "Exponential backoff timer"
-        varchar worker_id "Active worker identifier"
-        timestamptz locked_at "Heartbeat timestamp"
-        text error_message "Failure diagnostics"
-        timestamptz created_at
-        timestamptz completed_at
-    }
+### 4. Audio Stitcher $\leftrightarrow$ Reader Synchronization
+- **`ManifestTimelineEntry` Structure (stored in MongoDB `Chapter.manifest.timeline[]`)**:
+  ```typescript
+  interface ManifestTimelineEntry {
+    order: number;
+    segment_id: string;
+    start_ms: number;
+    end_ms: number;
+    character_id: string;
+    voice_id: string;
+    text: string;
+    type: 'narration' | 'dialogue' | 'thought';
+    words?: Array<{
+      word: string;
+      start_ms: number;
+      end_ms: number;
+    }>;
+  }
+  ```
 
-    NOVEL_PROFILE_JOB_TARGETS {
-        uuid job_id PK_FK "references synthesis_jobs(id)"
-        uuid novel_id FK "references novels(id)"
-    }
+---
 
-    CHAPTER_SYNTHESIS_JOB_TARGETS {
-        uuid job_id PK_FK "references synthesis_jobs(id)"
-        uuid chapter_id FK "references chapters(id)"
-    }
+## Code Layout
 
-    SEGMENT_AUDIO_CACHE {
-        varchar text_hash PK "SHA-256 text fingerprint"
-        varchar voice_hash PK "Voice ID + speed multiplier hash"
-        varchar local_pcm_path "File path to 24kHz raw PCM"
-        int n_samples "Audio sample count"
-        int sample_rate "Default: 24000 Hz"
-        timestamptz last_used_at "LRU eviction index"
-    }
-
-    PLAYBACK_HISTORY {
-        uuid id PK "gen_random_uuid()"
-        uuid user_id FK "references users(id)"
-        uuid novel_id FK "references novels(id)"
-        timestamptz created_at "Composite UK (user_id, novel_id)"
-    }
-
-    PLAYBACK_POSITIONS {
-        uuid history_id PK_FK "references playback_history(id)"
-        uuid chapter_id FK "references chapters(id)"
-        int segment_order "Last active segment sequence"
-        int position_ms "Playback timestamp offset in ms"
-        timestamptz updated_at "Atomic upsert timestamp"
-    }
-
-    MONGO_CHAPTER_DOC {
-        ObjectId _id PK "MongoDB internal identifier"
-        string pg_chapter_id UK "UUID foreign reference to chapters.id"
-        string novel_id "Indexed foreign reference to novels.id"
-        int chapter_number "Chapter index (1-based)"
-        string title "Chapter title"
-        string raw_text "Full, unparsed chapter prose"
-        int audio_version "Monotonic audio version counter"
-        array segments "Subdocuments: order, type, text, character_id, speaker_name, voice_id, confidence, source, needs_review, start_ms, end_ms"
-        object manifest "Derived timeline and audio_url"
-    }
+Existing conventions and target file assignments:
 ```
-
-### Key Database Architectural Rules & Constraints (Strict 4NF)
-1. **Separation of Concerns**: Relational tables in PostgreSQL hold zero unparsed long prose or large JSON blobs; MongoDB holds no identity, billing, or cross-novel relational constraints.
-2. **Deterministic Chapter & Character Ordering**: `UNIQUE(novel_id, chapter_number)` prevents duplicate chapters. `UNIQUE(novel_id, canonical_name)` guarantees character uniqueness per novel.
-3. **Single Narrator Guarantee**: Partial unique index `CREATE UNIQUE INDEX uq_characters_narrator_per_novel ON characters(novel_id) WHERE is_narrator = true;` guarantees at most one narrator per book at the database engine level.
-4. **3NF/4NF Alias Normalization (`CHARACTER_ALIASES`)**: Eliminates transitive `novel_id` redundancy (`character_id -> novel_id`) and enforces `UNIQUE(character_id, alias)` alongside a serialized database trigger (`fn_check_character_alias_novel_uniqueness`) preventing cross-character alias collisions within the same novel.
-5. **4NF Job Subtype Decomposition (`SYNTHESIS_JOBS`)**: `synthesis_jobs` acts as a pure queue broker without nullable target columns, decomposing target bindings into `novel_profile_job_targets` and `chapter_synthesis_job_targets` enforced by deferred constraint triggers.
-6. **4NF Playback Bookmark & Position Decomposition (`PLAYBACK_HISTORY` + `PLAYBACK_POSITIONS`)**: Separates user-novel bookmark identity (`playback_history`, `UNIQUE(user_id, novel_id)`) from mutable chapter/millisecond offset state (`playback_positions`, `1:0..1`), with compatibility views `v_playback_history` and `reading_progress`.
-7. **Direct Reader Playback Optimization**: In `MONGO_CHAPTER_DOC`, each item in `segments[]` contains pre-resolved `voice_id` and `speaker_name` alongside `start_ms` and `end_ms`. This allows the React reader to highlight and display active dialogue instantly without making relational joins to PostgreSQL during playback.
-
----
-
-## 3. Data Flow Diagrams (DFDs)
-
-### 3.1 Level 0 DFD (Context Diagram)
-The Level 0 diagram models the boundary between the external actors (Reader, Writer, Administrator, and Evaluator) and the Multi-Voice Novel Synthesizer platform.
-
-```mermaid
-flowchart LR
-    User(["👤 User / Evaluator\n(Reader / Writer / Admin)"])
-    System["0.0 Multi-Voice Novel Synthesizer System\n(SyncTone Platform)"]
-
-    User -->|"Novel Text Upload & Metadata"| System
-    User -->|"Authentication & Credentials"| System
-    User -->|"Character Voice Overrides"| System
-    User -->|"Playback Seek & Progress Updates"| System
-
-    System -->|"JWT Cookie & RBAC Claims"| User
-    System -->|"Novel Library Catalog & Cast Roster"| User
-    System -->|"RFC 7233 Range-Streamed Audio (206 Partial)"| User
-    System -->|"60fps Highlight Timelines (JSON Manifest)"| User
-    System -->|"Live Synthesis Progress (WebSocket / SSE)"| User
+novel-audio-synthesizer/
+├── backend/
+│   ├── prisma/
+│   │   └── schema.prisma                 # Updated Prisma models
+│   ├── src/
+│   │   ├── migrations/
+│   │   │   └── 0002_age_progression_and_pronunciation.sql # DB migrations
+│   │   ├── config/index.js               # Environment & provider config
+│   │   ├── db/                           # Database pools & queries
+│   │   ├── models/Chapter.js             # Mongoose chapter model with source offsets & words
+│   │   ├── routes/
+│   │   │   ├── novels.js                 # Novel ingestion, status, assets
+│   │   │   ├── chapters.js               # Chapter parsing, synthesis, review
+│   │   │   ├── voices.js                 # Cast management, pronunciation dict, preview
+│   │   │   └── jobs.js                   # Job cancellation and status
+│   │   └── engine/
+│   │       ├── queueWorker.js            # Node.js asynchronous SKIP LOCKED worker daemon
+│   │       ├── textParser.js             # Offset-preserving literary tokenizer
+│   │       ├── attribution.js            # Context & multi-party attribution engine
+│   │       ├── ageProgression.js         # Chronological timeline & age stage engine
+│   │       ├── voiceProfiler.js          # Novel-scoped voice profiler & casting engine
+│   │       ├── pronunciationDict.js      # Pronunciation dictionary replacement service
+│   │       ├── ttsEngine.js              # TTS provider integrations & SSML age modulator
+│   │       ├── audioStitcher.js          # PCM linear audio stitcher with crossfade & atomic write
+│   │       └── providers/                # Modular TTS providers (Edge, Kokoro, OpenAI, etc.)
+│   └── tests/                            # Automated test suites
+├── frontend/
+│   └── src/
+│       ├── components/
+│       │   ├── ReaderView.jsx            # Synchronized scroll reader with view-jump guard
+│       │   ├── OpenGLPageReader.jsx      # 3D paginated reader with navigation lock
+│       │   └── NovelCatalog.jsx          # Catalog with lazy-loaded 3D book
+│       └── utils/
+│           └── readerLayoutEngine.js     # Word and sentence active highlight engine
+└── test-novels/                          # Benchmark verification novels
 ```
-
----
-
-### 3.2 Level 1 DFD (Verified Subsystem Data Flow)
-This diagram defines the 8 architectural data stores ($D_1$ to $D_8$) and the 8 operational processes ($1.0$ to $8.0$). It maps the lifecycle of a chapter from raw text ingestion to speaker attribution, multi-voice synthesis, audio stitching, and 60fps synchronized playback.
-
-```mermaid
-flowchart TD
-    User(["👤 User / Reader / Admin"])
-
-    %% Processes
-    P1["1.0 Auth & Role Verification\n(Express + JWT + pgcrypto)"]
-    P2["2.0 Polyglot Chapter Ingestion & Rollback\n(Express Ingestion Gateway)"]
-    P3["3.0 Character Profiling & Verification\n(Grounded NLP & Regex Profiler)"]
-    P4["4.0 Dialogue Parsing & Speaker Attribution\n(Regex Quote Engine + SpaCy nsubj)"]
-    P5["5.0 Multi-Voice Synthesis & Cache Manager\n(Edge Neural TTS + Kokoro-82M Fallback)"]
-    P6["6.0 Audio Stitcher & Manifest Publisher\n(audioStitcher.js / FFmpeg single-pass)"]
-    P7["7.0 Range Audio Proxy & 60fps Sync\n(Express Proxy + React useAudioSync)"]
-    P8["8.0 Playback Progress Atomic Upsert\n(Express History Controller)"]
-
-    %% Data Stores
-    D1[("D1: Users Store\n(PostgreSQL 16)")]
-    D2[("D2: Novels & Chapters Meta Store\n(PostgreSQL 16)")]
-    D3[("D3: Characters, Aliases & Voices\n(PostgreSQL 16)")]
-    D4[("D4: Synthesis Jobs Queue\n(PostgreSQL SKIP LOCKED)")]
-    D5[("D5: Chapter Docs & Timelines\n(MongoDB 7.0)")]
-    D6[("D6: Audio & Covers Store\n(OpenStack Swift)")]
-    D7[("D7: Segment Audio Cache\n(Postgres Index + Local PCM Volume)")]
-    D8[("D8: Playback History\n(PostgreSQL 16)")]
-
-    %% 1.0 Auth Flow
-    User -->|"Credentials (username, password)"| P1
-    P1 <-->|"Validate user & role"| D1
-    P1 -->|"Set httpOnly JWT cookie"| User
-
-    %% 2.0 Ingestion Flow
-    User -->|"Upload novel prose & chapter text"| P2
-    P2 -->|"Insert novel/chapter metadata"| D2
-    P2 -->|"Write full raw_text doc"| D5
-    P2 -.->|"Compensating rollback on error"| D2
-    P2 -->|"Enqueue profile/synthesis job"| D4
-
-    %% 3.0 Profiling Flow
-    D4 -->|"Claim profile_novel job"| P3
-    D5 -->|"Read raw novel text"| P3
-    P3 -->|"Persist grounded characters & aliases"| D3
-    P3 -->|"Update novel status & global_tone"| D2
-
-    %% 4.0 Attribution Flow
-    D4 -->|"Claim synthesize_chapter job"| P4
-    D5 -->|"Read chapter raw_text"| P4
-    D3 -->|"Read cast, aliases & assigned voices"| P4
-    P4 -->|"Write segments[] with speaker_name & voice_id"| D5
-    P4 -->|"Forward attributed segments"| P5
-
-    %% 5.0 Synthesis & Caching
-    D3 -->|"Fetch voice pitch, speed & parameters"| P5
-    P5 <-->|"Check / store 24kHz PCM by hash"| D7
-    P5 -->|"Synthesized audio buffers"| P6
-    P5 -->|"Update job progress pct via WebSocket"| D4
-
-    %% 6.0 Stitching & Publishing (Write Order: Swift -> Mongo -> Postgres)
-    P6 -->|"1. Upload stitched audio blob"| D6
-    P6 -->|"2. Upsert segment timings & manifest"| D5
-    P6 -->|"3. Mark chapter completed & set duration"| D2
-    P6 -->|"Mark job completed"| D4
-
-    %% 7.0 Playback & 60fps Sync
-    User -->|"Open chapter reader"| P7
-    D2 -->|"Read chapter audio metadata"| P7
-    D5 -->|"Fetch segments[] & timeline manifest"| P7
-    D6 -->|"Stream audio via HTTP 206 Partial Content"| P7
-    D8 -->|"Fetch last resume position"| P7
-    P7 -->|"Synchronized audio stream + 60fps text highlights"| User
-
-    %% 8.0 Progress Tracking
-    User -->|"Audio seek / playback position tick"| P8
-    P8 -->|"ON CONFLICT (user_id, novel_id) DO UPDATE"| D8
-```
-
----
-
-## 4. 4-Phase Implementation Plan & Roadmap
-
-The SyncTone implementation is structured into 4 sequential engineering phases to guarantee deterministic progress, robust data integrity, and verifiable milestone deliveries.
-
-```mermaid
-flowchart LR
-    P1["Phase 1: Polyglot Infrastructure &\nSchema Authority\n[DONE]"]
-    P2["Phase 2: Express Gateway &\nMulti-Voice Engine\n[DONE]"]
-    P3["Phase 3: Frontend Library &\nSynced Reader Polish\n[NEXT]"]
-    P4["Phase 4: End-to-End Testing &\nAssessment Defense\n[UPCOMING]"]
-
-    P1 --> P2
-    P2 --> P3
-    P3 --> P4
-```
-
-### Phase 1: Polyglot Infrastructure, 12-Table 4NF PG Schema & Mongoose Contract `[DONE]`
-- [x] **6-Service Docker Compose Setup**: Configured and initialized `synctone-postgres` (PostgreSQL 16), `synctone-mongo` (MongoDB 7.0), `synctone-swift` (OpenStack Swift `bouncestorage/swift-aio`), `synctone-api` (Express Gateway), `synctone-worker` (Python Daemon), and `synctone-frontend` (React + Vite).
-- [x] **Relational Schema Authority (PostgreSQL 16 — Strict 4NF)**: Implemented Alembic migrations (`0001_initial_schema.py` $\rightarrow$ `0002_enforce_strict_3nf.py` $\rightarrow$ `0003_enforce_4nf.py`) and Prisma ORM schema (`prisma/schema.prisma`) defining all **12 tables in Strict Fourth Normal Form (4NF)**:
-  1. `users`: Identity and RBAC (`reader`, `writer`, `admin`) with unique constraints on `username` and `email`.
-  2. `voices`: Master voice catalog with 20 pre-seeded voices (12 Kokoro + 8 Microsoft Edge Neural).
-  3. `novels`: Catalog records with channel segmentation (`verified`, `community`) and lifecycle statuses.
-  4. `chapters`: Relational metadata storing `total_duration_ms`, `swift_audio_object`, and `audio_version`.
-  5. `characters`: Character cast portfolio with partial unique index ensuring at most one narrator per novel.
-  6. `character_aliases`: 3NF/4NF alias normalization (`UNIQUE(character_id, alias)`) with trigger-enforced novel-scoped alias uniqueness.
-  7. `synthesis_jobs`: Pure queue broker table supporting `SELECT ... FOR UPDATE SKIP LOCKED` and exponential backoff retry.
-  8. `novel_profile_job_targets`: 4NF subtype target table binding `profile_novel` jobs to `novels(id)`.
-  9. `chapter_synthesis_job_targets`: 4NF subtype target table binding `synthesize_chapter` jobs to `chapters(id)`.
-  10. `segment_audio_cache`: LRU-indexed lookup table keyed by `(text_hash, voice_hash)` for 24kHz raw PCM buffers.
-  11. `playback_history`: 4NF user-novel bookmark identity table (`UNIQUE(user_id, novel_id)`).
-  12. `playback_positions`: 4NF mutable chapter/millisecond offset table (`history_id` PK) with compatibility views `v_playback_history` and `reading_progress`.
-- [x] **Document Schema Contract (MongoDB 7.0)**: Defined Mongoose `Chapter` model in `novel-audio-synthesizer/backend/src/models/Chapter.js` keyed by unique `pg_chapter_id` UUID, storing full prose in `raw_text`, ordered `segments[]` (with `order`, `segment_id`, `type`, `text`, `character_id`, `speaker_id`, `speaker_name`, `voice_id`, `confidence`, `source`, `needs_review`), and `manifest` (`total_duration_ms`, `audio_url`, `timeline[]`).
-- [x] **Database Verification Suite**: Created automated data engineering tests (`npm run test:de`) verifying check constraints, partial indexes, foreign key cascading, 3NF/4NF triggers, and state-dependent downgrade safety.
-
-### Phase 2: Express Gateway, Auth/RBAC, Polyglot Ingestion, Multi-Voice Engine & Swift Range Proxy `[DONE]`
-- [x] **Express.js API Gateway**: Implemented pure JavaScript (CommonJS, Node.js 20+) backend in `novel-audio-synthesizer/backend/` with zero transpilation build step.
-- [x] **Authentication & RBAC Middleware**: Built `httpOnly` secure JWT cookie authentication with `pgcrypto` bcrypt password hashing and granular role authorization (`reader`, `writer`, `admin`).
-- [x] **Polyglot Chapter Ingestion with Compensating Rollback**: Implemented atomic multi-database chapter creation in `POST /api/novels/:id/chapters`. Wraps PostgreSQL in an explicit SQL transaction (`BEGIN...COMMIT`) and compensates on failure by deleting the associated MongoDB document (`Chapter.deleteOne({ pg_chapter_id })`), preventing orphan records.
-- [x] **Dual-TTS Multi-Voice Synthesis Engine**:
-  - Primary Engine: Microsoft Edge Neural TTS (`msedge-tts`, 24kHz 48kbps MP3) streaming authentic British character voices (Harry, Hermione, Ron, Dumbledore, Snape, McGonagall, Ryan Narrator).
-  - Fallback Engine: Python Kokoro-82M ONNX daemon in `kokoro-tts-backend/` providing local offline synthesis.
-- [x] **Audio Stitcher (`audioStitcher.js`)**: Implemented sample-accurate MP3/WAV segment stitching that inserts 250ms inter-speaker silence frames and computes exact start/end millisecond timeline offsets.
-- [x] **OpenStack Swift Range Proxy (`swift.js`)**: Developed RFC 7233 compliant streaming proxy (`GET /api/chapters/:id/audio` and `GET /api/stream/:chapter_id`) with single in-flight token refresh mutex, 401 automatic re-authentication retry, 416 range validation, HTTP 206 Partial Content delivery, and local filesystem fallback.
-- [x] **Attribution & Profiling Subsystem**: Created `textParser.js`, `attribution.js`, and `voiceProfiler.js` for quote-boundary segmentation, regex candidate extraction, and alias-to-character resolution.
-
-### Phase 3: Frontend Novel Library, Synced Reader Polyglot Wiring & Character Roster Polish `[NEXT]`
-- [ ] **Novel Library Catalog Interface**: Complete responsive React 18 + Tailwind CSS 3 novel browsing grid featuring Verified and Community channel tabs, genre filtering, cover art rendering, and chapter lists.
-- [ ] **Webnovel Reader Experience**: Build ergonomic reader interface (WTR-Lab style) with font customization, dark/sepia/light themes, and sticky audio playback dock.
-- [ ] **60fps `useAudioSync` Highlighting Hook**: Finalize zero-latency audio clock synchronization utilizing binary-search lookup over the MongoDB `manifest.timeline[]` within a `requestAnimationFrame` loop.
-- [ ] **Character Roster Drawer**: Deliver an interactive character drawer displaying canonical names, detected aliases, assigned voices, sample quote audio previews, and admin voice reassignment dropdowns.
-- [ ] **Real-Time Progress Consumer**: Wire frontend WebSocket/SSE client to display live progress bars for queued and actively synthesizing chapters.
-- [ ] **Atomic Playback Resume**: Connect reader playback ticks to `POST /api/playback/progress` and `GET /api/playback/progress` for seamless reading resumption across browser sessions.
-- [ ] **GitHub Actions CI Workflow (`.github/workflows/ci.yml`)**: Configure automated continuous integration checks on Pull Requests targeting `main` and pushes to `dev` (running backend JS syntax verification, frontend `npm run build`, Python `py_compile`, and polyglot PostgreSQL 16 + MongoDB 7.0 service-container verification suites `npm test` & `npm run test:de`) to enforce branch ruleset status checks.
-
-### Phase 4: End-to-End Integration Testing, Queue Reaper & Assessment Defense `[UPCOMING]`
-- [ ] **CI Gate Enforcement on `main` Ruleset**: Enable required status checks (`ci / build-and-test`) on the `protect-main` GitHub branch ruleset once the workflow is live.
-- [ ] **Benchmark Demonstration Packaging**:
-  - Local Harry Potter Demo: Pre-tuned multi-voice demo of Chapter 1 of *Harry Potter and the Philosopher's Stone* with verified British character casting.
-  - Public Gutenberg Demo: Public-domain evaluation on *The Adventures of Sherlock Holmes* (Chapter 1 & 2) demonstrating end-to-end automated profiling.
-- [ ] **Transactional Worker Reaper & Crash Recovery**: Test automated cleanup and exponential backoff retry for stalled synthesis jobs using `locked_at` heartbeat timeouts.
-- [ ] **Performance Benchmarks**: Document read latency, document size, and throughput metrics comparing MongoDB document retrieval vs PostgreSQL JSONB.
-- [ ] **Academic Viva & Project Defense**: Assemble finalized technical report, architecture diagrams, and slide deck for university examination.

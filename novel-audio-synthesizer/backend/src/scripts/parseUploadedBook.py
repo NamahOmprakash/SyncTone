@@ -45,13 +45,30 @@ def clean_ocr_disclaimers(raw_text: str) -> str:
     """Strips automated OCR notices and disclaimers (e.g. from Internet Archive scans)."""
     if not raw_text:
         return ""
-    clean = re.sub(r'<[^>]*>The text on this page is estimated to be only \d+\.?\d*% accurate[^<]*<[^>]*>', '', raw_text, flags=re.IGNORECASE)
+    clean = re.sub(r'(?is)<b[^>]*>[^<]*The text on this page is estimated to be only[^<]*</b>', ' ', raw_text)
+    clean = re.sub(r'<[^>]*>The text on this page is estimated to be only \d+\.?\d*% accurate[^<]*<[^>]*>', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'The text on this page is estimated to be only \d+\.?\d*% accurate.*', '', clean, flags=re.IGNORECASE)
-    clean = re.sub(r'This book was produced in EPUB format by the Internet Archive.*?(?:reading sequence\.|errors\.)', '', clean, flags=re.IGNORECASE | re.DOTALL)
+    clean = re.sub(r'This book was produced in EPUB format by the Internet Archive.*?(?:reading sequence\.|errors\.|volunteer\.|formats\.)', '', clean, flags=re.IGNORECASE | re.DOTALL)
     clean = re.sub(r'This book was produced in EPUB format by the Internet Archive.*', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'The book pages were scanned and converted to EPUB format automatically.*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'Notice:\s*The book may not offer the correct reading sequence.*?(?: guesses at structure\.|improve the scanning process\.|archive\.org|\n|$)', '', clean, flags=re.IGNORECASE | re.DOTALL)
+    clean = re.sub(r'The book may not offer the correct reading sequence because of missing or misordered pages.*?(?:improve the scanning process\.|archive\.org|\n|$)', '', clean, flags=re.IGNORECASE | re.DOTALL)
+    clean = re.sub(r'The hidden page numbering which may be available to your ereader.*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'The Internet Archive is working to improve the scanning process.*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'The Internet Archive was founded in 1996.*?(?:digital format\.|archive\.org|\n|$)', '', clean, flags=re.IGNORECASE | re.DOTALL)
+    clean = re.sub(r'This book is available for free download in a number of formats.*?(?:volunteer\.|\n|$)', '', clean, flags=re.IGNORECASE | re.DOTALL)
+    clean = re.sub(r'Access-restricted-item\s+true.*', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'(?i)Created with hocr-to-epub[^\n]*', '', clean)
+    clean = re.sub(r'(?i)hocr-to-epub[^\n]*', '', clean)
+    clean = re.sub(r'(?im)^\s*Notice\s*[:\.]?\s*$', '', clean)
+    clean = re.sub(r'(?:Addeddate|Boxid|Camera|Collection_set|External-identifier|Foldoutcount|Identifier|Invoice|Ocr|Ocr_detected_lang|Ocr_module_version|Page_number_confidence|Pages|Scanner)\s+[:=]?\s*.*', '', clean, flags=re.IGNORECASE)
     # Strip non-Latin OCR garbage (Urdu/Arabic scan artifacts from IA scans)
     clean = re.sub(r'[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF\u200e\u200f\u200b\u200c\u200d]+', ' ', clean)
+    # Repair common hOCR ligature and drop-cap scan corruptions
+    clean = re.sub(r'\bfi\*om\b', 'from', clean)
+    clean = re.sub(r'\b111\.\s+THE\s+ADVENTURE', 'III. THE ADVENTURE', clean)
+    clean = re.sub(r'\bY\s+dear\s+fellow\b', 'My dear fellow', clean)
+    clean = re.sub(r'(?:^|\n)\s*[Oo]\s+Sherlock\s+Holmes\b', '\nTo Sherlock Holmes', clean)
     return clean
 
 
@@ -60,9 +77,14 @@ def strip_html_tags(raw_html: str) -> str:
     if not raw_html:
         return ""
     clean = clean_ocr_disclaimers(raw_html)
+    clean = re.sub(r'(?is)<head.*?>.*?</head>', ' ', clean)
+    clean = re.sub(r'(?is)<title.*?>.*?</title>', ' ', clean)
     clean = re.sub(r'(?is)<script.*?>.*?</script>', ' ', clean)
     clean = re.sub(r'(?is)<style.*?>.*?</style>', ' ', clean)
-    clean = re.sub(r'(?i)<(br|p|div|h[1-6]|li|tr)[^>]*>', '\n', clean)
+    clean = re.sub(r'(?is)<(h[1-6])[^>]*>', '\n\n', clean)
+    clean = re.sub(r'(?is)</(h[1-6])>', '\n\n', clean)
+    clean = re.sub(r'(?is)<(br|p|div|li|tr|section|article)[^>]*>', '\n\n', clean)
+    clean = re.sub(r'(?is)</(p|div|li|tr|section|article)>', '\n\n', clean)
     clean = re.sub(r'<[^>]+>', ' ', clean)
     clean = html.unescape(clean)
     lines = [re.sub(r'[ \t]+', ' ', l).strip() for l in clean.splitlines()]
@@ -128,6 +150,14 @@ def split_by_chapter_headings(text: str):
             })
         return chapters
 
+    # Normalize conjoined chapter headings e.g. "CHAPTER TWO Nearly ten years had passed..." -> "CHAPTER TWO\n\nNearly ten years had passed..."
+    word_nums_pattern = '|'.join(WORD_NUMS.keys())
+    text = re.sub(
+        r'(?im)^([ \t]*(?:CHAPTER|Chapter|GHAPTER|Ghapter)\s+(?:[IVXLCDM\d]+|' + word_nums_pattern + r'))(?:[:.\-—\s]+|\s+)([A-Z][a-z].{25,})$',
+        r'\1\n\n\2',
+        text
+    )
+
     # Generic chapter headings: Chapter 1, CHAPTER II, GHAPTER ONE, PART 1, etc.
     heading_pattern = re.compile(
         r'(?:^|\n)[ \t]*(?:#+\s*)?(?:CHAPTER|Chapter|GHAPTER|Ghapter|G\s*HAPTER|ACT|Act|PART|Part|BOOK|Book)\s+([IVXLCDM\d]+|[A-Za-z]+|[0-9]+)(?:[:.\-—\s]+([^\n]*))?',
@@ -177,6 +207,24 @@ def split_by_chapter_headings(text: str):
             name_part = m.group(2).strip().title()
             chapters.append({
                 "title": f"Chapter {num_part}: {name_part}",
+                "raw_text": chunk
+            })
+        return chapters
+
+    # Diary / Journal month headings (e.g., SEPTEMBER, OCTOBER, NOVEMBER...)
+    month_pattern = re.compile(
+        r'(?:^|\n)[ \t]*(SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST)[ \t]*(?=\n|$)'
+    )
+    m_matches = list(month_pattern.finditer(text))
+    if len(m_matches) >= 2:
+        chapters = []
+        for i, m in enumerate(m_matches):
+            start = m.start()
+            end = m_matches[i + 1].start() if i + 1 < len(m_matches) else len(text)
+            chunk = text[start:end].strip()
+            month_name = m.group(1).strip().title()
+            chapters.append({
+                "title": f"Chapter {i + 1}: {month_name}",
                 "raw_text": chunk
             })
         return chapters
@@ -413,7 +461,7 @@ def parse_epub(file_path: str, original_filename: str = ""):
             if not c_bytes:
                 continue
             c_str = c_bytes.decode('utf-8', errors='replace')
-            if re.search(r'<title[^>]*>Page\s+\d+</title>', c_str, re.I) or re.search(r'page[_-]?\d+\.x?html?$', href, re.I):
+            if re.search(r'<title[^>]*>(?:Page\s+\d+|Notice|split_\d+|Cover|Title\s+Page|Copyright)</title>', c_str, re.I) or re.search(r'(?:page[_-]?\d+|split[_-]?\d+|notice)\.x?html?$', href, re.I):
                 page_titles_count += 1
             words_in_page = len(re.sub(r'<[^>]+>', ' ', c_str).split())
             total_words_sampled += words_in_page
@@ -421,7 +469,7 @@ def parse_epub(file_path: str, original_filename: str = ""):
         is_page_based = False
         if spine_count > 10:
             avg_words = total_words_sampled / max(1, min(15, spine_count))
-            if page_titles_count >= 2 or avg_words < 450:
+            if page_titles_count >= 2 or avg_words < 500:
                 is_page_based = True
 
         raw_spine_pages = []
@@ -467,6 +515,8 @@ def parse_epub(file_path: str, original_filename: str = ""):
                         continue
                     if re.match(r'^\d{1,4}$', trimmed):
                         continue
+                    if re.match(r'^Page\s+\d+$', trimmed, re.I):
+                        continue
                     if re.match(r'^(?:\d{1,4}\s+)?(?:ADVENTURES OF SHERLOCK HOLMES|HARRY POTTER)[.\s\d]*$', trimmed, re.I):
                         continue
                     page_lines.append(trimmed)
@@ -496,8 +546,13 @@ def parse_epub(file_path: str, original_filename: str = ""):
         chapters = []
 
         if is_page_based:
-            # Concatenate all page texts together
-            full_text = "\n\n".join([p["raw_text"] for p in raw_spine_pages])
+            # Concatenate all page texts together, excluding pure boilerplate pages
+            valid_pages = [
+                p["raw_text"] for p in raw_spine_pages
+                if not re.match(r'^(?:notice|cover|title\s+page|copyright)$', p["title"], re.I)
+                and not re.search(r'^(?:The Internet Archive was founded in 1996|Notice:\s*The book may not offer)', p["raw_text"].strip(), re.I)
+            ]
+            full_text = "\n\n".join(valid_pages)
             split_chapters = split_by_chapter_headings(full_text)
             if split_chapters and len(split_chapters) >= 2:
                 chapters = split_chapters
@@ -550,24 +605,62 @@ def parse_epub(file_path: str, original_filename: str = ""):
 
 
 def parse_pdf(file_path: str, original_filename: str = ""):
-    """Extracts text from PDF files using pypdf/fitz or zlib stream parsing."""
+    """Extracts text and cover from PDF files using permissive pypdf/pypdfium2 or zlib stream parsing."""
     full_text = ""
+    cover_object = None
 
-    # Strategy 1: pypdf if installed
+    backend_covers_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../output/covers'))
+    root_covers_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../novel-audio-synthesizer/output/covers'))
+    os.makedirs(backend_covers_dir, exist_ok=True)
+    if os.path.isdir(os.path.dirname(root_covers_dir)):
+        try:
+            os.makedirs(root_covers_dir, exist_ok=True)
+        except Exception:
+            pass
+
+    pdf_hash = hashlib.md5(file_path.encode()).hexdigest()[:8]
+
+    # Strategy 1: pypdf (BSD-3-Clause)
     try:
         import pypdf
         reader = pypdf.PdfReader(file_path)
         pages_text = [page.extract_text() or "" for page in reader.pages]
         full_text = "\n\n".join(pages_text).strip()
+
+        # Extract page 0 image as cover if present
+        if reader.pages and len(reader.pages[0].images) > 0:
+            try:
+                img_file = reader.pages[0].images[0]
+                img_ext = os.path.splitext(img_file.name)[1] or ".jpg"
+                if not img_ext.startswith('.'):
+                    img_ext = f".{img_ext}"
+                saved_name = f"pdf_cover_{pdf_hash}{img_ext}"
+                p1 = os.path.join(backend_covers_dir, saved_name)
+                with open(p1, 'wb') as fp:
+                    fp.write(img_file.data)
+                if os.path.isdir(root_covers_dir):
+                    try:
+                        p2 = os.path.join(root_covers_dir, saved_name)
+                        with open(p2, 'wb') as fp2:
+                            fp2.write(img_file.data)
+                    except Exception:
+                        pass
+                cover_object = f"/static/covers/{saved_name}"
+            except Exception:
+                pass
     except Exception:
         pass
 
-    # Strategy 2: fitz (PyMuPDF) if installed
+    # Strategy 2: pypdfium2 (Apache 2.0 / BSD-3) if installed
     if not full_text:
         try:
-            import fitz
-            doc = fitz.open(file_path)
-            pages_text = [page.get_text() or "" for page in doc]
+            import pypdfium2 as pdfium
+            pdf = pdfium.PdfDocument(file_path)
+            pages_text = []
+            for i in range(len(pdf)):
+                page = pdf[i]
+                textpage = page.get_textpage()
+                pages_text.append(textpage.get_text_range() or "")
             full_text = "\n\n".join(pages_text).strip()
         except Exception:
             pass
@@ -618,6 +711,7 @@ def parse_pdf(file_path: str, original_filename: str = ""):
         except Exception as e:
             sys.stderr.write(f"PDF raw parsing warning: {e}\n")
 
+    full_text = clean_ocr_disclaimers(full_text)
     base_name = original_filename or os.path.basename(file_path)
     title = clean_book_title(os.path.splitext(base_name)[0], base_name)
 
@@ -631,7 +725,7 @@ def parse_pdf(file_path: str, original_filename: str = ""):
     return {
         "title": title,
         "synopsis": synopsis,
-        "cover_object": None,
+        "cover_object": cover_object,
         "chapters": [
             {
                 "chapter_number": i + 1,

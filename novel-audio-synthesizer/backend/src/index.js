@@ -17,7 +17,16 @@ async function bootstrap() {
   });
 
   connectMongo().catch((e) => console.warn('[DB] Mongo connect warning:', e.message));
-  connectPostgres().catch((e) => console.warn('[DB] Postgres connect warning:', e.message));
+  connectPostgres()
+    .then(async () => {
+      try {
+        const { ensureVoiceCatalog } = require('./scripts/seedDemos');
+        await ensureVoiceCatalog();
+      } catch (e) {
+        console.warn('[DB] Voice catalog auto-upsert warning:', e.message);
+      }
+    })
+    .catch((e) => console.warn('[DB] Postgres connect warning:', e.message));
 }
 
 bootstrap().catch((err) => {

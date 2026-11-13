@@ -11,7 +11,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-synctone_pass}
       POSTGRES_DB: ${POSTGRES_DB:-synctone}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Bound strictly to localhost on host machine (never exposed to public internet)
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
@@ -36,7 +37,8 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-synctone_pass}
       MONGO_INITDB_DATABASE: ${MONGO_DB:-synctone}
     ports:
-      - "${MONGO_PORT:-27017}:27017"
+      # Bound strictly to localhost on host machine
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
     volumes:
       - mongo_data:/data/db
     networks:
@@ -55,7 +57,8 @@ services:
     container_name: synctone-swift
     restart: unless-stopped
     ports:
-      - "${SWIFT_PORT:-8080}:8080"
+      # Bound strictly to localhost on host machine
+      - "127.0.0.1:${SWIFT_PORT:-8080}:8080"
     volumes:
       - swift_data:/srv/node
     networks:
@@ -67,7 +70,23 @@ services:
       retries: 5
 
   # ==============================================================================
-  # 4. Express.js REST API & Swift Streaming Proxy (Profile: app / full)
+  # 4. Model Cache Downloader Init Step (Profile: full)
+  # ==============================================================================
+  model-init:
+    image: curlimages/curl:8.5.0
+    container_name: synctone-model-init
+    profiles:
+      - full
+    volumes:
+      - models_cache:/models
+      - ./scripts/download-models.sh:/scripts/download-models.sh:ro
+    user: root
+    entrypoint: ["sh", "-c", "apk add --no-cache bash && bash /scripts/download-models.sh /models"]
+    networks:
+      - synctone-net
+
+  # ==============================================================================
+  # 5. Express.js REST API & Swift Streaming Proxy (Profile: app / full)
   # ==============================================================================
   api:
     build:
@@ -89,6 +108,7 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${PORT:-4000}
       JWT_SECRET: ${JWT_SECRET:-synctone_super_secret_jwt_key_2026_dev_mode}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       DATABASE_URL: postgresql://${POSTGRES_USER:-synctone_user}:${POSTGRES_PASSWORD:-synctone_pass}@postgres:5432/${POSTGRES_DB:-synctone}
       MONGO_URI: mongodb://${MONGO_USER:-synctone_user}:${MONGO_PASSWORD:-synctone_pass}@mongo:27017/${MONGO_DB:-synctone}?authSource=admin
       SWIFT_AUTH_URL: http://swift:8080/auth/v1.0
@@ -96,15 +116,35 @@ services:
       SWIFT_KEY: ${SWIFT_KEY:-testing}
       SWIFT_CONTAINER_AUDIO: ${SWIFT_CONTAINER_AUDIO:-novel-chapters}
       SWIFT_CONTAINER_COVERS: ${SWIFT_CONTAINER_COVERS:-novel-covers}
+      PYTHON_BIN: ${PYTHON_BIN:-/opt/venv/bin/python3}
+      KOKORO_MODEL_PATH: /app/kokoro-tts-backend/models_cache/kokoro-v1.0.onnx
+      KOKORO_VOICES_PATH: /app/kokoro-tts-backend/models_cache/voices-v1.0.bin
+      PARADEE_MODEL_PATH: /app/kokoro-tts-backend/models_cache/paradee-v1.2-int8.onnx
+      PARADEE_VOICES_PATH: /app/kokoro-tts-backend/models_cache/paradee-voices.json
+      OLLAMA_URL: ${OLLAMA_URL:-http://localhost:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-mistral}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      UNLIMITED_OCR_URL: ${UNLIMITED_OCR_URL:-}
     ports:
-      - "${PORT:-4000}:4000"
+      # Bound strictly to localhost for direct API debugging; public traffic routes through Nginx
+      - "127.0.0.1:${PORT:-4000}:4000"
     volumes:
       - shared_output:/app/output
+      - covers_data:/app/output/covers
+      - chapters_data:/app/chapters
+      - app_data:/app/data
+      - models_cache:/app/kokoro-tts-backend/models_cache
+      - models_cache:/app/models_cache
     networks:
       - synctone-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ==============================================================================
-  # 5. Python Worker Daemon — NLP & Kokoro-ONNX TTS (Profile: app / full)
+  # 6. Python Worker Daemon — NLP & Kokoro-ONNX TTS (Profile: app / full)
   # ==============================================================================
   worker:
     build:
@@ -122,6 +162,8 @@ services:
         condition: service_healthy
       swift:
         condition: service_started
+      api:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-synctone_user}:${POSTGRES_PASSWORD:-synctone_pass}@postgres:5432/${POSTGRES_DB:-synctone}
       MONGO_URI: mongodb://${MONGO_USER:-synctone_user}:${MONGO_PASSWORD:-synctone_pass}@mongo:27017/${MONGO_DB:-synctone}?authSource=admin
@@ -131,14 +173,23 @@ services:
       SWIFT_CONTAINER_AUDIO: ${SWIFT_CONTAINER_AUDIO:-novel-chapters}
       WORKER_ID: ${WORKER_ID:-synctone-worker-1}
       WORKER_POLL_INTERVAL_SEC: ${WORKER_POLL_INTERVAL_SEC:-3}
+      KOKORO_MODEL_PATH: /app/models_cache/kokoro-v1.0.onnx
+      KOKORO_VOICES_PATH: /app/models_cache/voices-v1.0.bin
+      PARADEE_MODEL_PATH: /app/models_cache/paradee-v1.2-int8.onnx
+      PARADEE_VOICES_PATH: /app/models_cache/paradee-voices.json
     volumes:
       - shared_output:/app/output
       - pcm_cache:/app/output/pcm_cache
+      - covers_data:/app/output/covers
+      - chapters_data:/app/chapters
+      - app_data:/app/data
+      - models_cache:/app/models_cache
+      - models_cache:/app/kokoro-tts-backend/models_cache
     networks:
       - synctone-net
 
   # ==============================================================================
-  # 6. React + Vite Frontend Web Reader (Profile: app / full)
+  # 7. React + Vite Frontend Web Reader with Nginx Reverse Proxy (Profile: app / full)
   # ==============================================================================
   frontend:
     build:
@@ -149,10 +200,19 @@ services:
     profiles:
       - app
       - full
+    depends_on:
+      api:
+        condition: service_healthy
     ports:
-      - "5173:80"
+      # Bound to port 80 (or custom FRONTEND_PORT) for web traffic
+      - "${FRONTEND_PORT:-80}:80"
     networks:
       - synctone-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data:
@@ -164,6 +224,14 @@ volumes:
   pcm_cache:
     driver: local
   shared_output:
+    driver: local
+  covers_data:
+    driver: local
+  chapters_data:
+    driver: local
+  app_data:
+    driver: local
+  models_cache:
     driver: local
 
 networks:

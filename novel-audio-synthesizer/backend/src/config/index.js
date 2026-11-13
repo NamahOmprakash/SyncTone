@@ -83,6 +83,27 @@ const config = {
     model: process.env.OLLAMA_MODEL || 'mistral',
   },
 
+  // Paradee-8M-v1.2 Micro ONNX Model
+  paradee: {
+    modelDir: path.join(modelsDir, 'paradee'),
+    onnxFile: path.join(modelsDir, 'paradee', 'paradee_int8.onnx'),
+    configFile: path.join(modelsDir, 'paradee', 'config.json'),
+  },
+
+  // Google Gemini Multimodal AI (Tier 2 Parser & Attribution)
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || '',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    timeoutMs: parseInt(process.env.GEMINI_TIMEOUT_MS || '90000', 10),
+  },
+
+  // Baidu Unlimited-OCR via vLLM OpenAI-compatible Server (Tier 3 Parser)
+  unlimitedOcr: {
+    baseUrl: process.env.UNLIMITED_OCR_URL || 'http://localhost:8000/v1',
+    model: process.env.UNLIMITED_OCR_MODEL || 'baidu/Unlimited-OCR',
+    timeoutMs: parseInt(process.env.UNLIMITED_OCR_TIMEOUT_MS || '120000', 10),
+  },
+
   // Storage Directories
   paths: {
     root: ROOT_DIR,

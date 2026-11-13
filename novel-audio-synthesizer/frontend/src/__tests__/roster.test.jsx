@@ -7,6 +7,15 @@ import CharacterRoster from '../components/CharacterRoster';
 
 const MOCK_SEGMENTS = [
   {
+    order: 0,
+    segment_id: 0,
+    type: 'narration',
+    text: 'The Hogwarts Express rattled north through the rain.',
+    character_id: 'narrator',
+    speaker_name: 'Narrator',
+    assigned_voice_id: 'en-GB-RyanNeural',
+  },
+  {
     order: 1,
     segment_id: 1,
     type: 'dialogue',
@@ -37,9 +46,10 @@ const MOCK_SEGMENTS = [
 
 const MOCK_VOICES = {
   available_voices: {
-    'British Young Hero': 'en-GB-ThomasNeural',
-    'British Sidekick': 'en-GB-AlfieNeural',
-    'British Wise Elder': 'en-GB-ArthurNeural',
+    narrator: 'en-GB-RyanNeural',
+    harry: 'en-GB-ThomasNeural',
+    ron: 'en-GB-AlfieNeural',
+    hermione: 'en-GB-SoniaNeural',
   },
 };
 
@@ -70,29 +80,33 @@ describe('Milestone 4 — Character Roster & Voice Overrides', () => {
     vi.spyOn(api.voices, 'list').mockResolvedValue(MOCK_VOICES);
   });
 
-  it('aggregates characters with dialogue counts and sample quotes', async () => {
+  it('aggregates characters with narrator pinned, dialogue counts, and sample quotes', async () => {
     renderRosterWithAuth({ isWriterOrAdmin: false });
 
     await waitFor(() => {
+      expect(screen.getByText('Narrator')).toBeInTheDocument();
+      expect(screen.getByText('NARRATOR')).toBeInTheDocument();
       expect(screen.getByText('Harry Potter')).toBeInTheDocument();
       expect(screen.getByText('Ron Weasley')).toBeInTheDocument();
       expect(screen.getByText('2 lines')).toBeInTheDocument();
-      expect(screen.getByText('1 line')).toBeInTheDocument();
+      expect(screen.getAllByText('1 line').length).toBe(2);
       expect(screen.getByText('"Can I have some chocolate frogs?"')).toBeInTheDocument();
     });
   });
 
-  it('shows read-only view for reader role and restricts dropdown', async () => {
-    renderRosterWithAuth({ isWriterOrAdmin: false });
+  it('unlocks voice selection dropdowns and + ADD CHARACTER for reader role', async () => {
+    renderRosterWithAuth({ isWriterOrAdmin: false, role: 'reader' });
 
     await waitFor(() => {
-      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-      expect(screen.getByText('en-GB-ThomasNeural')).toBeInTheDocument();
-      expect(screen.getAllByText(/Sign in as writer\/admin to override voices/i).length).toBeGreaterThan(0);
+      const selects = screen.getAllByRole('combobox');
+      expect(selects.length).toBe(3);
+      expect(selects[0]).toHaveAttribute('aria-label', 'Voice for Narrator');
+      expect(screen.queryByText(/Sign in as writer\/admin to override voices/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /\+ ADD CHARACTER/i })).toBeInTheDocument();
     });
   });
 
-  it('enables voice selection dropdown for writer/admin and posts assignment', async () => {
+  it('enables canonical neural voice selection dropdown for writer/admin and posts assignment', async () => {
     const assignSpy = vi.spyOn(api.voices, 'assign').mockResolvedValue({ message: 'Success' });
     const handleVoiceChange = vi.fn();
 
@@ -103,19 +117,21 @@ describe('Milestone 4 — Character Roster & Voice Overrides', () => {
 
     await waitFor(() => {
       const selects = screen.getAllByRole('combobox');
-      expect(selects.length).toBe(2);
+      expect(selects.length).toBe(3);
+      expect(screen.getAllByText(/British Narrator \(Ryan\)/i).length).toBe(3);
+      expect(screen.getAllByText(/Irish Storyteller \(Connor\)/i).length).toBe(3);
     });
 
-    const harrySelect = screen.getAllByRole('combobox')[0];
-    fireEvent.change(harrySelect, { target: { value: 'en-GB-ArthurNeural' } });
+    const harrySelect = screen.getByLabelText(/Voice for Harry Potter/i);
+    fireEvent.change(harrySelect, { target: { value: 'en-IE-ConnorNeural' } });
 
     await waitFor(() => {
       expect(assignSpy).toHaveBeenCalledWith({
         character_id: 'harry_potter',
-        new_voice_id: 'en-GB-ArthurNeural',
+        new_voice_id: 'en-IE-ConnorNeural',
         chapter_id: 'ch-100',
       });
-      expect(handleVoiceChange).toHaveBeenCalledWith('harry_potter', 'en-GB-ArthurNeural');
+      expect(handleVoiceChange).toHaveBeenCalledWith('harry_potter', 'en-IE-ConnorNeural');
       expect(screen.getByText(/Updated voice for harry_potter/i)).toBeInTheDocument();
     });
   });
@@ -126,16 +142,54 @@ describe('Milestone 4 — Character Roster & Voice Overrides', () => {
     renderRosterWithAuth({ isWriterOrAdmin: true, role: 'writer' });
 
     await waitFor(() => {
-      expect(screen.getAllByRole('combobox').length).toBe(2);
+      expect(screen.getAllByRole('combobox').length).toBe(3);
+      expect(screen.getAllByText(/Irish Storyteller \(Connor\)/i).length).toBe(3);
     });
 
-    const harrySelect = screen.getAllByRole('combobox')[0];
-    fireEvent.change(harrySelect, { target: { value: 'en-GB-ArthurNeural' } });
+    const harrySelect = screen.getByLabelText(/Voice for Harry Potter/i);
+    fireEvent.change(harrySelect, { target: { value: 'en-IE-ConnorNeural' } });
 
     await waitFor(() => {
       expect(screen.getByText(/Permission Denied/i)).toBeInTheDocument();
       // Reverted back to original voice
       expect(harrySelect.value).toBe('en-GB-ThomasNeural');
+    });
+  });
+
+  it('dismisses when backdrop scrim is clicked', async () => {
+    const handleClose = vi.fn();
+    renderRosterWithAuth({ isWriterOrAdmin: false }, { onClose: handleClose });
+    await waitFor(() => {
+      expect(screen.getByText('Harry Potter')).toBeInTheDocument();
+    });
+    const scrim = screen.getByTestId('roster-scrim');
+    fireEvent.click(scrim);
+    expect(handleClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('dismisses when Escape key is pressed', async () => {
+    const handleClose = vi.fn();
+    renderRosterWithAuth({ isWriterOrAdmin: false }, { onClose: handleClose });
+    await waitFor(() => {
+      expect(screen.getByText('Harry Potter')).toBeInTheDocument();
+    });
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(handleClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('has topbar clearance and bottom dock spacing for reader viewport', async () => {
+    renderRosterWithAuth({ isWriterOrAdmin: false });
+    await waitFor(() => {
+      expect(screen.getByText('Harry Potter')).toBeInTheDocument();
+    });
+    const drawer = screen.getByRole('dialog', { name: /Character Roster/i });
+    expect(drawer).toHaveStyle({
+      top: 'var(--topbar-h, 3.5rem)',
+      bottom: 'var(--dock-safe-bottom, 4.5rem)',
+    });
+    const scrim = screen.getByTestId('roster-scrim');
+    expect(scrim).toHaveStyle({
+      top: 'var(--topbar-h, 3.5rem)',
     });
   });
 });

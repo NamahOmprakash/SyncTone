@@ -51,7 +51,7 @@ export function Switch({
         <span
           className={`w-11 h-6 rounded-full transition-colors duration-200 border border-[var(--border-subtle)] ${
             checked
-              ? 'bg-[var(--accent)] border-[var(--accent)]'
+              ? 'bg-[var(--brand-sage,#87A96B)] border-[var(--brand-sage,#87A96B)]'
               : 'bg-[var(--bg-hover)]'
           }`}
         />

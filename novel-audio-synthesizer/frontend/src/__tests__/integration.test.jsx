@@ -120,7 +120,7 @@ describe('Milestone 7 — Full-Stack Frontend Integration (Catalog → Details �
     });
 
     // 4. Open and close Cast Roster drawer
-    fireEvent.click(screen.getByText('Cast Roster'));
+    fireEvent.click(screen.getByRole('button', { name: /Toggle Cast/i }));
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: /Character Roster/i })).toBeInTheDocument();
     });

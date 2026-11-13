@@ -16,36 +16,52 @@ export function StatusBadge({
   const text = label || children;
 
   const statusConfig = {
+    verified: {
+      colorVar: 'var(--brand-sage, #87A96B)',
+      defaultIcon: '✓',
+    },
     success: {
-      colorVar: 'var(--color-status-success)',
+      colorVar: 'var(--brand-sage, #87A96B)',
+      defaultIcon: '✓',
+    },
+    sage: {
+      colorVar: 'var(--brand-sage, #87A96B)',
       defaultIcon: '✓',
     },
     warning: {
-      colorVar: 'var(--color-status-warning)',
+      colorVar: 'var(--warning, #C68A3C)',
       defaultIcon: '▲',
     },
+    amber: {
+      colorVar: 'var(--brand-amber, #D5851F)',
+      defaultIcon: '★',
+    },
     danger: {
-      colorVar: 'var(--color-status-danger)',
+      colorVar: 'var(--danger, #BA4E3D)',
       defaultIcon: '✕',
     },
     info: {
-      colorVar: 'var(--color-status-info)',
+      colorVar: 'var(--info, #A88462)',
       defaultIcon: 'ℹ',
     },
+    walnut: {
+      colorVar: 'var(--brand-walnut-deep, #5A3E2B)',
+      defaultIcon: '●',
+    },
     narrator: {
-      colorVar: 'var(--color-speaker-narrator)',
+      colorVar: 'var(--speaker-narrator, #D5C4AE)',
       defaultIcon: '✦',
     },
     dialogue: {
-      colorVar: 'var(--color-speaker-dialogue)',
+      colorVar: 'var(--speaker-a, #A88462)',
       defaultIcon: '💬',
     },
     system: {
-      colorVar: 'var(--color-speaker-system)',
+      colorVar: 'var(--text-sub, #A88462)',
       defaultIcon: '⚙',
     },
   }[status] || {
-    colorVar: 'var(--color-status-info)',
+    colorVar: 'var(--info, #A88462)',
     defaultIcon: 'ℹ',
   };
 

@@ -1,5 +1,27 @@
 import React from 'react';
 
+export function IconSyncToneLogo({ className = 'w-5 h-5', ...props }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      {...props}
+    >
+      {/* Precision Harmonic Acoustic Soundwave Spectrum */}
+      <rect x="2.5" y="9.5" width="2" height="5" rx="1" fill="currentColor" opacity="0.65" />
+      <rect x="6.5" y="6" width="2.2" height="12" rx="1.1" fill="currentColor" opacity="0.9" />
+      <rect x="10.8" y="2.5" width="2.4" height="19" rx="1.2" fill="currentColor" />
+      <rect x="15.2" y="6" width="2.2" height="12" rx="1.1" fill="currentColor" opacity="0.9" />
+      <rect x="19.5" y="9.5" width="2" height="5" rx="1" fill="currentColor" opacity="0.65" />
+      {/* Signature Resonance Signal Beacon */}
+      <circle cx="19.5" cy="4" r="1.5" fill="var(--signal, #FF5A1F)" />
+    </svg>
+  );
+}
+
 export function IconBook({ className = 'w-5 h-5', ...props }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} {...props}>
@@ -291,6 +313,14 @@ export function IconChevronRight({ className = 'w-5 h-5', ...props }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} {...props}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+export function IconTrash({ className = 'w-5 h-5', ...props }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
     </svg>
   );
 }
