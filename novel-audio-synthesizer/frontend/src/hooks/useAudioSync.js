@@ -158,6 +158,10 @@ const isBrowserEnv =
 export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, maybeOnChapterEnded = null) {
   let onSegmentChange = null;
   let onChapterEnded = null;
+  let currentNovelId = '';
+  let currentChapterId = '';
+  let providedCharacters = null;
+  let providedCharacterMap = null;
 
   if (typeof onSegmentChangeOrOptions === 'function') {
     onSegmentChange = onSegmentChangeOrOptions;
@@ -165,11 +169,40 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
   } else if (onSegmentChangeOrOptions && typeof onSegmentChangeOrOptions === 'object') {
     onSegmentChange = onSegmentChangeOrOptions.onSegmentChange || null;
     onChapterEnded = onSegmentChangeOrOptions.onChapterEnded || null;
+    currentNovelId = onSegmentChangeOrOptions.novelId || onSegmentChangeOrOptions.currentNovelId || '';
+    currentChapterId = onSegmentChangeOrOptions.chapterId || onSegmentChangeOrOptions.currentChapterId || '';
+    providedCharacters = Array.isArray(onSegmentChangeOrOptions.characters)
+      ? onSegmentChangeOrOptions.characters
+      : null;
+    providedCharacterMap =
+      onSegmentChangeOrOptions.characterMap && typeof onSegmentChangeOrOptions.characterMap === 'object'
+        ? onSegmentChangeOrOptions.characterMap
+        : null;
   }
+
+  const novelIdRef = useRef(currentNovelId);
+  const chapterIdRef = useRef(currentChapterId);
+  const charactersRef = useRef(providedCharacters);
+  const characterMapRef = useRef(providedCharacterMap);
+  useEffect(() => {
+    novelIdRef.current = currentNovelId;
+  }, [currentNovelId]);
+  useEffect(() => {
+    chapterIdRef.current = currentChapterId;
+  }, [currentChapterId]);
+  useEffect(() => {
+    charactersRef.current = providedCharacters;
+  }, [providedCharacters]);
+  useEffect(() => {
+    characterMapRef.current = providedCharacterMap;
+  }, [providedCharacterMap]);
 
   const audioRef = useRef(null);
   const secondaryAudioRef = useRef(null);
   const rafRef = useRef(0);
+  const ttsRafRef = useRef(0);
+  const speechFallbackTimerRef = useRef(null);
+  const playbackRateRef = useRef(1.0);
   const lastActiveSegIdRef = useRef(-1);
   const lastClockUpdateRef = useRef(0);
   const speechCancelledRef = useRef(false);
@@ -185,7 +218,7 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
 
   // Playback mode: 'tts' (Voice TTS read-along) vs 'studio' (stitched audio stream)
   // In real browser: default to 'tts' so every chapter (1-17 & EPUB) has live multi-voice speech!
-  // In jsdom/Vitest: default to 'studio' so all 54 existing tests run undisturbed!
+  // In jsdom/Vitest: default to 'studio' so all existing tests run undisturbed!
   const [playbackMode, setPlaybackMode] = useState(isBrowserEnv ? 'tts' : 'studio');
   const playbackModeRef = useRef(playbackMode);
   useEffect(() => {
@@ -195,15 +228,71 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
   const ttsReadAlongEnabled = playbackMode === 'tts';
 
   // 5-Engine Selection: 'msedge-tts' | 'kokoro-tts' | 'paradee-tts' | 'paradee-mixed' | 'machine-tts'
-  const [ttsEngine, setTtsEngine] = useState('msedge-tts');
+  // Persisted in localStorage so selected engine survives page refresh
+  const [ttsEngine, setTtsEngine] = useState(() => {
+    try {
+      return (typeof localStorage !== 'undefined' && localStorage.getItem('synctone_tts_engine')) || 'msedge-tts';
+    } catch (_) {
+      return 'msedge-tts';
+    }
+  });
+  const ttsEngineRef = useRef(ttsEngine);
+  useEffect(() => {
+    ttsEngineRef.current = ttsEngine;
+  }, [ttsEngine]);
 
   // Memoized mixed-mode cast map (Paradee-8M for Narrator + top 3 primary characters; Machine-TTS for 5th+ extras)
   const mixedCastMap = useMemo(() => buildClientMixedCastMap(timeline), [timeline]);
+
+  // Character metadata lookup (gender, cast_slot, voice overrides)
+  const resolvedCharacterMap = useMemo(() => {
+    const map = new Map();
+    const indexEntry = (key, val) => {
+      if (!key || !val || typeof val !== 'object') return;
+      map.set(String(key).trim().toLowerCase(), val);
+    };
+
+    if (providedCharacterMap instanceof Map) {
+      providedCharacterMap.forEach((val, key) => indexEntry(key, val));
+    } else if (providedCharacterMap && typeof providedCharacterMap === 'object') {
+      Object.entries(providedCharacterMap).forEach(([key, val]) => indexEntry(key, val));
+    }
+
+    if (Array.isArray(providedCharacters)) {
+      providedCharacters.forEach((charObj, idx) => {
+        if (!charObj || typeof charObj !== 'object') return;
+        const normalized = {
+          ...charObj,
+          cast_slot:
+            charObj.cast_slot !== undefined && charObj.cast_slot !== null
+              ? charObj.cast_slot
+              : charObj.slot !== undefined && charObj.slot !== null
+                ? charObj.slot
+                : idx,
+        };
+        indexEntry(charObj.character_id, normalized);
+        indexEntry(charObj.speaker_id, normalized);
+        indexEntry(charObj.id, normalized);
+        indexEntry(charObj.name, normalized);
+        indexEntry(charObj.speaker_name, normalized);
+      });
+    }
+
+    return map;
+  }, [providedCharacters, providedCharacterMap]);
 
   // Stop any active Web Speech or secondary audio
   const stopSpeech = useCallback(() => {
     speechGenRef.current += 1;
     speechCancelledRef.current = true;
+    if (ttsRafRef.current) {
+      cancelAnimationFrame(ttsRafRef.current);
+      ttsRafRef.current = 0;
+    }
+    if (speechFallbackTimerRef.current) {
+      clearInterval(speechFallbackTimerRef.current);
+      speechFallbackTimerRef.current = null;
+    }
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       try {
         window.speechSynthesis.cancel();
@@ -215,17 +304,32 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
         sec.onended = null;
         sec.onerror = null;
         sec.ontimeupdate = null;
+        sec.onplay = null;
+        sec.onpause = null;
         sec.pause();
         sec.currentTime = 0;
       } catch (_) {}
     }
-    if (playbackMode === 'tts' && audioRef.current) {
+    if (playbackModeRef.current === 'tts' && audioRef.current) {
       try {
         audioRef.current.pause();
       } catch (_) {}
     }
     activeUtteranceRef.current = null;
-  }, [playbackMode]);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (ttsRafRef.current) {
+        cancelAnimationFrame(ttsRafRef.current);
+        ttsRafRef.current = 0;
+      }
+      if (speechFallbackTimerRef.current) {
+        clearInterval(speechFallbackTimerRef.current);
+        speechFallbackTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Forward declaration for speaking segment
   const speakActiveSegmentRef = useRef(null);
@@ -268,7 +372,11 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
   // Speak segment with Web Speech Synthesis (distinct British/English voices & pitch per character)
   const speakWithSpeechSynthesis = useCallback(
     (entry, targetSegId, myGen) => {
-      if (typeof window === 'undefined' || !window.speechSynthesis) {
+      if (
+        typeof window === 'undefined' ||
+        !window.speechSynthesis ||
+        typeof SpeechSynthesisUtterance === 'undefined'
+      ) {
         advanceToNextSegment(targetSegId);
         return;
       }
@@ -325,23 +433,38 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
       }
 
       // Assign character pitch & rate
+      const globalRate = playbackRateRef.current || 1.0;
       if (typeof entry._pitch === 'number') {
         utterance.pitch = entry._pitch;
-        utterance.rate = typeof entry._rate === 'number' ? entry._rate : 1.0;
+        utterance.rate = (typeof entry._rate === 'number' ? entry._rate : 1.0) * globalRate;
       } else if (speakerName.includes('narrator')) {
         utterance.pitch = 1.0;
-        utterance.rate = 1.0;
+        utterance.rate = 1.0 * globalRate;
       } else {
         const hash = speakerName.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
         utterance.pitch = 0.85 + (hash % 7) * 0.06;
-        utterance.rate = 1.0;
+        utterance.rate = 1.0 * globalRate;
       }
+
+      const effectiveRate = Math.max(0.25, utterance.rate || 1.0);
+      const estDurationSec = Math.max(1.2, cleanText.length / (14 * effectiveRate));
+      const startTimeMs = Date.now();
+      let lastBoundaryAtMs = startTimeMs;
+
+      const clearFallbackTimer = () => {
+        if (speechFallbackTimerRef.current) {
+          clearInterval(speechFallbackTimerRef.current);
+          speechFallbackTimerRef.current = null;
+        }
+      };
 
       // Intra-segment word progress tracking via boundary events
       utterance.onboundary = (e) => {
         if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
-        if (typeof e.charIndex === 'number' && rawText.length > 0) {
-          const prog = Math.min(1, Math.max(0, e.charIndex / rawText.length));
+        lastBoundaryAtMs = Date.now();
+        const denom = cleanText.length || rawText.length;
+        if (typeof e.charIndex === 'number' && denom > 0) {
+          const prog = Math.min(1, Math.max(0, e.charIndex / denom));
           setSegmentProgress(prog);
           const segDuration = Math.max(200, (entry.end_ms || 0) - (entry.start_ms || 0));
           const estMs = Math.round((entry.start_ms || 0) + prog * segDuration);
@@ -349,7 +472,30 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
         }
       };
 
+      // 50ms fallback timer whenever onboundary has not fired in the last 400ms
+      clearFallbackTimer();
+      const timerId = setInterval(() => {
+        if (myGen !== speechGenRef.current || speechCancelledRef.current) {
+          clearInterval(timerId);
+          if (speechFallbackTimerRef.current === timerId) {
+            speechFallbackTimerRef.current = null;
+          }
+          return;
+        }
+        const now = Date.now();
+        if (now - lastBoundaryAtMs > 400) {
+          const elapsedSec = (now - startTimeMs) / 1000;
+          const prog = Math.min(0.98, Math.max(0, elapsedSec / estDurationSec));
+          setSegmentProgress(prog);
+          const segDuration = Math.max(200, (entry.end_ms || 0) - (entry.start_ms || 0));
+          const estMs = Math.round((entry.start_ms || 0) + prog * segDuration);
+          setCurrentTimeMs(estMs);
+        }
+      }, 50);
+      speechFallbackTimerRef.current = timerId;
+
       utterance.onend = () => {
+        clearFallbackTimer();
         if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
         setSegmentProgress(1.0);
         setCurrentTimeMs(entry.end_ms || entry.start_ms || 0);
@@ -357,6 +503,7 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
       };
 
       utterance.onerror = () => {
+        clearFallbackTimer();
         if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
         advanceToNextSegment(targetSegId);
       };
@@ -373,14 +520,18 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
       speechCancelledRef.current = false;
       const myGen = ++speechGenRef.current;
 
+      // Cleanly pause studio audio before playing TTS speech
       if (audioRef.current) {
-        audioRef.current.pause();
+        try {
+          audioRef.current.pause();
+        } catch (_) {}
       }
 
-      const entry = timeline.find(
+      const entryIndex = timeline.findIndex(
         (t) => (t.segment_id !== undefined ? t.segment_id : t.order) === targetSegId
       );
-      if (!entry) return;
+      if (entryIndex === -1) return;
+      const entry = timeline[entryIndex];
 
       const rawText = entry.text || '';
       const cleanText = rawText.replace(/\[IMAGE:[^\]]*\]/gi, '').trim();
@@ -389,81 +540,87 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
         return;
       }
 
-      // If user selected machine-tts directly in browser (preserved 100% untouched)
-      if (ttsEngine === 'machine-tts') {
-        speakWithSpeechSynthesis(entry, targetSegId, myGen);
-        return;
-      }
+      const rawCharId = String(entry.character_id || entry.speaker_id || '').trim();
+      const rawCharIdLower = rawCharId.toLowerCase();
+      const isNarrator = entry.type === 'narration' || rawCharIdLower === 'narrator';
 
-      // Resolve voice & sub-engine when paradee-mixed is active
-      let targetVoiceId = entry.assigned_voice_id || entry.voice_id || 'en-GB-RyanNeural';
-      let targetEngine = ttsEngine || 'msedge-tts';
-      let extraSlotParam = '';
-
-      if (ttsEngine === 'paradee-mixed') {
-        const speakerKey = String(
-          entry.character_id || entry.speaker_id || entry.speaker_name || 'narrator'
-        )
-          .trim()
-          .toLowerCase();
-        const explicitVoice = entry.assigned_voice_id || entry.voice_id || '';
-        let resolved = null;
-
-        if (PARADEE_VOICE_IDS.has(explicitVoice)) {
-          resolved = { engine: 'paradee-tts', voiceId: explicitVoice };
-        } else if (String(explicitVoice).startsWith('mac_')) {
-          const prof =
-            MACHINE_EXTRA_PROFILES.find((p) => p.id === explicitVoice) ||
-            MACHINE_EXTRA_PROFILES[0];
-          resolved = {
-            engine: 'machine-tts',
-            voiceId: prof.id,
-            matchName: prof.matchName,
-            pitch: prof.pitch,
-            rate: prof.rate,
-            castSlot: 0,
-          };
-        } else {
-          resolved = mixedCastMap.get(speakerKey) || {
-            engine: 'paradee-tts',
-            voiceId: 'bm_fable',
-          };
-        }
-
-        if (resolved.engine === 'machine-tts') {
-          const browserVoices =
-            typeof window !== 'undefined' && window.speechSynthesis
-              ? window.speechSynthesis.getVoices() || []
-              : [];
-          if (browserVoices.length > 0) {
-            speakWithSpeechSynthesis(
-              {
-                ...entry,
-                voice_id: resolved.voiceId,
-                _matchName: resolved.matchName,
-                _pitch: resolved.pitch,
-                _rate: resolved.rate,
-              },
-              targetSegId,
-              myGen
-            );
-            return;
+      // For unattributed dialogue ('unresolved' or empty character_id), alternate speaker keys by dialogue turn index
+      let resolvedCharacterId = entry.character_id || '';
+      if (!isNarrator && (!rawCharId || rawCharIdLower === 'unresolved')) {
+        let dialogueTurnIndex = 0;
+        for (let i = 0; i < entryIndex; i += 1) {
+          const prev = timeline[i];
+          const prevChar = String(prev?.character_id || prev?.speaker_id || '').trim().toLowerCase();
+          const prevIsNarrator = prev?.type === 'narration' || prevChar === 'narrator';
+          if (!prevIsNarrator) {
+            dialogueTurnIndex += 1;
           }
-          targetVoiceId = resolved.voiceId;
-          targetEngine = 'paradee-mixed';
-          extraSlotParam = `&cast_slot=${encodeURIComponent(resolved.castSlot ?? 0)}`;
-        } else {
-          targetVoiceId = resolved.voiceId;
-          targetEngine = 'paradee-tts';
+        }
+        resolvedCharacterId = dialogueTurnIndex % 2 === 0 ? 'dialogue_turn_even' : 'dialogue_turn_odd';
+      }
+
+      const lookupKeys = [resolvedCharacterId, rawCharId, entry.speaker_name]
+        .filter(Boolean)
+        .map((k) => String(k).trim().toLowerCase());
+      let charProfile = null;
+      for (const k of lookupKeys) {
+        if (resolvedCharacterMap.has(k)) {
+          charProfile = resolvedCharacterMap.get(k);
+          break;
         }
       }
 
-      // Try /api/voices/speak with selected engine if not previously failed
+      const entryGender = entry.gender || charProfile?.gender || '';
+      const mixedEntry =
+        mixedCastMap.get(rawCharIdLower) ||
+        mixedCastMap.get(String(resolvedCharacterId || '').toLowerCase()) ||
+        null;
+      const resolvedCastSlot =
+        entry.cast_slot !== undefined && entry.cast_slot !== null
+          ? entry.cast_slot
+          : entry.slot !== undefined && entry.slot !== null
+            ? entry.slot
+            : charProfile?.cast_slot !== undefined && charProfile?.cast_slot !== null
+              ? charProfile.cast_slot
+              : mixedEntry && mixedEntry.slot !== undefined && mixedEntry.slot !== null
+                ? mixedEntry.slot
+                : null;
+
+      const currentEngine = ttsEngineRef.current || ttsEngine || 'msedge-tts';
+      let targetVoiceId =
+        entry.assigned_voice_id || entry.voice_id || charProfile?.voice_id || charProfile?.assigned_voice_id || '';
+      let targetEngine = currentEngine;
+
+      if (currentEngine === 'msedge-tts' && !targetVoiceId) {
+        targetVoiceId = 'en-GB-RyanNeural';
+      } else if ((currentEngine === 'kokoro-tts' || currentEngine === 'paradee-tts') && !targetVoiceId) {
+        targetVoiceId = 'bm_fable';
+      }
+
+      const novelId = entry.novel_id || novelIdRef.current || currentNovelId || '';
+      const chapterId = entry.chapter_id || chapterIdRef.current || currentChapterId || '';
+      const effectiveEntry =
+        resolvedCharacterId !== (entry.character_id || '') || entryGender !== (entry.gender || '')
+          ? { ...entry, character_id: resolvedCharacterId, gender: entryGender || entry.gender }
+          : entry;
+
+      // Try /api/voices/speak with selected engine (including machine-tts first; fallback to window.speechSynthesis)
       if (!apiSpeakFailedRef.current && typeof Audio !== 'undefined') {
         const voiceParam = encodeURIComponent(targetVoiceId);
         const textParam = encodeURIComponent(cleanText);
         const engineParam = encodeURIComponent(targetEngine);
-        const speakUrl = `/api/voices/speak?text=${textParam}&voice_id=${voiceParam}&engine=${engineParam}${extraSlotParam}`;
+        const charIdParam = encodeURIComponent(resolvedCharacterId);
+        const speakerNameParam = encodeURIComponent(entry.speaker_name || '');
+        const novelIdParam = encodeURIComponent(novelId);
+        const chapterIdParam = encodeURIComponent(chapterId);
+
+        let speakUrl = `/api/voices/speak?text=${textParam}&voice_id=${voiceParam}&engine=${engineParam}&character_id=${charIdParam}&speaker_name=${speakerNameParam}&is_narrator=${isNarrator}&novel_id=${novelIdParam}&chapter_id=${chapterIdParam}`;
+        if (entryGender) {
+          speakUrl += `&gender=${encodeURIComponent(entryGender)}`;
+        }
+        if (resolvedCastSlot !== null && resolvedCastSlot !== '') {
+          speakUrl += `&cast_slot=${encodeURIComponent(String(resolvedCastSlot))}`;
+        }
 
         if (!secondaryAudioRef.current) {
           secondaryAudioRef.current = new Audio();
@@ -471,11 +628,61 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
 
         const secAudio = secondaryAudioRef.current;
         secAudio.src = speakUrl;
+        secAudio.playbackRate = playbackRateRef.current || 1.0;
+
+        let secRafActive = false;
+        const cancelSecRaf = () => {
+          secRafActive = false;
+          if (ttsRafRef.current) {
+            cancelAnimationFrame(ttsRafRef.current);
+            ttsRafRef.current = 0;
+          }
+        };
+
+        const tickSecProgress = () => {
+          if (
+            !secRafActive ||
+            myGen !== speechGenRef.current ||
+            speechCancelledRef.current ||
+            playbackModeRef.current !== 'tts'
+          ) {
+            cancelSecRaf();
+            return;
+          }
+          if (secAudio.ended) {
+            cancelSecRaf();
+            return;
+          }
+          if (secAudio.duration > 0 && !Number.isNaN(secAudio.duration)) {
+            const prog = Math.min(1, Math.max(0, secAudio.currentTime / secAudio.duration));
+            setSegmentProgress(prog);
+            const segDuration = Math.max(200, (entry.end_ms || 0) - (entry.start_ms || 0));
+            const estMs = Math.round((entry.start_ms || 0) + prog * segDuration);
+            setCurrentTimeMs(estMs);
+          }
+          ttsRafRef.current = requestAnimationFrame(tickSecProgress);
+        };
+
+        const startSecRaf = () => {
+          if (secRafActive || myGen !== speechGenRef.current || speechCancelledRef.current) return;
+          if (typeof requestAnimationFrame !== 'function') return;
+          secRafActive = true;
+          ttsRafRef.current = requestAnimationFrame(tickSecProgress);
+        };
+
+        secAudio.onplay = () => {
+          startSecRaf();
+        };
+
+        secAudio.onpause = () => {
+          cancelSecRaf();
+        };
 
         secAudio.onerror = () => {
+          cancelSecRaf();
           if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
-          // Fallback to client synthesis for this utterance without permanently killing the engine
-          speakWithSpeechSynthesis(entry, targetSegId, myGen);
+          // Fallback to client synthesis for this utterance as a true offline fallback
+          speakWithSpeechSynthesis(effectiveEntry, targetSegId, myGen);
         };
 
         secAudio.ontimeupdate = () => {
@@ -490,53 +697,103 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
         };
 
         secAudio.onended = () => {
+          cancelSecRaf();
           if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
           setSegmentProgress(1.0);
           advanceToNextSegment(targetSegId);
         };
 
-        secAudio.play().catch((err) => {
-          if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
-          if (
-            err &&
-            (err.name === 'AbortError' ||
-              String(err.message).toLowerCase().includes('interrupted') ||
-              String(err.name).includes('Abort'))
-          ) {
-            return;
-          }
-          speakWithSpeechSynthesis(entry, targetSegId, myGen);
-        });
+        const playPromise = secAudio.play();
+        if (playPromise && typeof playPromise.then === 'function') {
+          playPromise
+            .then(() => {
+              startSecRaf();
+            })
+            .catch(() => {
+              cancelSecRaf();
+              if (myGen !== speechGenRef.current || speechCancelledRef.current) return;
+              speakWithSpeechSynthesis(effectiveEntry, targetSegId, myGen);
+            });
+        } else {
+          startSecRaf();
+        }
       } else {
-        speakWithSpeechSynthesis(entry, targetSegId, myGen);
+        speakWithSpeechSynthesis(effectiveEntry, targetSegId, myGen);
       }
     },
-    [timeline, advanceToNextSegment, speakWithSpeechSynthesis, ttsEngine, mixedCastMap, stopSpeech]
+    [
+      timeline,
+      advanceToNextSegment,
+      speakWithSpeechSynthesis,
+      ttsEngine,
+      currentNovelId,
+      currentChapterId,
+      stopSpeech,
+      resolvedCharacterMap,
+      mixedCastMap,
+    ]
   );
 
   speakActiveSegmentRef.current = speakActiveSegment;
 
   const changeTtsEngine = useCallback(
     (newEngine) => {
-      stopSpeech();
-      apiSpeakFailedRef.current = false;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('synctone_tts_engine', newEngine);
+        }
+      } catch (_) {}
+      ttsEngineRef.current = newEngine;
       setTtsEngine(newEngine);
-      if (isPlaying && playbackMode === 'tts' && activeSegmentId !== -1) {
+      apiSpeakFailedRef.current = false;
+      stopSpeech();
+      if (isPlaying && playbackModeRef.current === 'tts' && activeSegmentId !== -1) {
         speakActiveSegmentRef.current?.(activeSegmentId, segmentProgress);
       }
     },
-    [stopSpeech, isPlaying, playbackMode, activeSegmentId, segmentProgress]
+    [stopSpeech, isPlaying, activeSegmentId, segmentProgress]
   );
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleStorageChange = (e) => {
+      if (e.key === 'synctone_tts_engine' && e.newValue && e.newValue !== ttsEngineRef.current) {
+        changeTtsEngine(e.newValue);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [changeTtsEngine]);
+
+  // Structural timeline identity so in-place voice updates do not reset active playback position
+  const timelineIdentity = useMemo(() => {
+    if (!Array.isArray(timeline) || timeline.length === 0) return 'empty';
+    return timeline
+      .map((t, idx) => {
+        const id = t.segment_id !== undefined ? t.segment_id : t.order !== undefined ? t.order : idx;
+        const charId = t.character_id || t.speaker_id || '';
+        const textHead = String(t.text || '').slice(0, 24);
+        return `${id}:${charId}:${textHead}`;
+      })
+      .join('|');
+  }, [timeline]);
+
+  const prevTimelineIdentityRef = useRef(timelineIdentity);
+
+  useEffect(() => {
+    apiSpeakFailedRef.current = false;
+    if (prevTimelineIdentityRef.current === timelineIdentity && timelineIdentity !== 'empty') {
+      // Only voice assignments / metadata updated on the current chapter
+      return;
+    }
+    prevTimelineIdentityRef.current = timelineIdentity;
     lastActiveSegIdRef.current = -1;
     setActiveSegmentId(-1);
     setCurrentTimeMs(0);
     setSegmentProgress(0);
     setIsPlaying(false);
-    apiSpeakFailedRef.current = false;
     stopSpeech();
-  }, [timeline, stopSpeech]);
+  }, [timelineIdentity]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Synchronized animation loop (60fps audio clock for Studio Track mode)
   const syncLoop = useCallback(() => {
@@ -645,24 +902,33 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
       );
       if (entry) {
         const targetSec = entry.start_ms / 1000;
-        if (audioRef.current) {
-          audioRef.current.currentTime = targetSec;
-        }
         lastActiveSegIdRef.current = segmentId;
         setActiveSegmentId(segmentId);
         setCurrentTimeMs(entry.start_ms);
         setSegmentProgress(0);
         setIsPlaying(true);
 
-        if (playbackMode === 'tts') {
+        if (playbackModeRef.current === 'tts') {
+          // Cleanly pause studio audio before playing TTS speech
+          if (audioRef.current) {
+            try {
+              audioRef.current.pause();
+              audioRef.current.currentTime = targetSec;
+            } catch (_) {}
+          }
           stopSpeech();
           speakActiveSegment(segmentId, 0);
-        } else if (audioRef.current) {
-          audioRef.current.play().catch(() => {});
+        } else {
+          // Cleanly pause secondaryAudioRef before playing studio audio
+          stopSpeech();
+          if (audioRef.current) {
+            audioRef.current.currentTime = targetSec;
+            audioRef.current.play().catch(() => {});
+          }
         }
       }
     },
-    [timeline, playbackMode, stopSpeech, speakActiveSegment]
+    [timeline, stopSpeech, speakActiveSegment]
   );
 
   // Seek by explicit millisecond offset (for playback progress resume)
@@ -693,20 +959,36 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
 
       if (shouldPlay) {
         setIsPlaying(true);
-        if (playbackMode === 'tts' && segId !== -1) {
+        if (playbackModeRef.current === 'tts') {
+          if (audioRef.current) {
+            try {
+              audioRef.current.pause();
+            } catch (_) {}
+          }
+          if (segId !== -1) {
+            stopSpeech();
+            speakActiveSegment(segId, 0);
+          }
+        } else {
           stopSpeech();
-          speakActiveSegment(segId, 0);
-        } else if (audioRef.current) {
-          audioRef.current.play().catch(() => {});
+          if (audioRef.current) {
+            audioRef.current.play().catch(() => {});
+          }
         }
       }
     },
-    [timeline, playbackMode, stopSpeech, speakActiveSegment]
+    [timeline, stopSpeech, speakActiveSegment]
   );
 
   const play = useCallback(() => {
     setIsPlaying(true);
-    if (playbackMode === 'tts') {
+    if (playbackModeRef.current === 'tts') {
+      // Cleanly pause studio audio before playing TTS speech
+      if (audioRef.current) {
+        try {
+          audioRef.current.pause();
+        } catch (_) {}
+      }
       let targetId = activeSegmentId;
       if (targetId === -1 && timeline.length > 0) {
         targetId = timeline[0].segment_id !== undefined ? timeline[0].segment_id : timeline[0].order;
@@ -716,16 +998,21 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
       if (targetId !== -1) {
         speakActiveSegment(targetId, segmentProgress);
       }
-    } else if (audioRef.current) {
-      audioRef.current.play().catch(() => {});
+    } else {
+      // Cleanly pause secondaryAudioRef before playing studio audio
+      stopSpeech();
+      if (audioRef.current) {
+        audioRef.current.play().catch(() => {});
+      }
     }
-  }, [playbackMode, activeSegmentId, timeline, segmentProgress, speakActiveSegment]);
+  }, [activeSegmentId, timeline, segmentProgress, speakActiveSegment, stopSpeech]);
 
   const pause = useCallback(() => {
     setIsPlaying(false);
     stopSpeech();
-    if (audioRef.current) {
+    if (audioRef.current && playbackModeRef.current === 'studio') {
       audioRef.current.pause();
+      setCurrentTimeMs(Math.round(audioRef.current.currentTime * 1000));
     }
   }, [stopSpeech]);
 
@@ -738,6 +1025,7 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
   }, [isPlaying, play, pause]);
 
   const setPlaybackRate = useCallback((rate) => {
+    playbackRateRef.current = rate || 1.0;
     if (audioRef.current) {
       audioRef.current.playbackRate = rate;
     }
@@ -747,33 +1035,86 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
   }, []);
 
   const togglePlaybackMode = useCallback((targetMode) => {
-    const validMode = targetMode === 'tts' || targetMode === 'studio' ? targetMode : null;
+    // Never corrupt playbackMode state with event objects
+    const validMode =
+      typeof targetMode === 'string' && (targetMode === 'tts' || targetMode === 'studio')
+        ? targetMode
+        : null;
+
     setPlaybackMode((prev) => {
       const next = validMode || (prev === 'tts' ? 'studio' : 'tts');
       if (next === prev) return prev;
+
+      playbackModeRef.current = next;
+
       if (next === 'tts') {
+        // Switching from Studio Track -> Voice TTS
+        // 1. Cleanly pause audioRef before playing TTS speech
         if (audioRef.current) {
-          audioRef.current.pause();
+          try {
+            audioRef.current.pause();
+          } catch (_) {}
         }
-        if (isPlaying) {
-          const currentId =
-            activeSegmentId !== -1
-              ? activeSegmentId
-              : timeline[0]?.segment_id ?? timeline[0]?.order ?? 1;
-          speakActiveSegment(currentId, 0);
+
+        // 2. Maintain current timestamp/segment position (do NOT reset clock to 0:00)
+        const currentMs =
+          audioRef.current && !isNaN(audioRef.current.currentTime) && audioRef.current.currentTime > 0
+            ? Math.round(audioRef.current.currentTime * 1000)
+            : currentTimeMs;
+        setCurrentTimeMs(currentMs);
+
+        const currentSegId =
+          activeSegmentId !== -1 ? activeSegmentId : findActiveSegment(timeline, currentMs);
+        const targetId =
+          currentSegId !== -1 ? currentSegId : (timeline[0]?.segment_id ?? timeline[0]?.order ?? 1);
+
+        if (targetId !== -1) {
+          setActiveSegmentId(targetId);
+          lastActiveSegIdRef.current = targetId;
+          const entry = timeline.find(
+            (t) => (t.segment_id !== undefined ? t.segment_id : t.order) === targetId
+          );
+          if (entry && entry.end_ms > entry.start_ms && currentMs >= entry.start_ms) {
+            setSegmentProgress(
+              Math.min(1, Math.max(0, (currentMs - entry.start_ms) / (entry.end_ms - entry.start_ms)))
+            );
+          }
+        }
+
+        if (isPlaying && targetId !== -1) {
+          speakActiveSegmentRef.current?.(targetId, 0);
         }
       } else {
+        // Switching from Voice TTS -> Studio Track
+        // 1. Cleanly pause secondaryAudioRef before playing studio audio
         stopSpeech();
+
+        // 2. Maintain current timestamp position in audioRef (do NOT reset clock to 0:00)
         if (audioRef.current) {
           audioRef.current.currentTime = Math.max(0, currentTimeMs / 1000);
-        }
-        if (isPlaying && audioRef.current) {
-          audioRef.current.play().catch(() => {});
+          if (isPlaying) {
+            audioRef.current.play().catch(() => {});
+          }
         }
       }
+
       return next;
     });
-  }, [isPlaying, activeSegmentId, timeline, stopSpeech, speakActiveSegment, currentTimeMs]);
+  }, [isPlaying, activeSegmentId, timeline, currentTimeMs, stopSpeech]);
+
+  const safeSetPlaybackMode = useCallback(
+    (target) => {
+      if (typeof target === 'function') {
+        const next = target(playbackModeRef.current);
+        if (next === 'tts' || next === 'studio') {
+          togglePlaybackMode(next);
+        }
+      } else if (target === 'tts' || target === 'studio') {
+        togglePlaybackMode(target);
+      }
+    },
+    [togglePlaybackMode]
+  );
 
   return {
     audioRef,
@@ -784,7 +1125,7 @@ export function useAudioSync(timeline = [], onSegmentChangeOrOptions = null, may
     duration,
     segmentProgress,
     playbackMode,
-    setPlaybackMode,
+    setPlaybackMode: safeSetPlaybackMode,
     togglePlaybackMode,
     ttsReadAlongEnabled,
     ttsEngine,

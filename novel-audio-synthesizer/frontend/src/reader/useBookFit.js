@@ -17,14 +17,14 @@ export function useBookFit(stageRef, opts = {}) {
 
   const [fitState, setFitState] = useState(() => {
     const defaultW = typeof window !== 'undefined' ? (window.innerWidth || 1024) : 1024;
-    const defaultH = typeof window !== 'undefined' ? Math.max(300, (window.innerHeight || 768) - 270) : 498;
+    const defaultH = typeof window !== 'undefined' ? Math.max(300, (window.innerHeight || 768) - 185) : 583;
     return {
       ...fitBook({ w: defaultW, h: defaultH }, opts),
       ready: true,
     };
   });
 
-  const prevLayoutRef = useRef('single');
+  const prevLayoutRef = useRef(fitState.layout || 'single');
   const rafIdRef = useRef(null);
 
   const measureAndFit = useCallback(() => {
@@ -36,7 +36,7 @@ export function useBookFit(stageRef, opts = {}) {
     if (w <= 0 || h <= 0) {
       if (typeof window !== 'undefined') {
         w = window.innerWidth || 1024;
-        h = Math.max(300, (window.innerHeight || 768) - 270);
+        h = Math.max(300, (window.innerHeight || 768) - 185);
       } else {
         return;
       }

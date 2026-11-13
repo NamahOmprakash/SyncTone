@@ -10,10 +10,19 @@ import {
   IconUser,
   IconUpload,
   IconPlay,
+  IconPause,
+  IconRefresh,
   IconCheck,
   IconBook,
   IconSparkles,
 } from './icons';
+import {
+  buildCanonicalVoiceGroups,
+  VoiceOptionGroups,
+  normalizeParsedCharacters,
+  encodeUtf8Base64,
+  useVoiceAudition,
+} from './VoicesView';
 
 export default function AddNovelModal({
   isOpen,
@@ -40,6 +49,9 @@ export default function AddNovelModal({
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [rawParsedChapters, setRawParsedChapters] = useState([]); // [{ chapter_number, title, raw_text, segments? }]
   const [parsedCharacters, setParsedCharacters] = useState([]);
+  const [pastedText, setPastedText] = useState('');
+  const { playingId, loadingId, toggleAudition, stopAudition } = useVoiceAudition();
+  const baseVoiceGroups = useMemo(() => buildCanonicalVoiceGroups({}), []);
   const [parserEngine, setParserEngine] = useState(() => {
     try {
       return (
@@ -50,7 +62,7 @@ export default function AddNovelModal({
     } catch (_) {
       return initialParserEngine || 'heuristic';
     }
-  }); // 'heuristic' | 'gemini' | 'unlimited-ocr'
+  }); // 'heuristic' | 'gemini' | 'unlimited-ocr' | 'ollama'
   const [useTtsSanitizer, setUseTtsSanitizer] = useState(false);
 
   const parsedChapters = useMemo(
@@ -149,55 +161,41 @@ export default function AddNovelModal({
     try {
       let parsedResult = null;
 
-      // Strategy 0: Direct client-side parsing (foliate-js / pdfjs-dist) when parserEngine === 'heuristic'
+      // Strategy 1: Fast Multipart FormData stream to backend parser across all 4 engines
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('parser_engine', parserEngine);
+        parsedResult = await api.novels.parseFile(formData, parserEngine);
+      } catch (uploadErr) {
+        console.warn('[Upload Parse API Warning]:', uploadErr);
+        // Strategy 2: If multipart failed (e.g. proxy issue), try base64 fallback for files < 50MB
+        if (file.size < 50 * 1024 * 1024) {
+          try {
+            const base64 = await readFileAsBase64(file);
+            parsedResult = await api.novels.parseFile(
+              {
+                file_name: file.name,
+                file_base64: base64,
+                parser_engine: parserEngine,
+              },
+              parserEngine
+            );
+          } catch (b64Err) {
+            console.error('[Base64 Parse Fallback Error]:', b64Err);
+          }
+        }
+      }
+
+      // Strategy 2.5: Fallback to client-side parsing (foliate-js / pdfjs-dist) if backend parsing fails or returns no chapters
       const clientSideFormats = ['epub', 'mobi', 'azw3', 'kf8', 'fb2', 'fbz', 'pdf'];
-      if (parserEngine === 'heuristic' && clientSideFormats.includes(ext)) {
+      if ((!parsedResult || !parsedResult.chapters || parsedResult.chapters.length === 0) && clientSideFormats.includes(ext)) {
         try {
           parsedResult = await parseNovelFileClientSide(file, {
             uploadAsset: api.novels.uploadAsset,
           });
         } catch (clientErr) {
-          console.warn('[Client-Side parseNovelFileClientSide Notice]:', clientErr);
-        }
-      }
-
-      // If client-side didn't handle it or parserEngine is AI (gemini/unlimited-ocr), use backend parser
-      if (!parsedResult || !parsedResult.chapters || parsedResult.chapters.length === 0) {
-        // Strategy 1: Fast Multipart FormData stream to backend parser
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('parser_engine', parserEngine);
-          parsedResult = await api.novels.parseFile(formData, parserEngine);
-        } catch (uploadErr) {
-          console.warn('[Upload Parse API Warning]:', uploadErr);
-          // Strategy 2: If multipart failed (e.g. proxy issue), try base64 fallback for files < 50MB
-          if (file.size < 50 * 1024 * 1024) {
-            try {
-              const base64 = await readFileAsBase64(file);
-              parsedResult = await api.novels.parseFile(
-                {
-                  file_name: file.name,
-                  file_base64: base64,
-                  parser_engine: parserEngine,
-                },
-                parserEngine
-              );
-            } catch (b64Err) {
-              console.error('[Base64 Parse Fallback Error]:', b64Err);
-            }
-          }
-        }
-
-        // Strategy 2.5: Fallback to client-side parsing if backend parsing fails or returns no chapters
-        if (!parsedResult || !parsedResult.chapters || parsedResult.chapters.length === 0) {
-          try {
-            parsedResult = await parseNovelFileClientSide(file, {
-              uploadAsset: api.novels.uploadAsset,
-            });
-          } catch (clientErr) {
-            console.warn('[Client-Side Fallback Parse Notice]:', clientErr);
-          }
+          console.warn('[Client-Side Fallback Parse Notice]:', clientErr);
         }
       }
 
@@ -210,7 +208,9 @@ export default function AddNovelModal({
         setSynopsis(resolvedSynopsis);
         setCoverObject(parsedResult.cover_object || null);
         setRawParsedChapters(parsedResult.chapters);
-        setParsedCharacters(Array.isArray(parsedResult.characters) ? parsedResult.characters : []);
+        setParsedCharacters(
+          normalizeParsedCharacters(parsedResult.characters || [], parsedResult.chapters)
+        );
         setUploadedFile({
           name: file.name,
           size: `${(file.size / 1024).toFixed(1)} KB`,
@@ -234,6 +234,7 @@ export default function AddNovelModal({
             setTitle(cleanTitle);
             setSynopsis(textContent.slice(0, 200).trim() + '...');
             setRawParsedChapters(chapters);
+            setParsedCharacters(normalizeParsedCharacters([], chapters));
             setUploadedFile({
               name: file.name,
               size: `${(file.size / 1024).toFixed(1)} KB`,
@@ -292,6 +293,7 @@ export default function AddNovelModal({
   };
 
   const handleRemoveFile = () => {
+    stopAudition();
     setUploadedFile(null);
     setCoverObject(null);
     setRawParsedChapters([]);
@@ -300,6 +302,57 @@ export default function AddNovelModal({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleParsePastedText = async () => {
+    if (!pastedText.trim()) return;
+    setIsParsingFile(true);
+    setError(null);
+    try {
+      let parsedResult = null;
+      try {
+        parsedResult = await api.novels.parseFile(
+          {
+            file_name: `${(title || 'pasted_manuscript').trim().replace(/\s+/g, '_')}.txt`,
+            file_base64: encodeUtf8Base64(pastedText),
+            parser_engine: parserEngine,
+          },
+          parserEngine
+        );
+      } catch (err) {
+        console.warn('[Pasted Text Parse API Warning]:', err);
+      }
+
+      const fallbackChapters =
+        parsedResult?.chapters?.length > 0
+          ? parsedResult.chapters
+          : extractChaptersFromText(pastedText, title.trim() || 'Manuscript');
+      setRawParsedChapters(fallbackChapters);
+      setParsedCharacters(
+        normalizeParsedCharacters(parsedResult?.characters || [], fallbackChapters)
+      );
+      if (!title.trim() && parsedResult?.title) {
+        setTitle(parsedResult.title);
+      }
+    } catch (err) {
+      setError('Failed to detect characters: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsParsingFile(false);
+    }
+  };
+
+  const handleCharacterUpdate = (charKey, field, value) => {
+    setParsedCharacters((prev) =>
+      prev.map((ch) =>
+        (ch.character_id || ch.name) === charKey
+          ? {
+              ...ch,
+              [field]: value,
+              ...(field === 'voice_id' ? { assigned_voice_id: value } : {}),
+            }
+          : ch
+      )
+    );
   };
 
   const handleDemoLogin = async () => {
@@ -338,6 +391,13 @@ export default function AddNovelModal({
 
     setIsSubmitting(true);
     try {
+      const chaptersToSubmit =
+        parsedChapters.length > 0
+          ? parsedChapters
+          : pastedText.trim()
+          ? extractChaptersFromText(pastedText, title.trim() || 'Manuscript')
+          : [];
+
       const res = await api.novels.create({
         title: title.trim(),
         synopsis: synopsis.trim(),
@@ -346,7 +406,7 @@ export default function AddNovelModal({
         cover_object: coverObject || null,
         parser_engine: parserEngine,
         characters: parsedCharacters,
-        chapters: parsedChapters,
+        chapters: chaptersToSubmit,
       });
 
       if (res?.novel) {
@@ -356,9 +416,9 @@ export default function AddNovelModal({
         let firstChapter = res?.chapters?.[0] || null;
 
         // If backend did not create chapters in batch, upload them sequentially
-        if (!firstChapter && parsedChapters.length > 0 && res.novel.id) {
+        if (!firstChapter && chaptersToSubmit.length > 0 && res.novel.id) {
           try {
-            for (const ch of parsedChapters) {
+            for (const ch of chaptersToSubmit) {
               const upRes = await api.novels.uploadChapter(res.novel.id, {
                 title: ch.title,
                 text: ch.raw_text,
@@ -387,6 +447,7 @@ export default function AddNovelModal({
         }
         setTitle('');
         setSynopsis('');
+        setPastedText('');
         handleRemoveFile();
         onClose();
       }
@@ -410,7 +471,7 @@ export default function AddNovelModal({
         exit="hidden"
         transition={{ duration: 0.2 }}
         onClick={(e) => {
-          if (e.target === e.currentTarget && !isCreating) onClose();
+          if (e.target === e.currentTarget && !isSubmitting) onClose();
         }}
       >
         <m.div
@@ -522,6 +583,9 @@ export default function AddNovelModal({
               <option value="unlimited-ocr">
                 Tier 3: Baidu Unlimited-OCR vLLM (Self-Hosted Vision Layout & BBox OCR)
               </option>
+              <option value="ollama">
+                Tier 4: Ollama Local LLM (Private Offline Attribution)
+              </option>
             </select>
 
             <p className="text-[11px] theme-muted leading-relaxed">
@@ -529,6 +593,8 @@ export default function AddNovelModal({
                 ? 'Uses Gemini Flash multimodal vision to reconstruct noisy/scanned pages and attribute complex unquoted multi-party dialogue.'
                 : parserEngine === 'unlimited-ocr'
                 ? 'Connects to Baidu Unlimited-OCR (vLLM) to extract layout-aware Markdown and figure bounding boxes before dialogue attribution.'
+                : parserEngine === 'ollama'
+                ? 'Uses your local Ollama model for private offline speaker attribution and dialogue splitting.'
                 : 'Zero-latency local extraction via foliate-js / pdfjs-dist / pypdf with deterministic regex and alternation speaker attribution.'}
             </p>
           </div>
@@ -765,6 +831,128 @@ export default function AddNovelModal({
               className="w-full px-3.5 py-2.5 text-xs theme-card border rounded-xl placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-focus)] transition resize-none"
             />
           </div>
+
+          {/* Paste Manuscript Text + Parse & Detect Characters */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="block text-xs font-semibold theme-sub uppercase tracking-wider font-mono">
+                Paste Manuscript Text (Optional)
+              </label>
+              <button
+                type="button"
+                onClick={handleParsePastedText}
+                disabled={isParsingFile || !pastedText.trim()}
+                className="px-3 py-1 rounded-lg bg-[var(--bg-elevated)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] text-[var(--text-main)] border border-[var(--border-subtle)] text-[11px] font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-45"
+              >
+                {isParsingFile ? (
+                  <IconRefresh className="w-3 h-3 animate-spin" />
+                ) : (
+                  <IconSparkles className="w-3 h-3" />
+                )}
+                Parse &amp; Detect Characters
+              </button>
+            </div>
+            <textarea
+              rows={4}
+              value={pastedText}
+              onChange={(e) => setPastedText(e.target.value)}
+              placeholder='Paste chapter or manuscript text here (e.g., "Welcome," said Alice.) and click Parse & Detect Characters...'
+              className="w-full px-3.5 py-2.5 text-xs theme-card border rounded-xl placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-focus)] transition resize-y font-mono leading-relaxed"
+            />
+          </div>
+
+          {/* Interactive Detected Characters & Voice Assignment Panel */}
+          {parsedCharacters.length > 0 && (
+            <div className="p-3.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <IconUser className="w-3.5 h-3.5 text-[var(--text-sub)]" />
+                  <span className="text-xs font-semibold text-[var(--text-main)] uppercase tracking-wider font-mono">
+                    Detected Characters &amp; Voice Assignment
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono text-[var(--text-muted)]">
+                  {parsedCharacters.length} cast {parsedCharacters.length === 1 ? 'role' : 'roles'}
+                </span>
+              </div>
+
+              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                {parsedCharacters.map((char) => {
+                  const charKey = char.character_id || char.name;
+                  const voiceId = char.voice_id || char.assigned_voice_id || 'en-GB-RyanNeural';
+                  const auditionKey = `modal:${charKey}`;
+                  const isPlaying = playingId === auditionKey;
+                  const isLoading = loadingId === auditionKey;
+                  return (
+                    <div
+                      key={charKey}
+                      className="p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center gap-2"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-xs font-semibold text-[var(--text-main)] truncate">
+                          {char.name || charKey}
+                        </span>
+                        {char.is_narrator && (
+                          <span className="px-1.5 py-0.5 rounded bg-[var(--accent)] text-[var(--on-accent)] text-[9px] font-mono font-bold uppercase tracking-wider shrink-0">
+                            NARRATOR
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                        <select
+                          aria-label={`Gender for ${char.name || charKey}`}
+                          value={char.gender || 'neutral'}
+                          onChange={(e) => handleCharacterUpdate(charKey, 'gender', e.target.value)}
+                          className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-md px-2 py-1 text-[11px] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-strong)]"
+                        >
+                          <option value="neutral">Neutral</option>
+                          <option value="female">Female</option>
+                          <option value="male">Male</option>
+                        </select>
+
+                        <select
+                          aria-label={`Voice for ${char.name || charKey}`}
+                          value={voiceId}
+                          onChange={(e) => handleCharacterUpdate(charKey, 'voice_id', e.target.value)}
+                          className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-md px-2 py-1 text-[11px] font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--border-strong)] max-w-[190px]"
+                        >
+                          <VoiceOptionGroups groups={baseVoiceGroups} />
+                        </select>
+
+                        <button
+                          type="button"
+                          aria-label={`Audition voice for ${char.name || charKey}`}
+                          onClick={() =>
+                            toggleAudition({
+                              key: auditionKey,
+                              voiceId,
+                              text: char.sample_quote || `Hello, I am ${char.name || charKey}.`,
+                              characterId: charKey,
+                              speakerName: char.name || charKey,
+                              isNarrator: Boolean(char.is_narrator),
+                              gender: char.gender || 'neutral',
+                            })
+                          }
+                          disabled={isLoading}
+                          className="px-2 py-1 rounded-md bg-[var(--bg-elevated)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] text-[var(--text-main)] border border-[var(--border-subtle)] text-[11px] font-medium transition flex items-center gap-1 cursor-pointer shrink-0 disabled:opacity-50"
+                        >
+                          {isLoading ? (
+                            <IconRefresh className="w-3 h-3 animate-spin" />
+                          ) : isPlaying ? (
+                            <IconPause className="w-3 h-3" />
+                          ) : (
+                            <IconPlay className="w-3 h-3" />
+                          )}
+                          <span>{isPlaying ? 'Stop' : 'Audition'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Cover Image (Optional — Auto-extracted or Upload Custom) */}
           <div className="space-y-1.5">

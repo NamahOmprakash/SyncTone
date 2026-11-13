@@ -1870,13 +1870,25 @@ body.focus-fullscreen-mode footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 24px;
+  padding: 6px 16px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
-  gap: 8px;
-  flex-wrap: nowrap;
+  gap: 6px 10px;
+  flex-wrap: wrap;
+  overflow-x: hidden;
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+}
+
+.reader-floating-toolbar .btn-sm {
+  padding: 4px 10px;
+  font-size: 11px;
+  gap: 4px;
+}
+
+.reader-floating-toolbar .badge {
+  padding: 3px 8px;
 }
 
 .reader-canvas-container.reader-mode-opengl .reader-floating-toolbar {
@@ -1887,13 +1899,14 @@ body.focus-fullscreen-mode footer {
 .reader-toolbar-group {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
-  flex-shrink: 0;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .reader-content-stage {
-  max-width: min(880px, 92vw);
+  max-width: min(1100px, 95vw);
   margin: 0 auto;
   padding: 32px 24px calc(var(--dock-safe-bottom, 72px) + env(safe-area-inset-bottom, 0px) + 36px);
   width: 100%;
@@ -1994,38 +2007,36 @@ body.focus-fullscreen-mode footer {
 }
 
 .gutter-chevron-left {
-  left: max(16px, calc((100vw - min(880px, 92vw)) / 4));
+  left: max(12px, calc((100vw - min(1180px, 95vw)) / 4 - 22px));
 }
 
 .gutter-chevron-right {
-  right: max(16px, calc((100vw - min(880px, 92vw)) / 4));
+  right: max(12px, calc((100vw - min(1180px, 95vw)) / 4 - 22px));
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1220px) {
   .gutter-chevron {
     display: none;
+  }
+}
+
+@media (max-width: 1120px) {
+  .desktop-only-tag {
+    display: none !important;
   }
 }
 
 @media (max-width: 768px) {
   .reader-floating-toolbar {
     padding: 6px 12px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    flex-wrap: nowrap;
-    gap: 12px;
-  }
-  .reader-floating-toolbar::-webkit-scrollbar {
-    display: none;
+    overflow-x: hidden;
+    flex-wrap: wrap;
+    gap: 6px 8px;
   }
   .reader-toolbar-group {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 6px;
-    flex-shrink: 0;
-  }
-  .desktop-only-tag {
-    display: none !important;
+    min-width: 0;
   }
 }
 

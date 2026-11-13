@@ -27,10 +27,10 @@ import {
  * High-fidelity Hogwarts Heraldic Crest Ornament matching Apple Books Screenshot 2
  * features 4 house quarters (Lion, Eagle, Serpent, Badger), central 'H', and Latin motto banner.
  */
-function HogwartsCrest({ className = 'w-44 h-44 sm:w-48 sm:h-48' }) {
+function HogwartsCrest({ className = 'w-32 h-32 sm:w-36 sm:h-36' }) {
   return (
-    <div className="flex flex-col items-center justify-center my-3 select-none">
-      <div className="relative p-3.5 rounded-2xl bg-[var(--accent-surface)] border border-[var(--border-subtle)] shadow-sm dark:shadow-md">
+    <div className="flex flex-col items-center justify-center my-2 select-none">
+      <div className="relative p-2.5 rounded-2xl bg-[var(--accent-surface)] border border-[var(--border-subtle)] shadow-sm dark:shadow-md">
         <svg
           viewBox="0 0 240 240"
           className={className}
@@ -170,31 +170,65 @@ export default function OpenGLPageReader({
   fontFamily = 'serif',
   fontSize = 18,
   isFocusMode = false,
+  isFollowingAlong = true,
   onToggleFocusMode,
   onPageChange,
 }) {
   const { isDark } = useTheme();
   const [currentSpreadIndex, setCurrentSpreadIndex] = useState(0);
   const [isFlipping, setIsFlipping] = useState(false);
-  const [flipDirection, setFlipDirection] = useState('next'); // 'next' | 'prev'
+  const [flipDirection, setFlipDirection] = useState('next'); // 'next' | 'prev' | 0
   const [lastJumpPage, setLastJumpPage] = useState(1);
   const [showCoverSpread, setShowCoverSpread] = useState(false);
+  const [isUserBrowsingSpreads, setIsUserBrowsingSpreads] = useState(false);
 
   const chapterTransitioningRef = useRef(false);
-
-  // Reset spread when chapter changes
-  useEffect(() => {
-    chapterTransitioningRef.current = false;
-    setCurrentSpreadIndex(0);
-    setShowCoverSpread(false);
-  }, [currentChapter?.id, currentChapter?.chapter_number]);
-
   const bookContainerRef = useRef(null);
   const stageRef = useRef(null);
   const fit = useBookFit(stageRef);
   const anchorSegmentIdRef = useRef(null);
   const autoFlipLockRef = useRef(false);
+  const autoFlipTimerRef = useRef(null);
   const lastAutoFlippedSegRef = useRef(-1);
+  const currentSpreadIndexRef = useRef(currentSpreadIndex);
+  currentSpreadIndexRef.current = currentSpreadIndex;
+  const prevPagesRef = useRef(null);
+  const prevIsFollowingAlongRef = useRef(isFollowingAlong);
+  const lastWheelTurnRef = useRef(0);
+
+  // Reset spread & timers when chapter changes
+  useEffect(() => {
+    chapterTransitioningRef.current = false;
+    if (autoFlipTimerRef.current) {
+      clearTimeout(autoFlipTimerRef.current);
+      autoFlipTimerRef.current = null;
+    }
+    autoFlipLockRef.current = false;
+    lastAutoFlippedSegRef.current = -1;
+    setIsFlipping(false);
+    setIsUserBrowsingSpreads(false);
+    setCurrentSpreadIndex(0);
+    setShowCoverSpread(false);
+  }, [currentChapter?.id, currentChapter?.chapter_number]);
+
+  // Clear auto-flip timer strictly on unmount
+  useEffect(() => {
+    return () => {
+      if (autoFlipTimerRef.current) {
+        clearTimeout(autoFlipTimerRef.current);
+        autoFlipTimerRef.current = null;
+      }
+      autoFlipLockRef.current = false;
+    };
+  }, []);
+
+  // Clear browsing lock if parent re-enables Follow Along
+  useEffect(() => {
+    if (!prevIsFollowingAlongRef.current && isFollowingAlong) {
+      setIsUserBrowsingSpreads(false);
+    }
+    prevIsFollowingAlongRef.current = isFollowingAlong;
+  }, [isFollowingAlong]);
 
   const isHarryPotter = useMemo(() => {
     return (currentNovel?.title || '').toLowerCase().includes('harry potter');
@@ -208,6 +242,14 @@ export default function OpenGLPageReader({
     return currentChapter?.image_url || null;
   }, [segments, currentChapter]);
 
+  const firstPageExtraReservePx = useMemo(() => {
+    const firstHasImg = Boolean(segments?.[0] && parseSegmentImage(segments[0]).imgUrl);
+    if (!firstHasImg && (isHarryPotter || Boolean(chapterOpeningImg))) {
+      return 240;
+    }
+    return 150;
+  }, [segments, isHarryPotter, chapterOpeningImg]);
+
   // Paginate prose into book pages using fit engine contentBox
   const pages = useMemo(() => {
     return measureAndPaginateSegments(segments, {
@@ -215,8 +257,9 @@ export default function OpenGLPageReader({
       containerHeight: fit.contentBox?.h || (isFocusMode ? 750 : 640),
       fontSize,
       lineHeight: 1.85,
+      firstPageExtraReservePx,
     });
-  }, [segments, fit.contentBox?.w, fit.contentBox?.h, fontSize, isFocusMode]);
+  }, [segments, fit.contentBox?.w, fit.contentBox?.h, fontSize, isFocusMode, firstPageExtraReservePx]);
 
   const totalPages = Math.max(1, pages.length);
   const isSingleLayout = fit.layout === 'single';
@@ -230,16 +273,26 @@ export default function OpenGLPageReader({
   const leftPageNum = leftPageIdx + 1;
   const rightPageNum = rightPageIdx >= 0 ? rightPageIdx + 1 : 0;
 
-  // Track anchor when user turns spread
-  useEffect(() => {
-    if (pages.length > 0) {
-      const pageIdx = isSingleLayout ? currentSpreadIndex : currentSpreadIndex * 2;
-      const anchor = getAnchorSegmentIdFromPage(pages, pageIdx);
-      if (anchor != null) {
-        anchorSegmentIdRef.current = anchor;
+  const updateAnchorForSpread = useCallback(
+    (spreadIdx) => {
+      if (pages.length > 0) {
+        const pageIdx = isSingleLayout ? spreadIdx : spreadIdx * 2;
+        const clampedPageIdx = Math.max(0, Math.min(pages.length - 1, pageIdx));
+        const anchor = getAnchorSegmentIdFromPage(pages, clampedPageIdx);
+        if (anchor != null) {
+          anchorSegmentIdRef.current = anchor;
+        }
       }
+    },
+    [pages, isSingleLayout]
+  );
+
+  // Track anchor when spread changes (skip if pages just re-paginated so resize restoration runs first)
+  useEffect(() => {
+    if (prevPagesRef.current === pages && pages.length > 0) {
+      updateAnchorForSpread(currentSpreadIndex);
     }
-  }, [currentSpreadIndex, pages, isSingleLayout]);
+  }, [currentSpreadIndex, pages, updateAnchorForSpread]);
 
   // Report page updates to parent Reader toolbar
   useEffect(() => {
@@ -255,22 +308,19 @@ export default function OpenGLPageReader({
 
   // Restore spread index from anchor after re-pagination (e.g. font scale A+/A- or live resize)
   useEffect(() => {
+    prevPagesRef.current = pages;
     if (anchorSegmentIdRef.current != null && pages.length > 0) {
       const targetPageIdx = derivePageIndexFromAnchor(pages, anchorSegmentIdRef.current);
       const targetSpreadIdx = isSingleLayout ? targetPageIdx : Math.floor(targetPageIdx / 2);
       if (targetSpreadIdx >= 0 && targetSpreadIdx < totalSpreads) {
         setCurrentSpreadIndex(targetSpreadIdx);
+        currentSpreadIndexRef.current = targetSpreadIdx;
       }
     }
   }, [pages, isSingleLayout, totalSpreads]);
 
-  // Auto-flip spread to track active spoken segment & fragment
-  useEffect(() => {
-    if (activeSegmentId === -1 || pages.length === 0) {
-      lastAutoFlippedSegRef.current = -1;
-      return;
-    }
-
+  const activeTarget = useMemo(() => {
+    if (activeSegmentId === -1 || pages.length === 0) return null;
     const targetPageIdx = pages.findIndex((page) =>
       page.some((s) => {
         const sId = s.segment_id !== undefined ? s.segment_id : s.order;
@@ -284,45 +334,124 @@ export default function OpenGLPageReader({
         return true;
       })
     );
+    if (targetPageIdx === -1) return null;
+    const targetSpreadIdx = isSingleLayout ? targetPageIdx : Math.floor(targetPageIdx / 2);
+    return { targetPageIdx, targetSpreadIdx };
+  }, [activeSegmentId, segmentProgress, pages, isSingleLayout]);
 
-    if (targetPageIdx !== -1) {
-      const targetSpreadIdx = isSingleLayout ? targetPageIdx : Math.floor(targetPageIdx / 2);
-      const flipKey = `${activeSegmentId}_spread_${targetSpreadIdx}`;
-      if (flipKey === lastAutoFlippedSegRef.current) return;
+  const activeTargetPageIdx = activeTarget ? activeTarget.targetPageIdx : -1;
+  const activeTargetSpreadIdx = activeTarget ? activeTarget.targetSpreadIdx : -1;
+
+  // Auto-flip spread to track active spoken segment & fragment (never cancelled by segmentProgress ticks)
+  useEffect(() => {
+    if (activeSegmentId === -1 || activeTargetSpreadIdx === -1) {
+      lastAutoFlippedSegRef.current = -1;
+      if (autoFlipTimerRef.current) {
+        clearTimeout(autoFlipTimerRef.current);
+        autoFlipTimerRef.current = null;
+      }
+      autoFlipLockRef.current = false;
+      return;
+    }
+
+    if (!isFollowingAlong || isUserBrowsingSpreads) {
+      return;
+    }
+
+    const targetSpreadIdx = activeTargetSpreadIdx;
+    const flipKey = `${activeSegmentId}_spread_${targetSpreadIdx}`;
+    if (flipKey === lastAutoFlippedSegRef.current) return;
+
+    // If active segment is on Page 2 of Spread 0 while cover is showing, automatically switch to prose
+    if (!isSingleLayout && targetSpreadIdx === 0 && activeTargetPageIdx === 1 && showCoverSpread) {
+      setShowCoverSpread(false);
+    }
+
+    if (targetSpreadIdx === currentSpreadIndexRef.current) {
       lastAutoFlippedSegRef.current = flipKey;
+      return;
+    }
 
-      // If active segment is on Page 2 of Spread 0 while cover is showing, automatically switch to prose
-      if (!isSingleLayout && targetSpreadIdx === 0 && targetPageIdx === 1 && showCoverSpread) {
+    lastAutoFlippedSegRef.current = flipKey;
+
+    if (autoFlipTimerRef.current) {
+      clearTimeout(autoFlipTimerRef.current);
+      autoFlipTimerRef.current = null;
+    }
+
+    const curSpread = currentSpreadIndexRef.current;
+    setLastJumpPage(isSingleLayout ? curSpread + 1 : curSpread * 2 + 1);
+    setFlipDirection(targetSpreadIdx > curSpread ? 'next' : 'prev');
+    setIsFlipping(true);
+    autoFlipLockRef.current = true;
+
+    autoFlipTimerRef.current = setTimeout(() => {
+      autoFlipTimerRef.current = null;
+      setCurrentSpreadIndex(targetSpreadIdx);
+      currentSpreadIndexRef.current = targetSpreadIdx;
+      updateAnchorForSpread(targetSpreadIdx);
+      setFlipDirection(0);
+      setIsFlipping(false);
+      autoFlipLockRef.current = false;
+    }, 350);
+  }, [
+    activeSegmentId,
+    activeTargetSpreadIdx,
+    activeTargetPageIdx,
+    isFollowingAlong,
+    isUserBrowsingSpreads,
+    showCoverSpread,
+    isSingleLayout,
+    updateAnchorForSpread,
+  ]);
+
+  // Jump back to the active audio spread and clear manual browsing lock
+  const handleResumeFollowAlong = useCallback(() => {
+    setIsUserBrowsingSpreads(false);
+    if (autoFlipTimerRef.current) {
+      clearTimeout(autoFlipTimerRef.current);
+      autoFlipTimerRef.current = null;
+    }
+    autoFlipLockRef.current = false;
+    setIsFlipping(false);
+    setFlipDirection(0);
+
+    if (activeTargetSpreadIdx >= 0 && activeTargetSpreadIdx < totalSpreads) {
+      if (!isSingleLayout && activeTargetSpreadIdx === 0 && activeTargetPageIdx === 1 && showCoverSpread) {
         setShowCoverSpread(false);
       }
-
-      if (targetSpreadIdx !== currentSpreadIndex && !autoFlipLockRef.current) {
-        setLastJumpPage(isSingleLayout ? currentSpreadIndex + 1 : currentSpreadIndex * 2 + 1);
-        setFlipDirection(targetSpreadIdx > currentSpreadIndex ? 'next' : 'prev');
-        setIsFlipping(true);
-        autoFlipLockRef.current = true;
-
-        const timer = setTimeout(() => {
-          setCurrentSpreadIndex(targetSpreadIdx);
-          setIsFlipping(false);
-          autoFlipLockRef.current = false;
-        }, 350);
-
-        return () => clearTimeout(timer);
+      const curSpread = currentSpreadIndexRef.current;
+      if (activeTargetSpreadIdx !== curSpread) {
+        setLastJumpPage(isSingleLayout ? curSpread + 1 : curSpread * 2 + 1);
       }
+      setCurrentSpreadIndex(activeTargetSpreadIdx);
+      currentSpreadIndexRef.current = activeTargetSpreadIdx;
+      updateAnchorForSpread(activeTargetSpreadIdx);
+      lastAutoFlippedSegRef.current = `${activeSegmentId}_spread_${activeTargetSpreadIdx}`;
+    } else {
+      lastAutoFlippedSegRef.current = -1;
     }
-  }, [activeSegmentId, segmentProgress, pages, currentSpreadIndex, showCoverSpread, isSingleLayout]);
+  }, [
+    activeTargetSpreadIdx,
+    activeTargetPageIdx,
+    activeSegmentId,
+    totalSpreads,
+    isSingleLayout,
+    showCoverSpread,
+    updateAnchorForSpread,
+  ]);
 
   // Turn to Next Spread
   const handleNextPage = useCallback(() => {
-    if (currentSpreadIndex === 0 && showCoverSpread) {
+    if (currentSpreadIndexRef.current === 0 && showCoverSpread) {
+      if (isPlaying) setIsUserBrowsingSpreads(true);
       setShowCoverSpread(false);
       setFlipDirection('next');
       setIsFlipping(true);
       setTimeout(() => setIsFlipping(false), 280);
       return;
     }
-    if (currentSpreadIndex >= totalSpreads - 1) {
+    if (currentSpreadIndexRef.current >= totalSpreads - 1) {
       if (nextChapter && onNextChapter && !chapterTransitioningRef.current) {
         chapterTransitioningRef.current = true;
         setFlipDirection('next');
@@ -335,20 +464,24 @@ export default function OpenGLPageReader({
       }
       return;
     }
-    setCurrentSpreadIndex((prev) => {
-      if (prev >= totalSpreads - 1) return prev;
-      setLastJumpPage(isSingleLayout ? prev + 1 : prev * 2 + 1);
-      setFlipDirection('next');
-      setIsFlipping(true);
-      setTimeout(() => setIsFlipping(false), 280);
-      return prev + 1;
-    });
-  }, [totalSpreads, currentSpreadIndex, showCoverSpread, nextChapter, onNextChapter, isSingleLayout]);
+    const prev = currentSpreadIndexRef.current;
+    const nextIdx = Math.min(totalSpreads - 1, prev + 1);
+    if (nextIdx === prev) return;
+    if (isPlaying) setIsUserBrowsingSpreads(true);
+    setLastJumpPage(isSingleLayout ? prev + 1 : prev * 2 + 1);
+    setFlipDirection('next');
+    setIsFlipping(true);
+    setTimeout(() => setIsFlipping(false), 280);
+    setCurrentSpreadIndex(nextIdx);
+    currentSpreadIndexRef.current = nextIdx;
+    updateAnchorForSpread(nextIdx);
+  }, [totalSpreads, showCoverSpread, nextChapter, onNextChapter, isSingleLayout, isPlaying, updateAnchorForSpread]);
 
   // Turn to Previous Spread (Fixes previous page button bug on Spread 0 and cover transitions)
   const handlePrevPage = useCallback(() => {
-    if (currentSpreadIndex === 0) {
+    if (currentSpreadIndexRef.current === 0) {
       if (!showCoverSpread && currentNovel?.cover_object) {
+        if (isPlaying) setIsUserBrowsingSpreads(true);
         setShowCoverSpread(true);
         setFlipDirection('prev');
         setIsFlipping(true);
@@ -356,31 +489,57 @@ export default function OpenGLPageReader({
       }
       return;
     }
-    setCurrentSpreadIndex((prev) => {
-      if (prev <= 0) return 0;
-      setLastJumpPage(isSingleLayout ? prev + 1 : prev * 2 + 1);
-      setFlipDirection('prev');
-      setIsFlipping(true);
-      setTimeout(() => setIsFlipping(false), 280);
-      return prev - 1;
-    });
-  }, [currentSpreadIndex, showCoverSpread, currentNovel?.cover_object, isSingleLayout]);
+    const prev = currentSpreadIndexRef.current;
+    const prevIdx = Math.max(0, prev - 1);
+    if (isPlaying) setIsUserBrowsingSpreads(true);
+    setLastJumpPage(isSingleLayout ? prev + 1 : prev * 2 + 1);
+    setFlipDirection('prev');
+    setIsFlipping(true);
+    setTimeout(() => setIsFlipping(false), 280);
+    setCurrentSpreadIndex(prevIdx);
+    currentSpreadIndexRef.current = prevIdx;
+    updateAnchorForSpread(prevIdx);
+  }, [showCoverSpread, currentNovel?.cover_object, isSingleLayout, isPlaying, updateAnchorForSpread]);
 
   // Apple Books Jump-Back (matching Screenshot 1 bottom-left ↩ pill)
   const handleJumpBack = useCallback(() => {
     const targetSpread = isSingleLayout
       ? Math.max(0, lastJumpPage - 1)
       : Math.floor(Math.max(0, lastJumpPage - 1) / 2);
-    if (targetSpread !== currentSpreadIndex && !isFlipping) {
-      setLastJumpPage(isSingleLayout ? currentSpreadIndex + 1 : currentSpreadIndex * 2 + 1);
-      setFlipDirection(targetSpread > currentSpreadIndex ? 'next' : 'prev');
+    const curSpread = currentSpreadIndexRef.current;
+    if (targetSpread !== curSpread && !isFlipping) {
+      if (isPlaying) setIsUserBrowsingSpreads(true);
+      setLastJumpPage(isSingleLayout ? curSpread + 1 : curSpread * 2 + 1);
+      setFlipDirection(targetSpread > curSpread ? 'next' : 'prev');
       setIsFlipping(true);
       setTimeout(() => {
         setCurrentSpreadIndex(targetSpread);
+        currentSpreadIndexRef.current = targetSpread;
+        updateAnchorForSpread(targetSpread);
         setIsFlipping(false);
       }, 300);
     }
-  }, [lastJumpPage, currentSpreadIndex, isFlipping, isSingleLayout]);
+  }, [lastJumpPage, isFlipping, isSingleLayout, isPlaying, updateAnchorForSpread]);
+
+  // Debounced wheel spread turning
+  const handleStageWheel = useCallback(
+    (e) => {
+      if (isFlipping || pages.length === 0) return;
+      const absX = Math.abs(e.deltaX || 0);
+      const absY = Math.abs(e.deltaY || 0);
+      const delta = absX > absY ? e.deltaX : e.deltaY;
+      if (Math.abs(delta) < 28) return;
+      const now = Date.now();
+      if (now - lastWheelTurnRef.current < 420) return;
+      lastWheelTurnRef.current = now;
+      if (delta > 0) {
+        handleNextPage();
+      } else {
+        handlePrevPage();
+      }
+    },
+    [isFlipping, pages.length, handleNextPage, handlePrevPage]
+  );
 
   // Keyboard navigation (Left / Right arrow keys & PageUp / PageDown)
   useEffect(() => {
@@ -636,7 +795,7 @@ export default function OpenGLPageReader({
     <div
       className={
         isFocusMode
-          ? 'fixed inset-0 z-50 bg-[var(--bg-page)] flex flex-col justify-between px-3 sm:px-8 pt-3 pb-24 overflow-hidden animate-fade-in select-none w-screen h-screen'
+          ? 'fixed inset-0 z-50 bg-[var(--bg-page)] flex flex-col justify-between px-3 sm:px-8 pt-3 pb-28 overflow-hidden animate-fade-in select-none w-screen h-screen'
           : 'w-full flex-1 flex flex-col justify-between items-center animate-fade-in select-none relative overflow-hidden py-2 min-h-0'
       }
     >
@@ -667,6 +826,7 @@ export default function OpenGLPageReader({
       {/* 3D Apple Books Two-Page Spread Stage */}
       <div
         ref={stageRef}
+        onWheel={handleStageWheel}
         className={`relative w-full perspective-1200 flex flex-col justify-center items-center ${
           isFocusMode ? 'flex-1 min-h-0 py-1' : 'flex-1 min-h-0 py-1 my-1'
         }`}
@@ -682,7 +842,9 @@ export default function OpenGLPageReader({
           `}
           style={{
             width: fit.book?.w ? `${fit.book.w}px` : (typeof window !== 'undefined' && window.innerWidth < 640 ? '100%' : '900px'),
-            height: fit.book?.h ? `${fit.book.h}px` : (typeof window !== 'undefined' && window.innerHeight < 640 ? '440px' : '580px'),
+            height: fit.book?.h
+              ? `${fit.book.h}px`
+              : (typeof window !== 'undefined' ? `${Math.max(380, (window.innerHeight || 768) - 220)}px` : '580px'),
             maxWidth: '100%',
             maxHeight: '100%',
             margin: '0 auto',
@@ -720,10 +882,10 @@ export default function OpenGLPageReader({
               </div>
 
               {/* Left Page Content */}
-              <div className="flex-1 min-h-0 py-2 sm:py-3 space-y-3 sm:space-y-4 overflow-y-auto">
+              <div className="flex-1 min-h-0 py-2 sm:py-3 space-y-3 sm:space-y-4 overflow-hidden">
                 {/* On Spread 0, render Chapter Opening Header */}
                 {isSpreadZero && (
-                  <div className="text-center space-y-2 mb-4 animate-fade-in">
+                  <div className="text-center space-y-1.5 mb-3 animate-fade-in">
                     <h1 className="text-sm sm:text-base font-serif font-bold tracking-widest uppercase text-[var(--accent-text)]">
                       {currentNovel?.title || 'Chapter Opening'}
                     </h1>
@@ -733,18 +895,18 @@ export default function OpenGLPageReader({
                     {!leftHasImage && isHarryPotter ? (
                       <HogwartsCrest />
                     ) : !leftHasImage && chapterOpeningImg ? (
-                      <div className="my-3 flex justify-center">
+                      <div className="my-2 flex justify-center">
                         <img
                           src={chapterOpeningImg}
                           alt="Chapter opening illustration"
-                          className="max-h-48 sm:max-h-56 rounded-xl border border-stone-200 dark:border-white/15 shadow-lg object-contain"
+                          className="max-h-36 sm:max-h-40 rounded-xl border border-stone-200 dark:border-white/15 shadow-lg object-contain"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                           }}
                         />
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center gap-3 my-4 opacity-60 dark:opacity-50 select-none">
+                      <div className="flex items-center justify-center gap-3 my-3 opacity-60 dark:opacity-50 select-none">
                         <span className="h-px w-12 bg-gradient-to-r from-transparent to-[var(--brand-bronze,#A88462)]/50" />
                         <span className="text-[var(--accent-text)] text-xs">❦</span>
                         <span className="h-px w-12 bg-gradient-to-l from-transparent to-[var(--brand-bronze,#A88462)]/50" />
@@ -793,11 +955,11 @@ export default function OpenGLPageReader({
               </div>
 
               {/* Right Page Content */}
-              <div className="flex-1 min-h-0 py-2 sm:py-3 space-y-3 sm:space-y-4 overflow-y-auto">
+              <div className="flex-1 min-h-0 py-2 sm:py-3 space-y-3 sm:space-y-4 overflow-hidden">
                 {isCoverActiveOnSpreadZero ? (
                   /* Cover Showcase Panel (Matching Screenshot 1) */
-                  <div className="flex-1 flex flex-col items-center justify-center py-4 px-2 text-center animate-fade-in">
-                    <div className="relative group max-w-[340px] sm:max-w-[380px] w-full aspect-[2/3] max-h-[480px] rounded-2xl overflow-hidden shadow-2xl ring-2 ring-[var(--brand-bronze,#A88462)]/30 transition-transform duration-300 hover:scale-[1.01]">
+                  <div className="h-full flex flex-col items-center justify-center py-2 px-2 text-center animate-fade-in">
+                    <div className="relative group w-auto h-full max-h-[320px] sm:max-h-[400px] aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl ring-2 ring-[var(--brand-bronze,#A88462)]/30 transition-transform duration-300 hover:scale-[1.01]">
                       {/* MinaLima Ornate Gold Border Frame */}
                       <div className="absolute inset-0 border-4 border-[var(--brand-bronze,#A88462)]/40 rounded-2xl pointer-events-none z-10" />
                       {currentNovel?.cover_object ? (
@@ -929,7 +1091,7 @@ export default function OpenGLPageReader({
       </div>
 
       {/* Floating Apple Books Dock Controls */}
-      <div className="w-full max-w-3xl sm:max-w-4xl mx-auto flex flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 rounded-xl glass-dock border theme-border shadow-md flex-shrink-0 text-xs my-1 overflow-x-auto">
+      <div className="relative z-30 w-full max-w-5xl mx-auto flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 rounded-xl glass-dock border theme-border shadow-md flex-shrink-0 text-xs my-1 overflow-x-hidden">
         {/* Prev / Next Page Buttons */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <button
@@ -966,9 +1128,12 @@ export default function OpenGLPageReader({
             value={currentSpreadIndex}
             onChange={(e) => {
               const val = parseInt(e.target.value, 10);
-              if (val !== currentSpreadIndex) {
-                setLastJumpPage(currentSpreadIndex * 2 + 1);
+              if (val !== currentSpreadIndexRef.current) {
+                if (isPlaying) setIsUserBrowsingSpreads(true);
+                setLastJumpPage(isSingleLayout ? currentSpreadIndexRef.current + 1 : currentSpreadIndexRef.current * 2 + 1);
                 setCurrentSpreadIndex(val);
+                currentSpreadIndexRef.current = val;
+                updateAnchorForSpread(val);
                 if (val > 0) {
                   setShowCoverSpread(false);
                 }
@@ -981,6 +1146,20 @@ export default function OpenGLPageReader({
             / {totalSpreads}
           </span>
         </div>
+
+        {/* Resume Follow Along Pill (when user manually browsed spreads while playing) */}
+        {isUserBrowsingSpreads && (
+          <button
+            type="button"
+            onClick={handleResumeFollowAlong}
+            className="px-2.5 py-1.5 rounded-xl bg-[var(--accent)] text-[var(--on-accent)] border border-[var(--border-strong)] text-xs font-mono font-bold transition hover:opacity-90 active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-xs flex-shrink-0"
+            title="Jump back to the active audio spread and resume Follow Along"
+            aria-label="Resume Follow Along"
+          >
+            <IconSoundwave className="w-3.5 h-3.5" />
+            <span>Resume Follow Along</span>
+          </button>
+        )}
 
         {/* Spread 0 Cover Toggle */}
         {isSpreadZero && (

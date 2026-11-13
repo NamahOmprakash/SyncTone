@@ -65,6 +65,8 @@ export default function AudioPlayer({
   onTogglePlaybackMode,
   ttsEngine = 'msedge-tts',
   onChangeTtsEngine,
+  isFollowingAlong: propIsFollowingAlong,
+  onToggleFollowAlong,
   isBuffering: propIsBuffering,
   error: propError,
 }) {
@@ -72,14 +74,22 @@ export default function AudioPlayer({
   const [volume, setVolume] = useState(1.0);
   const [isMuted, setIsMuted] = useState(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  const [followAlong, setFollowAlong] = useState(true);
+  const [localFollowAlong, setLocalFollowAlong] = useState(true);
+  const followAlong = propIsFollowingAlong !== undefined ? propIsFollowingAlong : localFollowAlong;
+  const handleToggleFollowAlong = useCallback(() => {
+    if (onToggleFollowAlong) {
+      onToggleFollowAlong();
+    } else {
+      setLocalFollowAlong((prev) => !prev);
+    }
+  }, [onToggleFollowAlong]);
   const [hoverTimeMs, setHoverTimeMs] = useState(null);
   const [hoverFraction, setHoverFraction] = useState(0);
   const [bufferedFraction, setBufferedFraction] = useState(0);
   const [isBufferingState, setIsBufferingState] = useState(false);
   const isBuffering = propIsBuffering ?? isBufferingState;
   const [localError, setLocalError] = useState(null);
-  const error = propError || localError;
+  const error = playbackMode === 'tts' ? null : (propError || localError);
   const scrubberTrackRef = useRef(null);
 
   const totalDurationMs =
@@ -122,6 +132,12 @@ export default function AudioPlayer({
     setIsBufferingState(false);
     setBufferedFraction(0);
   }, [audioUrl]);
+
+  useEffect(() => {
+    if (playbackMode === 'tts') {
+      setLocalError(null);
+    }
+  }, [playbackMode]);
 
   const handleSeekFromClientX = useCallback(
     (clientX) => {
@@ -665,7 +681,7 @@ export default function AudioPlayer({
           {/* Follow Along / Live Sync Toggle */}
           <button
             type="button"
-            onClick={() => setFollowAlong((prev) => !prev)}
+            onClick={handleToggleFollowAlong}
             className={`boxed-btn px-3 py-1 text-[11px] font-mono cursor-pointer hidden md:inline-flex items-center gap-1.5 rounded-full active:scale-95 transition-all ${
               followAlong && isPlaying
                 ? 'text-[var(--text-main)] border-[var(--border-strong)]'

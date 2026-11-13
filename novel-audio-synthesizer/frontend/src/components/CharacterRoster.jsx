@@ -1,34 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api, ApiError } from '../services/api';
-import { useAuth } from '../hooks/useAuth';
-import { getSpeakerColor } from '../utils/speakerColors';
+import {
+  buildCanonicalVoiceGroups,
+  VoiceOptionGroups,
+  CANONICAL_NEURAL_VOICES,
+} from './VoicesView';
 import {
   IconUsers,
-  IconLock,
   IconX,
   IconCheck,
   IconMic,
 } from './icons';
 
-const PARADEE_VOICE_OPTIONS = [
-  { id: 'bm_fable', label: 'Fable — British Narrator/Lead (bm_fable)' },
-  { id: 'bf_isabella', label: 'Isabella — British Female Lead (bf_isabella)' },
-  { id: 'am_puck', label: 'Puck — Dynamic Male Lead (am_puck)' },
-  { id: 'af_heart', label: 'Heart — Warm Female Lead (af_heart)' },
-];
-
-const MACHINE_EXTRA_VOICE_OPTIONS = [
-  { id: 'mac_reed', label: 'Reed — British Male Extra (mac_reed)' },
-  { id: 'mac_moira', label: 'Moira — Irish Female Extra (mac_moira)' },
-  { id: 'mac_rocko', label: 'Rocko — Deep Male Extra (mac_rocko)' },
-  { id: 'mac_shelley', label: 'Shelley — Clear Female Extra (mac_shelley)' },
-  { id: 'mac_grandpa', label: 'Grandpa — Elder Male Extra (mac_grandpa)' },
-  { id: 'mac_flo', label: 'Flo — Mature Female Extra (mac_flo)' },
-  { id: 'mac_daniel', label: 'Daniel — Classic UK Male (mac_daniel)' },
-  { id: 'mac_serena', label: 'Serena — Classic UK Female (mac_serena)' },
-];
-
-function getVoiceTierBadge(voiceId = '', rankIdx = 0) {
+function getVoiceTierBadge(voiceId = '', rankIdx = 0, isNarrator = false) {
+  if (isNarrator) {
+    return { label: 'NARRATOR', color: 'text-[var(--text-main)] border-[var(--border-strong)] bg-[var(--bg-surface)]' };
+  }
   if (['bm_fable', 'bf_isabella', 'am_puck', 'af_heart'].includes(voiceId)) {
     return { label: 'PARADEE-8M', color: 'text-[var(--text-main)] border-[var(--border-strong)] bg-[var(--bg-surface)]' };
   }
@@ -47,39 +34,65 @@ export default function CharacterRoster({
   onClose,
   onVoiceChange,
 }) {
-  const { isWriterOrAdmin } = useAuth();
   const [characters, setCharacters] = useState([]);
+  const [customCharacters, setCustomCharacters] = useState([]);
   const [availableVoices, setAvailableVoices] = useState({});
   const [updatingId, setUpdatingId] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
-  // Aggregate detected characters and sample quotes from segments
+  // Inline + ADD CHARACTER form state
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newCharName, setNewCharName] = useState('');
+  const [newCharGender, setNewCharGender] = useState('unknown');
+  const [newCharVoice, setNewCharVoice] = useState(CANONICAL_NEURAL_VOICES[1]?.id || 'en-GB-ThomasNeural');
+  const [addingChar, setAddingChar] = useState(false);
+
+  // Aggregate detected characters (including Narrator pinned to top) and sample quotes from segments
   useEffect(() => {
     const charMap = new Map();
 
     for (const seg of segments) {
-      const charKey = seg.character_id || seg.speaker_id;
-      if (charKey && charKey !== 'narrator' && charKey !== 'unresolved') {
-        const existing = charMap.get(charKey);
-        if (existing) {
-          existing.segmentCount++;
-          if (!existing.sampleQuote && seg.type === 'dialogue' && seg.text) {
-            existing.sampleQuote = seg.text;
-          }
-        } else {
-          charMap.set(charKey, {
-            id: charKey,
-            name: seg.speaker_name || charKey,
-            voiceId: seg.assigned_voice_id || seg.voice_id || 'en-GB-ThomasNeural',
-            segmentCount: 1,
-            sampleQuote: seg.type === 'dialogue' ? seg.text : '',
-          });
+      if (seg.type === 'image') continue;
+      const rawKey = seg.character_id || seg.speaker_id || (seg.type === 'narration' ? 'narrator' : null);
+      if (!rawKey) continue;
+      const lowerKey = String(rawKey).toLowerCase();
+      if (['unresolved', 'unknown', 'unknown_speaker', 'image'].includes(lowerKey)) continue;
+
+      const isNarrator = lowerKey === 'narrator' || seg.type === 'narration';
+      const charKey = isNarrator ? 'narrator' : rawKey;
+      const existing = charMap.get(charKey);
+      if (existing) {
+        existing.segmentCount++;
+        if (!existing.sampleQuote && seg.type === 'dialogue' && seg.text) {
+          existing.sampleQuote = seg.text;
         }
+      } else {
+        charMap.set(charKey, {
+          id: charKey,
+          name: isNarrator ? 'Narrator' : (seg.speaker_name || rawKey),
+          isNarrator,
+          voiceId: seg.assigned_voice_id || seg.voice_id || (isNarrator ? 'en-GB-RyanNeural' : 'en-GB-ThomasNeural'),
+          segmentCount: 1,
+          sampleQuote: seg.type === 'dialogue' ? seg.text : '',
+        });
       }
     }
 
-    setCharacters(Array.from(charMap.values()));
+    // Merge any manually added characters not yet present in segments
+    for (const custom of customCharacters) {
+      if (!charMap.has(custom.id)) {
+        charMap.set(custom.id, custom);
+      }
+    }
+
+    const list = Array.from(charMap.values()).sort((a, b) => {
+      if (a.isNarrator && !b.isNarrator) return -1;
+      if (!a.isNarrator && b.isNarrator) return 1;
+      return 0;
+    });
+
+    setCharacters(list);
 
     // Fetch voice palette from real endpoint
     api.voices
@@ -90,7 +103,12 @@ export default function CharacterRoster({
       .catch((err) => {
         console.warn('[CharacterRoster] Failed to load voice catalog:', err.message);
       });
-  }, [segments]);
+  }, [segments, customCharacters]);
+
+  const baseVoiceGroups = useMemo(
+    () => buildCanonicalVoiceGroups(availableVoices),
+    [availableVoices]
+  );
 
   const handleVoiceSelect = async (characterId, newVoiceId) => {
     if (!newVoiceId) return;
@@ -103,6 +121,9 @@ export default function CharacterRoster({
 
     // Optimistic update
     setCharacters((prev) =>
+      prev.map((c) => (c.id === characterId ? { ...c, voiceId: newVoiceId } : c))
+    );
+    setCustomCharacters((prev) =>
       prev.map((c) => (c.id === characterId ? { ...c, voiceId: newVoiceId } : c))
     );
 
@@ -125,9 +146,65 @@ export default function CharacterRoster({
         setCharacters((prev) =>
           prev.map((c) => (c.id === characterId ? { ...c, voiceId: prevVoice } : c))
         );
+        setCustomCharacters((prev) =>
+          prev.map((c) => (c.id === characterId ? { ...c, voiceId: prevVoice } : c))
+        );
       }
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleAddCharacterSubmit = async (e) => {
+    e.preventDefault();
+    const trimmedName = newCharName.trim();
+    if (!trimmedName) {
+      setErrorMessage('Please enter a character name.');
+      return;
+    }
+
+    const isNarrator = trimmedName.toLowerCase() === 'narrator';
+    const charId = isNarrator
+      ? 'narrator'
+      : trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || trimmedName;
+
+    setAddingChar(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await api.voices.assign({
+        character_id: charId,
+        new_voice_id: newCharVoice,
+        chapter_id: chapterId,
+      });
+
+      const newEntry = {
+        id: charId,
+        name: trimmedName,
+        gender: newCharGender,
+        isNarrator,
+        voiceId: newCharVoice,
+        segmentCount: 0,
+        sampleQuote: '',
+      };
+
+      setCustomCharacters((prev) => {
+        const filtered = prev.filter((c) => c.id !== charId);
+        return [...filtered, newEntry];
+      });
+      setSuccessMessage(`Added ${trimmedName} with voice ${newCharVoice}`);
+      if (onVoiceChange) {
+        onVoiceChange(charId, newCharVoice);
+      }
+      setNewCharName('');
+      setNewCharGender('unknown');
+      setShowAddForm(false);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : err.message || 'Failed to add character';
+      setErrorMessage(msg);
+    } finally {
+      setAddingChar(false);
     }
   };
 
@@ -217,12 +294,11 @@ export default function CharacterRoster({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            disabled
-            title="Character profiles are generated automatically from chapter manuscript parsing"
-            className="boxed-btn opacity-50 cursor-not-allowed text-[10px] font-mono px-2 py-1 flex items-center gap-1"
+            onClick={() => setShowAddForm((prev) => !prev)}
+            className="boxed-btn text-[10px] font-mono px-2 py-1 flex items-center gap-1 cursor-pointer hover:border-[var(--text-main)] transition"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-current" />
-            <span>+ ADD CHARACTER</span>
+            <span>{showAddForm ? 'CANCEL' : '+ ADD CHARACTER'}</span>
           </button>
           <button
             onClick={onClose}
@@ -233,6 +309,65 @@ export default function CharacterRoster({
           </button>
         </div>
       </div>
+
+      {/* Inline + ADD CHARACTER Form */}
+      {showAddForm && (
+        <form
+          onSubmit={handleAddCharacterSubmit}
+          className="mx-4 mt-3 p-3 bg-[var(--bg-card)] border border-[var(--border-strong)] rounded-xl space-y-2.5 text-xs font-mono"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">
+              Add Character Profile
+            </span>
+          </div>
+          <input
+            type="text"
+            aria-label="Character Name"
+            value={newCharName}
+            onChange={(e) => setNewCharName(e.target.value)}
+            placeholder="Character Name (e.g. Dr. Watson)"
+            className="w-full px-2.5 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-main)] focus:outline-none focus:border-[var(--border-strong)]"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              aria-label="Character Gender"
+              value={newCharGender}
+              onChange={(e) => setNewCharGender(e.target.value)}
+              className="px-2 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-main)] focus:outline-none focus:border-[var(--border-strong)]"
+            >
+              <option value="unknown">Gender: Unknown</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="neutral">Neutral</option>
+            </select>
+            <select
+              aria-label="New Character Voice Model"
+              value={newCharVoice}
+              onChange={(e) => setNewCharVoice(e.target.value)}
+              className="px-2 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-main)] focus:outline-none focus:border-[var(--border-strong)]"
+            >
+              <VoiceOptionGroups groups={baseVoiceGroups} />
+            </select>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAddForm(false)}
+              className="px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-sub)] hover:text-[var(--text-main)] cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={addingChar}
+              className="px-3 py-1 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] font-bold cursor-pointer disabled:opacity-50"
+            >
+              {addingChar ? 'Adding...' : 'Add Character'}
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Alerts */}
       {errorMessage && (
@@ -266,7 +401,8 @@ export default function CharacterRoster({
         ) : (
           characters.map((char, idx) => {
             const isUpdating = updatingId === char.id;
-            const tierBadge = getVoiceTierBadge(char.voiceId, idx);
+            const tierBadge = getVoiceTierBadge(char.voiceId, idx, char.isNarrator);
+            const charVoiceGroups = buildCanonicalVoiceGroups(availableVoices, [char.voiceId]);
 
             return (
               <div
@@ -303,41 +439,15 @@ export default function CharacterRoster({
                       VOICE:
                     </label>
 
-                    {isWriterOrAdmin ? (
-                      <select
-                        value={char.voiceId}
-                        disabled={isUpdating}
-                        onChange={(e) => handleVoiceSelect(char.id, e.target.value)}
-                        className="text-xs px-2.5 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:border-[var(--text-main)] transition font-mono text-[var(--text-main)] disabled:opacity-50 min-w-0 max-w-[210px] truncate"
-                      >
-                        <optgroup label="Edge / Kokoro & Archetypes">
-                          {Object.entries(availableVoices).map(([archetype, voiceId]) => (
-                            <option key={archetype} value={voiceId}>
-                              {archetype} ({voiceId})
-                            </option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Paradee-8M Neural (Primary 4)">
-                          {PARADEE_VOICE_OPTIONS.map((opt) => (
-                            <option key={`paradee_${opt.id}`} value={opt.id}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Machine Extra Voices (5th+ Cast)">
-                          {MACHINE_EXTRA_VOICE_OPTIONS.map((opt) => (
-                            <option key={`machine_${opt.id}`} value={opt.id}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                      </select>
-                    ) : (
-                      <span className="text-xs font-mono text-[var(--text-sub)] bg-[var(--bg-surface)] px-2.5 py-1 rounded-lg border border-[var(--border-subtle)] flex items-center gap-1">
-                        <IconLock className="w-3 h-3 text-[var(--text-main)]" />
-                        <span>{char.voiceId}</span>
-                      </span>
-                    )}
+                    <select
+                      aria-label={`Voice for ${char.name}`}
+                      value={char.voiceId}
+                      disabled={isUpdating}
+                      onChange={(e) => handleVoiceSelect(char.id, e.target.value)}
+                      className="text-xs px-2.5 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:border-[var(--text-main)] transition font-mono text-[var(--text-main)] disabled:opacity-50 min-w-0 max-w-[210px] truncate"
+                    >
+                      <VoiceOptionGroups groups={charVoiceGroups} />
+                    </select>
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] font-mono text-[var(--text-sub)]">
@@ -357,12 +467,6 @@ export default function CharacterRoster({
                       <span>ASSIGNED</span>
                     </span>
                   </div>
-
-                  {!isWriterOrAdmin && (
-                    <p className="text-[10px] font-mono text-[var(--text-muted)] pt-1 text-right">
-                      Sign in as writer/admin to override voices.
-                    </p>
-                  )}
                 </div>
               </div>
             );

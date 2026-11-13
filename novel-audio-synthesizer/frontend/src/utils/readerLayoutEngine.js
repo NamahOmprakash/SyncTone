@@ -83,9 +83,11 @@ export function estimateSegmentHeight(segment, options = {}) {
     totalHeight += Math.min(280, Math.round(containerWidth * 0.5)) + 12;
   }
 
-  // Speaker badge / annotation header line
+  // Speaker badge / annotation header line + vertical wrapper padding (py-1.5)
   if (segment.speaker_name) {
-    totalHeight += 22; // Badge row + margin-bottom
+    totalHeight += 30; // py-1.5 (12px) + badge row + margin-bottom
+  } else {
+    totalHeight += 12; // py-1.5 wrapper padding
   }
 
   if (text && text.length > 0) {
@@ -128,6 +130,7 @@ export function measureAndPaginateSegments(segments = [], options = {}) {
     fontSize = 18,
     lineHeight = 1.85,
     maxSegmentsPerPage,
+    firstPageExtraReservePx = 150,
   } = options;
 
   // Maximum segments per page based on chapter length to guarantee interactive spreads
@@ -139,9 +142,15 @@ export function measureAndPaginateSegments(segments = [], options = {}) {
   // Available vertical pixel budget for body prose on a single page
   const usablePageHeight = Math.max(300, containerHeight - headerHeight - footerHeight);
 
+  // Reserve vertical space on Page 1 (index 0) for the Chapter Opening Header / crest
+  const page0Reserve = Math.min(
+    Math.max(0, Number(firstPageExtraReservePx) || 0),
+    Math.max(0, usablePageHeight - 80)
+  );
+
   const pages = [];
   let currentPage = [];
-  let currentUsedHeight = 0;
+  let currentUsedHeight = page0Reserve;
 
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
@@ -159,19 +168,34 @@ export function measureAndPaginateSegments(segments = [], options = {}) {
       if (currentPage.length > 0) {
         pages.push(currentPage);
         currentPage = [];
-        currentUsedHeight = 0;
       }
       pages.push([seg]);
+      currentUsedHeight = 0;
       continue;
     }
 
-    // If a single text segment exceeds usable page height, split it by sentence boundaries
-    // so prose never bleeds outside the book spread container or overlaps the footer
-    if (segHeight > usablePageHeight && cleanText && cleanText.length > 300) {
+    // If a single text segment exceeds the remaining/usable page height, split it by sentence boundaries
+    // so prose never bleeds outside the book spread container or gets clipped by overflow-hidden
+    if (
+      (segHeight > usablePageHeight ||
+        (currentPage.length === 0 && currentUsedHeight + segHeight > usablePageHeight)) &&
+      cleanText &&
+      cleanText.length > 250
+    ) {
       const sentences = cleanText.match(/[^.!?]+[.!?]+["”']?\s*|[^.!?]+$/g) || [cleanText];
+      const firstSentenceHeight = estimateSegmentHeight(
+        { ...seg, text: sentences[0] || cleanText },
+        { containerWidth, fontSize, lineHeight }
+      );
+      if (currentPage.length > 0 && currentUsedHeight + firstSentenceHeight > usablePageHeight) {
+        pages.push(currentPage);
+        currentPage = [];
+        currentUsedHeight = 0;
+      }
+
       const fragmentTexts = [];
       let subText = '';
-      let subUsedHeight = 0;
+      let activePageUsed = currentUsedHeight;
 
       for (let sIdx = 0; sIdx < sentences.length; sIdx++) {
         const sentence = sentences[sIdx];
@@ -179,21 +203,16 @@ export function measureAndPaginateSegments(segments = [], options = {}) {
         const testSubSeg = { ...seg, text: testSubText };
         const testHeight = estimateSegmentHeight(testSubSeg, { containerWidth, fontSize, lineHeight });
 
-        if (currentPage.length > 0 && currentUsedHeight + testHeight > usablePageHeight) {
-          if (subText.trim()) {
-            fragmentTexts.push(subText.trim());
-          }
-          currentUsedHeight = 0;
+        if ((currentPage.length > 0 || activePageUsed > 0) && activePageUsed + testHeight > usablePageHeight && subText.trim()) {
+          fragmentTexts.push(subText.trim());
+          activePageUsed = 0;
           subText = sentence;
-          subUsedHeight = estimateSegmentHeight({ ...seg, text: sentence }, { containerWidth, fontSize, lineHeight });
         } else if (testHeight > usablePageHeight && subText.trim()) {
           fragmentTexts.push(subText.trim());
-          currentUsedHeight = 0;
+          activePageUsed = 0;
           subText = sentence;
-          subUsedHeight = estimateSegmentHeight({ ...seg, text: sentence }, { containerWidth, fontSize, lineHeight });
         } else {
           subText = testSubText;
-          subUsedHeight = testHeight;
         }
       }
 
@@ -281,8 +300,12 @@ export function measureAndPaginateSegments(segments = [], options = {}) {
     const penPage = pages[pages.length - 2];
     if (lastPage.length === 1 && penPage.length >= 2) {
       const movedSeg = penPage[penPage.length - 1];
-      pages[pages.length - 2] = penPage.slice(0, -1);
-      pages[pages.length - 1] = [movedSeg, ...lastPage];
+      const movedH = estimateSegmentHeight(movedSeg, { containerWidth, fontSize, lineHeight });
+      const lastH = estimateSegmentHeight(lastPage[0], { containerWidth, fontSize, lineHeight });
+      if (movedH + lastH <= usablePageHeight) {
+        pages[pages.length - 2] = penPage.slice(0, -1);
+        pages[pages.length - 1] = [movedSeg, ...lastPage];
+      }
     }
   }
 

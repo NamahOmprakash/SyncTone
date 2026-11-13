@@ -71,8 +71,8 @@ function stripUnlimitedOcrTags(rawOcrText = '', figureUrls = []) {
  * Checks whether the Unlimited-OCR vLLM OpenAI-compatible server is reachable.
  */
 async function checkUnlimitedOcrAvailable(options = {}) {
-  const baseUrl = (options.baseUrl || config.unlimitedOcr?.baseUrl || 'http://localhost:8000/v1').replace(/\/+$/, '');
-  const model = options.model || config.unlimitedOcr?.model || 'baidu/Unlimited-OCR';
+  const baseUrl = (options.baseUrl || options.unlimitedOcrUrl || config.unlimitedOcr?.baseUrl || 'http://localhost:8000/v1').replace(/\/+$/, '');
+  const model = options.model || options.unlimitedOcrModel || config.unlimitedOcr?.model || 'baidu/Unlimited-OCR';
   const fetchImpl = options.fetchImpl || global.fetch;
 
   const controller = new AbortController();
@@ -97,8 +97,8 @@ async function checkUnlimitedOcrAvailable(options = {}) {
  * Transcribes a single page image buffer (`image/png` or `image/jpeg`) via Baidu Unlimited-OCR vLLM.
  */
 async function transcribePageWithUnlimitedOcr(imageBuffer, mimeType = 'image/png', options = {}) {
-  const baseUrl = (options.baseUrl || config.unlimitedOcr?.baseUrl || 'http://localhost:8000/v1').replace(/\/+$/, '');
-  const model = options.model || config.unlimitedOcr?.model || 'baidu/Unlimited-OCR';
+  const baseUrl = (options.baseUrl || options.unlimitedOcrUrl || config.unlimitedOcr?.baseUrl || 'http://localhost:8000/v1').replace(/\/+$/, '');
+  const model = options.model || options.unlimitedOcrModel || config.unlimitedOcr?.model || 'baidu/Unlimited-OCR';
   const timeoutMs = options.timeoutMs || config.unlimitedOcr?.timeoutMs || 120000;
   const fetchImpl = options.fetchImpl || global.fetch;
 
@@ -187,7 +187,8 @@ async function parseWithUnlimitedOcr(filePath, options = {}) {
     };
     const imgBuf = fs.readFileSync(filePath);
     const pageResult = await transcribePageWithUnlimitedOcr(imgBuf, mimeMap[ext] || 'image/png', options);
-    return {
+    const { enrichExtractedChaptersWithParser } = require('./index');
+    const extracted = {
       title: baseTitle,
       author: '',
       synopsis: pageResult.markdown.slice(0, 360),
@@ -198,18 +199,31 @@ async function parseWithUnlimitedOcr(filePath, options = {}) {
           chapter_number: 1,
           title: 'Chapter 1',
           text: pageResult.markdown,
+          raw_text: pageResult.markdown,
+          content_text: pageResult.markdown,
         },
       ],
     };
+    return await enrichExtractedChaptersWithParser(extracted, {
+      engine: 'unlimited-ocr',
+      model: status.model,
+      settings: options,
+    });
   }
 
-  // For PDFs/EPUBs, run local extractor first and enrich any image/scanned pages via Unlimited-OCR
+  // For PDFs/EPUBs, run local extractor first and enrich chapters via Unlimited-OCR
   if (typeof options.runLocalExtractor === 'function') {
     const localData = await options.runLocalExtractor(filePath);
-    return {
+    const { enrichExtractedChaptersWithParser } = require('./index');
+    const extracted = {
       ...localData,
       parser_engine: 'unlimited-ocr',
     };
+    return await enrichExtractedChaptersWithParser(extracted, {
+      engine: 'unlimited-ocr',
+      model: status.model,
+      settings: options,
+    });
   }
 
   throw new Error(`Unsupported file type '${ext}' for Unlimited-OCR parser.`);

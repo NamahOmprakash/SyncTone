@@ -136,7 +136,7 @@ class ParadeeSynthesizer:
 
     def synthesize(self, text: str, voice: str = "bm_fable", speed: float = 1.0) -> np.ndarray:
         cleaned = (text or "").strip()
-        if not cleaned:
+        if not cleaned or not re.search(r"[A-Za-z0-9]", cleaned):
             return np.zeros(int(self.sample_rate * 0.15), dtype=np.float32)
 
         voice_idx, is_british = self.resolve_voice_index(voice)

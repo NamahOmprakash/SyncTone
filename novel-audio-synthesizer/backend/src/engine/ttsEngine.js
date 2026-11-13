@@ -3,49 +3,203 @@ const path = require('path');
 const child_process = require('child_process');
 const crypto = require('crypto');
 const os = require('os');
+const { promisify } = require('util');
 const WebSocket = require('ws');
 const { config } = require('../config');
-const { VOICE_CATALOG } = require('./voiceProfiler');
+const {
+  VOICE_CATALOG,
+  KEYWORD_MAP,
+  SORTED_KEYWORDS,
+  matchesKeyword,
+  LEGACY_VOICE_ALIASES,
+} = require('./voiceProfiler');
 const {
   mapToParadeeVoice,
   resolveMixedVoiceForCharacter,
+  stableHash,
 } = require('./mixedVoiceRouter');
+const { ttsWorkerPool } = require('./ttsWorkerPool');
 
-const MAC_VOICE_MAP = {
-  'en-GB-RyanNeural': 'Daniel',
-  'en-GB-ArthurNeural': 'Grandpa (English (UK))',
-  'en-GB-SoniaNeural': 'Kate (Enhanced)',
-  'en-GB-LibbyNeural': 'Serena (Premium)',
-  'en-GB-ThomasNeural': 'Eddy (English (UK))',
-  'en-GB-AlfieNeural': 'Reed (English (UK))',
-  'en-GB-NoahNeural': 'Rocko (English (UK))',
-  'en-GB-OliverNeural': 'Flo (English (UK))',
-  bm_george: 'Daniel',
-  bm_daniel: 'Eddy (English (UK))',
-  bf_emma: 'Serena (Premium)',
-  am_adam: 'Daniel',
-  am_michael: 'Rocko (English (UK))',
-  am_george: 'Grandpa (English (UK))',
-  am_onyx: 'Rocko (English (UK))',
-  af_heart: 'Serena (Premium)',
-  af_bella: 'Flo (English (UK))',
-  af_nicole: 'Sandy (English (UK))',
-  af_sarah: 'Kate (Enhanced)',
-  af_sky: 'Shelley (English (UK))',
+const execFileAsync = promisify(child_process.execFile);
+
+const MAC_VOICE_CANDIDATES = {
+  'en-GB-RyanNeural': ['Daniel', 'Reed (English (UK))', 'Fred'],
+  'en-GB-ArthurNeural': ['Grandpa (English (UK))', 'Rocko (English (UK))', 'Fred', 'Daniel'],
+  'en-GB-SoniaNeural': ['Kate (Enhanced)', 'Shelley (English (UK))', 'Karen', 'Samantha'],
+  'en-GB-LibbyNeural': ['Serena (Premium)', 'Flo (English (UK))', 'Samantha', 'Moira'],
+  'en-GB-ThomasNeural': ['Eddy (English (UK))', 'Reed (English (UK))', 'Rishi', 'Daniel'],
+  'en-GB-AlfieNeural': ['Reed (English (UK))', 'Eddy (English (UK))', 'Rishi', 'Daniel'],
+  'en-GB-NoahNeural': ['Rocko (English (UK))', 'Fred', 'Eddy (English (UK))', 'Daniel'],
+  'en-GB-OliverNeural': ['Flo (English (UK))', 'Reed (English (UK))', 'Daniel'],
+  'en-US-RogerNeural': ['Rishi', 'Rocko (English (US))', 'Grandpa (English (UK))', 'Daniel'],
+  'en-IE-ConnorNeural': ['Reed (English (UK))', 'Rishi', 'Eddy (English (UK))', 'Daniel'],
+  'en-AU-WilliamMultilingualNeural': ['Fred', 'Eddy (English (UK))', 'Rocko (English (UK))', 'Daniel'],
+  'en-NZ-MitchellNeural': ['Rocko (English (UK))', 'Rishi', 'Fred', 'Daniel'],
+  'en-US-SteffanNeural': ['Grandpa (English (UK))', 'Rocko (English (UK))', 'Fred'],
+  'en-GB-MaisieNeural': ['Sandy (English (UK))', 'Flo (English (UK))', 'Tessa', 'Samantha'],
+  'en-IE-EmilyNeural': ['Moira', 'Shelley (English (UK))', 'Karen', 'Samantha'],
+  'en-CA-LiamNeural': ['Reed (English (US))', 'Reed (English (UK))', 'Rishi'],
+  'en-US-ChristopherNeural': ['Eddy (English (US))', 'Reed (English (US))', 'Daniel'],
+  'en-US-AndrewNeural': ['Rocko (English (US))', 'Rishi', 'Daniel'],
+  'en-US-EricNeural': ['Fred', 'Reed (English (US))', 'Daniel'],
+  'en-US-GuyNeural': ['Grandpa (English (US))', 'Eddy (English (US))', 'Daniel'],
+  'en-US-BrianNeural': ['Rishi', 'Eddy (English (US))', 'Daniel'],
+  'en-AU-NatashaNeural': ['Karen', 'Tessa', 'Samantha'],
+  'en-NZ-MollyNeural': ['Tessa', 'Karen', 'Moira'],
+  'en-CA-ClaraNeural': ['Tara', 'Samantha', 'Karen'],
+  'en-US-AriaNeural': ['Samantha', 'Flo (English (US))', 'Karen'],
+  'en-US-AvaNeural': ['Flo (English (US))', 'Samantha', 'Tessa'],
+  'en-US-EmmaNeural': ['Shelley (English (US))', 'Serena (Premium)', 'Samantha'],
+  'en-US-JennyNeural': ['Sandy (English (US))', 'Karen', 'Samantha'],
+  'en-US-MichelleNeural': ['Grandma (English (UK))', 'Shelley (English (UK))', 'Moira'],
+  bm_george: ['Grandpa (English (UK))', 'Reed (English (UK))', 'Fred', 'Daniel'],
+  bm_daniel: ['Eddy (English (UK))', 'Reed (English (UK))', 'Rishi', 'Daniel'],
+  bm_lewis: ['Rocko (English (UK))', 'Grandpa (English (UK))', 'Fred', 'Daniel'],
+  bf_emma: ['Serena (Premium)', 'Flo (English (UK))', 'Samantha', 'Karen'],
+  am_adam: ['Fred', 'Reed (English (US))', 'Rishi', 'Daniel'],
+  am_michael: ['Rocko (English (US))', 'Rocko (English (UK))', 'Eddy (English (US))', 'Daniel'],
+  am_george: ['Grandpa (English (US))', 'Grandpa (English (UK))', 'Fred', 'Daniel'],
+  am_onyx: ['Rishi', 'Rocko (English (UK))', 'Fred', 'Daniel'],
+  af_heart: ['Samantha', 'Serena (Premium)', 'Flo (English (UK))', 'Karen'],
+  af_bella: ['Flo (English (US))', 'Flo (English (UK))', 'Tessa', 'Samantha'],
+  af_nicole: ['Sandy (English (US))', 'Sandy (English (UK))', 'Karen', 'Tessa'],
+  af_sarah: ['Karen', 'Kate (Enhanced)', 'Shelley (English (UK))', 'Samantha'],
+  af_sky: ['Shelley (English (US))', 'Shelley (English (UK))', 'Tessa', 'Samantha'],
   // Paradee-8M voice IDs mapped for macOS fallback if needed
-  bm_fable: 'Daniel',
-  bf_isabella: 'Serena (Premium)',
-  am_puck: 'Reed (English (UK))',
+  bm_fable: ['Daniel', 'Reed (English (UK))', 'Fred'],
+  bf_isabella: ['Serena (Premium)', 'Shelley (English (UK))', 'Samantha', 'Karen'],
+  am_puck: ['Reed (English (UK))', 'Eddy (English (UK))', 'Rishi', 'Daniel'],
   // Machine Extra Voice Pool (5th+ cast slots & explicit selection)
-  mac_daniel: 'Daniel',
-  mac_serena: 'Serena (Premium)',
-  mac_reed: 'Reed (English (UK))',
-  mac_rocko: 'Rocko (English (UK))',
-  mac_shelley: 'Shelley (English (UK))',
-  mac_grandpa: 'Grandpa (English (UK))',
-  mac_flo: 'Flo (English (UK))',
-  mac_moira: 'Moira',
+  mac_daniel: ['Daniel', 'Reed (English (UK))'],
+  mac_serena: ['Serena (Premium)', 'Flo (English (UK))', 'Samantha'],
+  mac_reed: ['Reed (English (UK))', 'Reed (English (US))', 'Rishi'],
+  mac_rocko: ['Rocko (English (UK))', 'Rocko (English (US))', 'Fred'],
+  mac_shelley: ['Shelley (English (UK))', 'Shelley (English (US))', 'Karen'],
+  mac_grandpa: ['Grandpa (English (UK))', 'Fred', 'Rocko (English (UK))'],
+  mac_flo: ['Flo (English (UK))', 'Flo (English (US))', 'Samantha'],
+  mac_moira: ['Moira', 'Tessa', 'Karen'],
+  mac_rishi: ['Rishi', 'Reed (English (UK))', 'Fred'],
+  mac_karen: ['Karen', 'Samantha', 'Tessa'],
+  mac_tessa: ['Tessa', 'Karen', 'Moira'],
+  mac_samantha: ['Samantha', 'Karen', 'Flo (English (UK))'],
+  mac_fred: ['Fred', 'Rocko (English (UK))', 'Daniel'],
+  mac_eddy: ['Eddy (English (UK))', 'Reed (English (UK))', 'Daniel'],
+  mac_sandy: ['Sandy (English (UK))', 'Flo (English (UK))', 'Tessa'],
 };
+
+const MAC_CHARACTER_FALLBACK_POOL = [
+  'Reed (English (UK))',
+  'Flo (English (UK))',
+  'Rocko (English (UK))',
+  'Shelley (English (UK))',
+  'Grandpa (English (UK))',
+  'Eddy (English (UK))',
+  'Sandy (English (UK))',
+  'Moira',
+  'Karen',
+  'Samantha',
+  'Rishi',
+  'Tessa',
+  'Fred',
+];
+
+function discoverInstalledMacVoices() {
+  const exactVoices = new Set();
+  const lookupMap = new Map();
+  if (process.platform === 'darwin' && fs.existsSync('/usr/bin/say')) {
+    try {
+      const output = child_process.execFileSync('/usr/bin/say', ['-v', '?'], {
+        encoding: 'utf8',
+        timeout: 5000,
+      });
+      for (const line of String(output || '').split(/\r?\n/)) {
+        const match = line.match(/^(.+?)\s+([a-z]{2,3}(?:_[A-Za-z0-9]+)+)\s+#/);
+        if (!match) continue;
+        const fullName = match[1].trim();
+        const locale = match[2].trim();
+        exactVoices.add(fullName);
+        lookupMap.set(fullName.toLowerCase(), fullName);
+        const bareMatch = fullName.match(/^(.+?)\s+\(English\s+\([^)]+\)\)$/);
+        if (bareMatch) {
+          const bareLower = bareMatch[1].trim().toLowerCase();
+          if (!lookupMap.has(bareLower) || locale === 'en_GB') {
+            lookupMap.set(bareLower, fullName);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[TTSEngine] Failed to probe installed macOS voices: ${err.message}`);
+    }
+  }
+  return { exactVoices, lookupMap };
+}
+
+const { exactVoices: INSTALLED_MAC_VOICES, lookupMap: MAC_VOICE_LOOKUP } = discoverInstalledMacVoices();
+
+function pickFirstInstalledMacVoice(candidates = []) {
+  if (INSTALLED_MAC_VOICES.size === 0) {
+    return candidates[0] || 'Daniel';
+  }
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const hit = MAC_VOICE_LOOKUP.get(String(candidate).trim().toLowerCase());
+    if (hit) return hit;
+  }
+  return (
+    MAC_VOICE_LOOKUP.get('daniel') ||
+    MAC_VOICE_LOOKUP.get('samantha') ||
+    Array.from(INSTALLED_MAC_VOICES)[0] ||
+    'Daniel'
+  );
+}
+
+const MAC_VOICE_MAP = Object.fromEntries(
+  Object.entries(MAC_VOICE_CANDIDATES).map(([voiceKey, candidates]) => [
+    voiceKey,
+    pickFirstInstalledMacVoice(candidates),
+  ])
+);
+
+const INSTALLED_NON_NARRATOR_MAC_POOL = (() => {
+  const pool = MAC_CHARACTER_FALLBACK_POOL
+    .map((v) => (INSTALLED_MAC_VOICES.size > 0 ? MAC_VOICE_LOOKUP.get(v.toLowerCase()) : v))
+    .filter(Boolean);
+  return pool.length > 0 ? Array.from(new Set(pool)) : ['Reed (English (UK))', 'Samantha', 'Karen', 'Moira'];
+})();
+
+function resolveMacVoice(voiceId, mixContext = {}) {
+  const charId = String(
+    mixContext.characterId || mixContext.character_id || mixContext.speakerName || mixContext.speaker_name || ''
+  ).trim();
+  const isNarr = Boolean(
+    mixContext.isNarrator ||
+    mixContext.is_narrator ||
+    charId.toLowerCase() === 'narrator'
+  );
+  const rawVoice = String(voiceId || '').trim();
+  const aliasedVoice = LEGACY_VOICE_ALIASES[rawVoice] || rawVoice;
+
+  let resolved = null;
+  if (rawVoice && INSTALLED_MAC_VOICES.size > 0 && MAC_VOICE_LOOKUP.has(rawVoice.toLowerCase())) {
+    resolved = MAC_VOICE_LOOKUP.get(rawVoice.toLowerCase());
+  } else if (MAC_VOICE_CANDIDATES[rawVoice]) {
+    resolved = pickFirstInstalledMacVoice(MAC_VOICE_CANDIDATES[rawVoice]);
+  } else if (MAC_VOICE_CANDIDATES[aliasedVoice]) {
+    resolved = pickFirstInstalledMacVoice(MAC_VOICE_CANDIDATES[aliasedVoice]);
+  }
+
+  const narratorMacVoice = MAC_VOICE_MAP['en-GB-RyanNeural'] || pickFirstInstalledMacVoice(['Daniel']);
+  if (!isNarr && charId) {
+    const collidedWithNarrator =
+      !resolved ||
+      (resolved === narratorMacVoice && rawVoice !== 'mac_daniel' && !mixContext.explicitVoice);
+    if (collidedWithNarrator) {
+      return INSTALLED_NON_NARRATOR_MAC_POOL[stableHash(charId) % INSTALLED_NON_NARRATOR_MAC_POOL.length];
+    }
+  }
+
+  return resolved || narratorMacVoice;
+}
 
 const KOKORO_TO_EDGE_MAP = {
   af_heart: 'en-GB-SoniaNeural',
@@ -54,48 +208,114 @@ const KOKORO_TO_EDGE_MAP = {
   af_sky: 'en-GB-SoniaNeural',
   af_sarah: 'en-GB-SoniaNeural',
   am_adam: 'en-GB-ThomasNeural',
-  am_michael: 'en-GB-NoahNeural',
-  am_george: 'en-GB-ArthurNeural',
-  am_onyx: 'en-GB-RyanNeural',
+  am_michael: 'en-US-RogerNeural',
+  am_george: 'en-NZ-MitchellNeural',
+  am_onyx: 'en-US-RogerNeural',
   bm_george: 'en-GB-RyanNeural',
+  bm_lewis: 'en-NZ-MitchellNeural',
   bf_emma: 'en-GB-LibbyNeural',
-  bm_daniel: 'en-GB-AlfieNeural',
+  bm_daniel: 'en-IE-ConnorNeural',
   bm_fable: 'en-GB-RyanNeural',
   bf_isabella: 'en-GB-LibbyNeural',
   am_puck: 'en-GB-ThomasNeural',
   mac_daniel: 'en-GB-RyanNeural',
   mac_serena: 'en-GB-LibbyNeural',
-  mac_reed: 'en-GB-AlfieNeural',
-  mac_rocko: 'en-GB-NoahNeural',
+  mac_reed: 'en-IE-ConnorNeural',
+  mac_rocko: 'en-US-RogerNeural',
   mac_shelley: 'en-GB-SoniaNeural',
-  mac_grandpa: 'en-GB-ArthurNeural',
-  mac_flo: 'en-GB-SoniaNeural',
-  mac_moira: 'en-GB-LibbyNeural',
+  mac_grandpa: 'en-NZ-MitchellNeural',
+  mac_flo: 'en-GB-MaisieNeural',
+  mac_moira: 'en-IE-EmilyNeural',
 };
 
 const EDGE_TO_KOKORO_MAP = {
   'en-GB-RyanNeural': 'bm_george',
-  'en-GB-ArthurNeural': 'am_george',
+  'en-GB-ArthurNeural': 'bm_lewis',
   'en-GB-SoniaNeural': 'af_sarah',
   'en-GB-LibbyNeural': 'bf_emma',
   'en-GB-ThomasNeural': 'am_adam',
   'en-GB-AlfieNeural': 'bm_daniel',
   'en-GB-NoahNeural': 'am_michael',
-  'en-GB-OliverNeural': 'bm_daniel',
+  'en-GB-OliverNeural': 'bm_george',
+  'en-US-RogerNeural': 'am_adam',
+  'en-IE-ConnorNeural': 'bm_daniel',
+  'en-AU-WilliamMultilingualNeural': 'bm_george',
+  'en-NZ-MitchellNeural': 'bm_lewis',
+  'en-GB-MaisieNeural': 'bf_emma',
+  'en-IE-EmilyNeural': 'af_sarah',
 };
 
-const VALID_KOKORO_VOICES = new Set(Object.keys(KOKORO_TO_EDGE_MAP));
+// Full catalog of native English Kokoro v1.0 voices from voices-v1.0.bin
+const VALID_KOKORO_VOICES = new Set([
+  'af_alloy', 'af_aoede', 'af_bella', 'af_heart', 'af_jessica', 'af_kore', 'af_nicole', 'af_nova', 'af_river', 'af_sarah', 'af_sky',
+  'am_adam', 'am_echo', 'am_eric', 'am_fenrir', 'am_liam', 'am_michael', 'am_onyx', 'am_puck', 'am_santa',
+  'bf_alice', 'bf_emma', 'bf_isabella', 'bf_lily',
+  'bm_daniel', 'bm_fable', 'bm_george', 'bm_lewis',
+]);
 
-function resolveKokoroVoice(voiceId) {
+function resolveKokoroVoice(voiceId, mixContext = {}) {
+  const charId = String(mixContext.characterId || mixContext.character_id || '').trim();
+  const isNarr = Boolean(mixContext.isNarrator || mixContext.is_narrator || charId.toLowerCase() === 'narrator');
+
+  if (!mixContext.skipCatalogLookup) {
+    if (isNarr && VOICE_CATALOG.narrator?.fallback) {
+      const fb = VOICE_CATALOG.narrator.fallback;
+      return LEGACY_VOICE_ALIASES[fb] || fb;
+    }
+    if (charId) {
+      const charKey = charId.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      if (VOICE_CATALOG[charKey]?.fallback) {
+        const fb = VOICE_CATALOG[charKey].fallback;
+        return LEGACY_VOICE_ALIASES[fb] || fb;
+      }
+    }
+  }
+
   if (!voiceId) return 'bm_george';
-  if (VALID_KOKORO_VOICES.has(voiceId)) return voiceId;
+  if (voiceId === 'am_george') return 'bm_lewis'; // Fix missing am_george -> bm_lewis
+  const aliased = LEGACY_VOICE_ALIASES[voiceId] || voiceId;
+  if (VALID_KOKORO_VOICES.has(aliased)) return aliased;
+  if (EDGE_TO_KOKORO_MAP[aliased]) return EDGE_TO_KOKORO_MAP[aliased];
   if (EDGE_TO_KOKORO_MAP[voiceId]) return EDGE_TO_KOKORO_MAP[voiceId];
   for (const [key, entry] of Object.entries(VOICE_CATALOG)) {
-    if ((entry.primary === voiceId || key === voiceId) && entry.fallback && VALID_KOKORO_VOICES.has(entry.fallback)) {
-      return entry.fallback;
+    if ((entry.primary === aliased || key === aliased || entry.primary === voiceId || key === voiceId) && entry.fallback) {
+      const fb = entry.fallback === 'am_george' ? 'bm_lewis' : entry.fallback;
+      if (VALID_KOKORO_VOICES.has(fb)) return fb;
     }
   }
   return 'bm_george';
+}
+
+function convertPitchToHz(pitchStr) {
+  if (!pitchStr) return '+0Hz';
+  if (/^[+-]?\d+Hz$/i.test(pitchStr)) {
+    const num = parseInt(pitchStr, 10);
+    return `${num >= 0 ? '+' : ''}${num}Hz`;
+  }
+  const match = String(pitchStr).match(/^([+-]?\d+)(?:%|st)?$/i);
+  if (match) {
+    const val = parseInt(match[1], 10);
+    return `${val >= 0 ? '+' : ''}${val}Hz`;
+  }
+  return '+0Hz';
+}
+
+function trimExcessiveLeadingSilence(pcmBuffer, maxLeadingBytes = 800) {
+  if (!pcmBuffer || pcmBuffer.length <= maxLeadingBytes) return pcmBuffer;
+  let firstNonZero = -1;
+  for (let i = 0; i < pcmBuffer.length - 1; i += 2) {
+    const sample = pcmBuffer.readInt16LE(i);
+    if (Math.abs(sample) > 50) {
+      firstNonZero = i;
+      break;
+    }
+  }
+  if (firstNonZero > maxLeadingBytes) {
+    const trimAmount = firstNonZero - maxLeadingBytes;
+    const alignedTrim = trimAmount - (trimAmount % 2);
+    return pcmBuffer.subarray(alignedTrim);
+  }
+  return pcmBuffer;
 }
 
 const TRUSTED_CLIENT_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
@@ -130,6 +350,7 @@ class TTSEngine {
     this.paradeeModelPath = config.paradee?.onnxFile || path.resolve(config.paths.modelsDir, 'paradee/paradee_int8.onnx');
     this.paradeeConfigPath = config.paradee?.configFile || path.resolve(config.paths.modelsDir, 'paradee/config.json');
     this.paradeeWorkerScript = path.resolve(__dirname, '../scripts/paradeeWorker.py');
+    this.kokoroWorkerScript = path.resolve(__dirname, '../scripts/kokoroWorker.py');
   }
 
   async checkModelAvailable(options = {}) {
@@ -308,17 +529,10 @@ class TTSEngine {
     });
   }
 
+  // Non-blocking async Edge CLI execution
   async synthesizeWithEdgeCli(text, voiceId, options = {}) {
     const prosody = options.prosody || { pitch: '+0Hz', rate: '+0%' };
-    let edgePitch = '+0Hz';
-    if (prosody.pitch) {
-      if (/^[+-]\d+Hz$/i.test(prosody.pitch)) {
-        edgePitch = prosody.pitch;
-      } else {
-        const num = parseInt(prosody.pitch, 10);
-        edgePitch = isNaN(num) ? '+0Hz' : `${num >= 0 ? '+' : ''}${num}Hz`;
-      }
-    }
+    const edgePitch = convertPitchToHz(prosody.pitch);
     const tmpFile = path.join(os.tmpdir(), `edge_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.mp3`);
 
     const edgeBinCandidates = [
@@ -331,39 +545,28 @@ class TTSEngine {
 
     try {
       if (edgeBin) {
-        child_process.execFileSync(
+        await execFileAsync(
           edgeBin,
           [
-            '--text',
-            text,
-            '--voice',
-            voiceId,
-            '--rate',
-            prosody.rate || '+0%',
-            '--pitch',
-            edgePitch,
-            '--write-media',
-            tmpFile,
+            '--text', text,
+            '--voice', voiceId,
+            '--rate', prosody.rate || '+0%',
+            '--pitch', edgePitch,
+            '--write-media', tmpFile,
             '--no-progress',
           ],
           { timeout: 15000 }
         );
       } else {
-        child_process.execFileSync(
+        await execFileAsync(
           'python3',
           [
-            '-m',
-            'edge_tts',
-            '--text',
-            text,
-            '--voice',
-            voiceId,
-            '--rate',
-            prosody.rate || '+0%',
-            '--pitch',
-            edgePitch,
-            '--write-media',
-            tmpFile,
+            '-m', 'edge_tts',
+            '--text', text,
+            '--voice', voiceId,
+            '--rate', prosody.rate || '+0%',
+            '--pitch', edgePitch,
+            '--write-media', tmpFile,
             '--no-progress',
           ],
           { timeout: 15000 }
@@ -372,7 +575,7 @@ class TTSEngine {
 
       if (fs.existsSync(tmpFile)) {
         const buffer = fs.readFileSync(tmpFile);
-        fs.unlinkSync(tmpFile);
+        try { fs.unlinkSync(tmpFile); } catch (_) {}
         if (buffer.length === 0) {
           throw new Error('Edge TTS CLI output is empty');
         }
@@ -396,38 +599,74 @@ class TTSEngine {
 
   async synthesizeWithEdgeNode(text, voiceId, options = {}) {
     return new Promise(async (resolve, reject) => {
+      let settled = false;
+      let tts = null;
+      const timeout = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          try {
+            if (tts && typeof tts.close === 'function') {
+              tts.close();
+            }
+          } catch (_) {}
+          reject(new Error('Edge-TTS timed out after 8000ms'));
+        }
+      }, 8000);
+
+      const finishResolve = (val) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          resolve(val);
+        }
+      };
+
+      const finishReject = (err) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          try {
+            if (tts && typeof tts.close === 'function') {
+              tts.close();
+            }
+          } catch (_) {}
+          reject(err);
+        }
+      };
+
       try {
         const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
-        const tts = new MsEdgeTTS();
+        tts = new MsEdgeTTS();
         const pitchStr = options.prosody?.pitch || '+0Hz';
         const rateStr = options.prosody?.rate || '+0%';
         await tts.setMetadata(voiceId || 'en-GB-RyanNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+        if (settled) return;
         const streamResult = tts.toStream(text, {
           pitch: pitchStr,
           rate: rateStr,
         });
         const audioStream = streamResult?.audioStream || streamResult;
         if (!audioStream || typeof audioStream.on !== 'function') {
-          return reject(new Error('MsEdgeTTS toStream did not return a readable audioStream'));
+          return finishReject(new Error('MsEdgeTTS toStream did not return a readable audioStream'));
         }
         const chunks = [];
         audioStream.on('data', (chunk) => chunks.push(chunk));
         audioStream.on('end', () => {
           const buffer = Buffer.concat(chunks);
           if (buffer.length === 0) {
-            return reject(new Error('MsEdgeTTS returned empty audio stream'));
+            return finishReject(new Error('MsEdgeTTS returned empty audio stream'));
           }
           const durationMs = Math.round((buffer.length / this.bytesPerSec) * 1000);
-          resolve({
+          finishResolve({
             audio_buffer: buffer,
             duration_ms: durationMs,
             format: 'mp3',
             engine: 'msedge-tts',
           });
         });
-        audioStream.on('error', (err) => reject(err));
+        audioStream.on('error', (err) => finishReject(err));
       } catch (err) {
-        reject(err);
+        finishReject(err);
       }
     });
   }
@@ -446,7 +685,7 @@ class TTSEngine {
   }
 
   // --- ENGINE 2: Kokoro-TTS (Local ONNX / Acoustic Neural Fallback) ---
-  async synthesizeWithKokoro(text, voiceId, speed = 1.0) {
+  async synthesizeWithKokoro(text, voiceId, speed = 1.0, options = {}) {
     const trimmed = (text || '').trim();
     if (!trimmed) {
       return {
@@ -457,205 +696,91 @@ class TTSEngine {
       };
     }
 
-    const modelExists = fs.existsSync(this.modelPath) && fs.existsSync(this.voicesPath);
+    const kokoroVoice = resolveKokoroVoice(voiceId);
+    const lang = kokoroVoice.startsWith('b') ? 'en-gb' : 'en-us';
 
-    // If local ONNX weights exist, execute Kokoro ONNX model synthesis
-    if (modelExists) {
-      const tmpWavPath = path.join(
-        os.tmpdir(),
-        `kokoro_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.wav`
-      );
+    if (ttsWorkerPool.isKokoroAvailable()) {
       try {
-        const pythonBin = getPythonBin();
-        const kokoroVoice = resolveKokoroVoice(voiceId);
-        const lang = kokoroVoice.startsWith('b') ? 'en-gb' : 'en-us';
+        const poolRes = await ttsWorkerPool.synthesizeKokoro({
+          text: trimmed,
+          voice: kokoroVoice,
+          speed,
+          lang,
+        });
 
-        const pyScript = `
-import sys, os, shutil, re, numpy as np, soundfile as sf, espeakng_loader
-from kokoro_onnx import Kokoro, EspeakConfig
-
-model_path, voices_path, text, voice, speed_str, lang, out_wav = sys.argv[1:8]
-speed = float(speed_str)
-orig_dp = espeakng_loader.get_data_path()
-if len(orig_dp) > 130:
-    short_dp = "/tmp/espeak-ng-data"
-    if os.path.islink(short_dp):
-        os.unlink(short_dp)
-    if not os.path.exists(short_dp):
-        shutil.copytree(orig_dp, short_dp, symlinks=True)
-    orig_dp = short_dp
-
-kokoro = Kokoro(model_path, voices_path, espeak_config=EspeakConfig(data_path=orig_dp))
-
-# Split long text into sentence chunks to stay well under Kokoro's 510 phoneme window
-sentences = [s.strip() for s in re.split(r'(?<=[.!?])\\s+', text) if s.strip()]
-if not sentences:
-    sentences = [text]
-
-chunks = []
-curr = ""
-for s in sentences:
-    if len(curr) + len(s) + 1 <= 320:
-        curr = f"{curr} {s}".strip() if curr else s
-    else:
-        if curr:
-            chunks.append(curr)
-        curr = s[:320]
-if curr:
-    chunks.append(curr)
-
-all_samples = []
-sr = 24000
-for c in chunks:
-    samples, sr = kokoro.create(c, voice=voice, speed=speed, lang=lang)
-    if len(samples) > 0:
-        all_samples.append(samples)
-
-final_samples = np.concatenate(all_samples) if all_samples else np.zeros(int(sr * 0.2), dtype=np.float32)
-sf.write(out_wav, final_samples, sr, subtype="PCM_16")
-`;
-
-        child_process.execFileSync(
-          pythonBin,
-          [
-            '-c',
-            pyScript,
-            this.modelPath,
-            this.voicesPath,
-            trimmed,
-            kokoroVoice,
-            String(speed || 1.0),
-            lang,
-            tmpWavPath,
-          ],
-          { timeout: 25000 }
-        );
-
-        if (fs.existsSync(tmpWavPath)) {
-          const wavBuf = fs.readFileSync(tmpWavPath);
-          fs.unlinkSync(tmpWavPath);
-
-          let pcmBuffer;
-          const dataIdx = wavBuf.indexOf(Buffer.from('data'));
-          if (dataIdx !== -1 && dataIdx + 8 <= wavBuf.length) {
-            const dataLen = wavBuf.readUInt32LE(dataIdx + 4);
-            pcmBuffer =
-              dataLen > 0 && dataIdx + 8 + dataLen <= wavBuf.length
-                ? wavBuf.subarray(dataIdx + 8, dataIdx + 8 + dataLen)
-                : wavBuf.subarray(dataIdx + 8);
-          } else {
-            pcmBuffer = wavBuf.subarray(44);
-          }
-
+        if (poolRes && poolRes.audio_buffer && poolRes.audio_buffer.length > 0) {
+          const pcmBuffer = trimExcessiveLeadingSilence(poolRes.audio_buffer);
           const durationMs = Math.max(100, Math.round((pcmBuffer.length / 2 / this.sampleRate) * 1000));
           return {
             audio_buffer: pcmBuffer,
             duration_ms: durationMs,
             format: 'pcm',
             engine: 'kokoro-tts',
+            resolved_voice_id: kokoroVoice,
           };
         }
-      } catch (kokoroErr) {
-        if (fs.existsSync(tmpWavPath)) {
-          try {
-            fs.unlinkSync(tmpWavPath);
-          } catch (_) {}
+      } catch (err) {
+        if (options.failHonestly) {
+          throw err;
         }
-        console.warn(`[TTSEngine] Kokoro ONNX direct execution failed: ${kokoroErr.message}`);
+        console.warn(`[TTSEngine] Kokoro worker pool failed: ${err.message}`);
       }
     }
 
-    // When ONNX weights are not yet downloaded on disk:
-    // Modulated multi-formant / vocal-tract acoustic bridge via local neural speech
-    if (
-      fs.existsSync('/usr/bin/say') &&
-      process.env.NODE_ENV !== 'test' &&
-      !process.env.SYNCTONE_DISABLE_MACOS_SAY
-    ) {
-      const macVoice = MAC_VOICE_MAP[voiceId] || 'Daniel';
-      const tmpWavPath = path.join(
-        os.tmpdir(),
-        `kokoro_bridge_${Date.now()}_${Math.random().toString(36).slice(2, 9)}.wav`
-      );
-
-      try {
-        child_process.execFileSync(
-          '/usr/bin/say',
-          [
-            '-v',
-            macVoice,
-            '-r',
-            String(Math.round(180 * (speed || 1.0))),
-            '--data-format=LEI16@24000',
-            '-o',
-            tmpWavPath,
-            trimmed,
-          ],
-          { timeout: 15000 }
-        );
-
-        if (fs.existsSync(tmpWavPath)) {
-          const wavBuf = fs.readFileSync(tmpWavPath);
-          fs.unlinkSync(tmpWavPath);
-
-          let pcmBuffer;
-          const dataIdx = wavBuf.indexOf(Buffer.from('data'));
-          if (dataIdx !== -1 && dataIdx + 8 <= wavBuf.length) {
-            const dataLen = wavBuf.readUInt32LE(dataIdx + 4);
-            pcmBuffer =
-              dataLen > 0 && dataIdx + 8 + dataLen <= wavBuf.length
-                ? wavBuf.subarray(dataIdx + 8, dataIdx + 8 + dataLen)
-                : wavBuf.subarray(dataIdx + 8);
-          } else {
-            pcmBuffer = wavBuf.subarray(44);
-          }
-
-          const durationMs = Math.max(
-            100,
-            Math.round((pcmBuffer.length / 2 / this.sampleRate) * 1000)
-          );
-
-          return {
-            audio_buffer: pcmBuffer,
-            duration_ms: durationMs,
-            format: 'pcm',
-            engine: 'kokoro-tts',
-          };
-        }
-      } catch (bridgeErr) {
-        if (fs.existsSync(tmpWavPath)) {
-          try {
-            fs.unlinkSync(tmpWavPath);
-          } catch (_) {}
-        }
-        console.warn(`[TTSEngine] Kokoro acoustic bridge failed: ${bridgeErr.message}`);
-      }
+    if (options.failHonestly) {
+      throw new Error(`Kokoro-TTS model weights not available or synthesis failed for voice '${voiceId}'`);
     }
 
-    // In test mode or when local speech is unavailable: clean silent PCM buffer
-    const baseDurationSec = Math.max(0.6, trimmed.length / 15 / (speed || 1.0));
-    const sampleCount = Math.floor(this.sampleRate * baseDurationSec);
-    const silentBuffer = Buffer.alloc(sampleCount * 2);
+    // In test mode or when local speech is disabled: clean silent PCM buffer
+    if (process.env.NODE_ENV === 'test' || process.env.SYNCTONE_DISABLE_MACOS_SAY) {
+      const baseDurationSec = Math.max(0.6, trimmed.length / 15 / (speed || 1.0));
+      const sampleCount = Math.floor(this.sampleRate * baseDurationSec);
+      return {
+        audio_buffer: Buffer.alloc(sampleCount * 2),
+        duration_ms: Math.round(baseDurationSec * 1000),
+        format: 'pcm',
+        engine: 'kokoro-tts',
+        resolved_voice_id: kokoroVoice,
+      };
+    }
 
+    // When NOT in failHonestly mode, fall back to Machine TTS returning true engine name
+    const machineRes = await this.synthesizeWithMachine(trimmed, voiceId, speed);
     return {
-      audio_buffer: silentBuffer,
-      duration_ms: Math.round(baseDurationSec * 1000),
-      format: 'pcm',
-      engine: 'kokoro-tts',
+      ...machineRes,
+      engine: 'machine-tts',
+      resolved_voice_id: kokoroVoice,
     };
   }
 
-  // --- ENGINE 3: Machine / Local OS Speech Synthesis ---
-  async synthesizeWithMachine(text, voiceId, speed = 1.0) {
+  // --- ENGINE 3: Machine / Local OS Speech Synthesis (Async non-blocking) ---
+  async synthesizeWithMachine(text, voiceId, speed = 1.0, mixContext = {}) {
     const trimmed = (text || '').trim();
+    const macVoice = resolveMacVoice(voiceId, mixContext);
     if (!trimmed) {
       return {
         audio_buffer: Buffer.alloc(0),
         duration_ms: 0,
         format: 'pcm',
         engine: 'machine-tts',
+        resolved_voice_id: macVoice,
       };
     }
+
+    const charId = String(
+      mixContext.characterId || mixContext.character_id || mixContext.speakerName || mixContext.speaker_name || ''
+    ).trim();
+    const isNarr = Boolean(
+      mixContext.isNarrator ||
+      mixContext.is_narrator ||
+      charId.toLowerCase() === 'narrator'
+    );
+    let baseWpm = 185;
+    if (charId && !isNarr && !mixContext.skipCharacterRateJitter) {
+      const wpmSteps = [164, 172, 180, 192, 200, 210];
+      baseWpm = wpmSteps[stableHash(`${charId}:mac_rate`) % wpmSteps.length];
+    }
+    const targetWpm = Math.max(140, Math.min(240, Math.round(baseWpm * (speed || 1.0))));
 
     // In test mode, return clean silent PCM buffer
     if (process.env.NODE_ENV === 'test' || process.env.SYNCTONE_DISABLE_MACOS_SAY) {
@@ -666,25 +791,25 @@ sf.write(out_wav, final_samples, sr, subtype="PCM_16")
         duration_ms: Math.round(baseDurationSec * 1000),
         format: 'pcm',
         engine: 'machine-tts',
+        resolved_voice_id: macVoice,
       };
     }
 
-    // On macOS, execute /usr/bin/say with MAC_VOICE_MAP
+    // On macOS, execute /usr/bin/say asynchronously using verified installed voices
     if (fs.existsSync('/usr/bin/say')) {
-      const macVoice = MAC_VOICE_MAP[voiceId] || 'Daniel';
       const tmpWavPath = path.join(
         os.tmpdir(),
         `say_${Date.now()}_${Math.random().toString(36).slice(2, 9)}.wav`
       );
 
       try {
-        child_process.execFileSync(
+        await execFileAsync(
           '/usr/bin/say',
           [
             '-v',
             macVoice,
             '-r',
-            String(Math.round(185 * (speed || 1.0))),
+            String(targetWpm),
             '--data-format=LEI16@24000',
             '-o',
             tmpWavPath,
@@ -695,7 +820,7 @@ sf.write(out_wav, final_samples, sr, subtype="PCM_16")
 
         if (fs.existsSync(tmpWavPath)) {
           const wavBuf = fs.readFileSync(tmpWavPath);
-          fs.unlinkSync(tmpWavPath);
+          try { fs.unlinkSync(tmpWavPath); } catch (_) {}
 
           let pcmBuffer;
           const dataIdx = wavBuf.indexOf(Buffer.from('data'));
@@ -708,6 +833,7 @@ sf.write(out_wav, final_samples, sr, subtype="PCM_16")
           } else {
             pcmBuffer = wavBuf.subarray(44);
           }
+          pcmBuffer = trimExcessiveLeadingSilence(pcmBuffer);
 
           const durationMs = Math.max(
             100,
@@ -719,6 +845,7 @@ sf.write(out_wav, final_samples, sr, subtype="PCM_16")
             duration_ms: durationMs,
             format: 'pcm',
             engine: 'machine-tts',
+            resolved_voice_id: macVoice,
           };
         }
       } catch (sayErr) {
@@ -739,13 +866,26 @@ sf.write(out_wav, final_samples, sr, subtype="PCM_16")
       duration_ms: Math.round(baseDurationSec * 1000),
       format: 'pcm',
       engine: 'machine-tts',
+      resolved_voice_id: macVoice,
     };
   }
 
-  // --- ENGINE 4: Paradee-8M-v1.2 (Local Micro 8.5MB Int8 ONNX) ---
-  async synthesizeWithParadee(text, voiceId, speed = 1.0) {
+  // --- ENGINE 4: Paradee-8M-v1.2 (Local Micro 8.5MB Int8 ONNX via Worker Pool) ---
+  async synthesizeWithParadee(text, voiceId, speed = 1.0, mixContext = {}) {
     const trimmed = (text || '').trim();
-    const paradeeVoice = mapToParadeeVoice(voiceId);
+    const charId = String(
+      mixContext.characterId || mixContext.character_id || mixContext.speakerName || mixContext.speaker_name || ''
+    ).trim();
+    const isNarr = Boolean(
+      mixContext.isNarrator ||
+      mixContext.is_narrator ||
+      charId.toLowerCase() === 'narrator'
+    );
+    const paradeeVoice = mapToParadeeVoice(voiceId, {
+      isNarrator: isNarr,
+      gender: mixContext.gender || '',
+      accent: mixContext.accent || '',
+    });
     if (!trimmed) {
       return {
         audio_buffer: Buffer.alloc(0),
@@ -756,54 +896,24 @@ sf.write(out_wav, final_samples, sr, subtype="PCM_16")
       };
     }
 
-    const paradeeExists =
-      fs.existsSync(this.paradeeModelPath) &&
-      fs.existsSync(this.paradeeConfigPath) &&
-      fs.existsSync(this.paradeeWorkerScript);
+    // Deterministic per-character speed variation (skip when caller already applied cast-slot jitter)
+    let rateMultiplier = 1.0;
+    if (charId && !isNarr && !mixContext.skipCharacterRateJitter) {
+      const rateSteps = [0.91, 0.95, 1.04, 1.08, 0.88, 1.12];
+      rateMultiplier = rateSteps[stableHash(charId) % rateSteps.length];
+    }
+    const effectiveSpeed = Number(((speed || 1.0) * rateMultiplier).toFixed(2));
 
-    if (paradeeExists && !process.env.SYNCTONE_DISABLE_PARADEE_ONNX) {
-      const tmpWavPath = path.join(
-        os.tmpdir(),
-        `paradee_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.wav`
-      );
+    if (ttsWorkerPool.isParadeeAvailable() && !process.env.SYNCTONE_DISABLE_PARADEE_ONNX) {
       try {
-        const pythonBin = getPythonBin();
-        child_process.execFileSync(
-          pythonBin,
-          [
-            this.paradeeWorkerScript,
-            '--model',
-            this.paradeeModelPath,
-            '--config',
-            this.paradeeConfigPath,
-            '--text',
-            trimmed,
-            '--voice',
-            paradeeVoice,
-            '--speed',
-            String(speed || 1.0),
-            '--out',
-            tmpWavPath,
-          ],
-          { timeout: 25000 }
-        );
+        const poolRes = await ttsWorkerPool.synthesizeParadee({
+          text: trimmed,
+          voice: paradeeVoice,
+          speed: effectiveSpeed,
+        });
 
-        if (fs.existsSync(tmpWavPath)) {
-          const wavBuf = fs.readFileSync(tmpWavPath);
-          fs.unlinkSync(tmpWavPath);
-
-          let pcmBuffer;
-          const dataIdx = wavBuf.indexOf(Buffer.from('data'));
-          if (dataIdx !== -1 && dataIdx + 8 <= wavBuf.length) {
-            const dataLen = wavBuf.readUInt32LE(dataIdx + 4);
-            pcmBuffer =
-              dataLen > 0 && dataIdx + 8 + dataLen <= wavBuf.length
-                ? wavBuf.subarray(dataIdx + 8, dataIdx + 8 + dataLen)
-                : wavBuf.subarray(dataIdx + 8);
-          } else {
-            pcmBuffer = wavBuf.subarray(44);
-          }
-
+        if (poolRes && poolRes.audio_buffer && poolRes.audio_buffer.length > 0) {
+          const pcmBuffer = trimExcessiveLeadingSilence(poolRes.audio_buffer);
           const durationMs = Math.max(
             100,
             Math.round((pcmBuffer.length / 2 / this.sampleRate) * 1000)
@@ -816,18 +926,19 @@ sf.write(out_wav, final_samples, sr, subtype="PCM_16")
             resolved_voice_id: paradeeVoice,
           };
         }
-      } catch (paradeeErr) {
-        if (fs.existsSync(tmpWavPath)) {
-          try {
-            fs.unlinkSync(tmpWavPath);
-          } catch (_) {}
-        }
-        console.warn(`[TTSEngine] Paradee-8M ONNX synthesis failed: ${paradeeErr.message}`);
+      } catch (err) {
+        console.warn(`[TTSEngine] Paradee worker pool failed: ${err.message}`);
       }
     }
 
-    // Fallback when Paradee ONNX is unavailable: delegate to Machine TTS or silent test buffer
-    const fallbackRes = await this.synthesizeWithMachine(trimmed, paradeeVoice, speed);
+    // Fallback when Paradee ONNX is unavailable: fail honestly if requested, else delegate to Machine TTS
+    if (mixContext.failHonestly) {
+      throw new Error(`Paradee-TTS model weights not available or synthesis failed for voice '${voiceId}'`);
+    }
+    const fallbackRes = await this.synthesizeWithMachine(trimmed, paradeeVoice, effectiveSpeed, {
+      ...mixContext,
+      skipCharacterRateJitter: true,
+    });
     return {
       ...fallbackRes,
       engine: 'paradee-tts',
@@ -859,18 +970,20 @@ sf.write(out_wav, final_samples, sr, subtype="PCM_16")
     });
 
     const effectiveSpeed = Number(((speed || 1.0) * (resolved.rateMultiplier || 1.0)).toFixed(2));
+    const singleJitterContext = { ...mixContext, skipCharacterRateJitter: true };
 
     if (resolved.engine === 'machine-tts') {
-      const macRes = await this.synthesizeWithMachine(trimmed, resolved.voiceId, effectiveSpeed);
+      const macRes = await this.synthesizeWithMachine(trimmed, resolved.voiceId, effectiveSpeed, singleJitterContext);
       return {
         ...macRes,
         engine: 'paradee-mixed',
         sub_engine: 'machine-tts',
         resolved_voice_id: resolved.voiceId,
+        mac_voice: macRes.resolved_voice_id,
       };
     }
 
-    const paradeeRes = await this.synthesizeWithParadee(trimmed, resolved.voiceId, effectiveSpeed);
+    const paradeeRes = await this.synthesizeWithParadee(trimmed, resolved.voiceId, effectiveSpeed, singleJitterContext);
     return {
       ...paradeeRes,
       engine: 'paradee-mixed',
@@ -891,66 +1004,194 @@ sf.write(out_wav, final_samples, sr, subtype="PCM_16")
       };
     }
 
-    const engineChoice = (preferredEngine || 'auto').toLowerCase();
+    if (!/[a-zA-Z0-9]/.test(trimmed)) {
+      const sampleCount = Math.floor(this.sampleRate * 0.2);
+      return {
+        audio_buffer: Buffer.alloc(sampleCount * 2),
+        duration_ms: 200,
+        format: 'pcm',
+        engine: preferredEngine === 'auto' ? 'msedge-tts' : preferredEngine,
+      };
+    }
 
-    // 1. Explicit Machine TTS (Untouched standalone engine)
+    const engineChoice = (preferredEngine || 'auto').toLowerCase();
+    const KNOWN_ENGINES = new Set(['msedge-tts', 'kokoro-tts', 'paradee-tts', 'paradee-mixed', 'machine-tts', 'auto']);
+    if (!KNOWN_ENGINES.has(engineChoice)) {
+      throw new Error(`Unsupported TTS engine '${preferredEngine}'`);
+    }
+
+    // Resolve character / speaker identity from mixContext
+    const charId = String(mixContext.characterId || mixContext.character_id || '').trim();
+    const speakerName = String(mixContext.speakerName || mixContext.speaker_name || '').trim();
+    const identityKey = (charId || speakerName).trim();
+    const isNarrator = Boolean(
+      mixContext.isNarrator ||
+      mixContext.is_narrator ||
+      charId.toLowerCase() === 'narrator' ||
+      speakerName.toLowerCase() === 'narrator'
+    );
+
+    const rawVoiceId = String(voiceId || '').trim();
+    const deadVoiceFallbacks = {
+      'en-GB-ArthurNeural': 'en-US-RogerNeural',
+      'en-GB-NoahNeural': 'en-AU-WilliamMultilingualNeural',
+    };
+    const aliasedVoiceId = LEGACY_VOICE_ALIASES[rawVoiceId] || deadVoiceFallbacks[rawVoiceId] || rawVoiceId;
+    const requestedEdgeVoice = KOKORO_TO_EDGE_MAP[rawVoiceId] || KOKORO_TO_EDGE_MAP[aliasedVoiceId] || aliasedVoiceId;
+    const narratorDefaultEdge = VOICE_CATALOG.narrator?.primary || 'en-GB-RyanNeural';
+    const hasExplicitVoiceOverride = Boolean(
+      !isNarrator &&
+      (mixContext.explicitVoice || (rawVoiceId && requestedEdgeVoice !== narratorDefaultEdge && rawVoiceId !== 'narrator'))
+    );
+
+    // 1. Match catalog entry by character/speaker first
+    let charCatalogEntry = null;
+    if (isNarrator) {
+      charCatalogEntry = VOICE_CATALOG.narrator;
+    } else if (charId) {
+      const charKey = charId.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      if (VOICE_CATALOG[charKey]) {
+        charCatalogEntry = VOICE_CATALOG[charKey];
+      }
+    }
+
+    if (!charCatalogEntry && !isNarrator && (charId || speakerName)) {
+      const searchStr = `${charId} ${speakerName}`.toLowerCase().trim();
+      for (const [kw, archetype] of SORTED_KEYWORDS) {
+        if (matchesKeyword(searchStr, kw)) {
+          if (VOICE_CATALOG[archetype]) {
+            charCatalogEntry = VOICE_CATALOG[archetype];
+            break;
+          }
+        }
+      }
+    }
+
+    // Decide whether the catalog entry governs voice selection or caller explicitly overrode voiceId
+    let catalogEntry = null;
+    let useCatalogVoice = false;
+    if (isNarrator) {
+      catalogEntry = VOICE_CATALOG.narrator;
+      useCatalogVoice = !mixContext.explicitVoice || !rawVoiceId;
+    } else if (charCatalogEntry) {
+      const catEdge = LEGACY_VOICE_ALIASES[charCatalogEntry.primary] || charCatalogEntry.primary;
+      const catFallback = charCatalogEntry.fallback
+        ? (LEGACY_VOICE_ALIASES[charCatalogEntry.fallback] || charCatalogEntry.fallback)
+        : '';
+      const matchesCatalogVoice =
+        !hasExplicitVoiceOverride ||
+        requestedEdgeVoice === catEdge ||
+        aliasedVoiceId === catFallback ||
+        rawVoiceId === charCatalogEntry.primary;
+
+      if (matchesCatalogVoice) {
+        catalogEntry = charCatalogEntry;
+        useCatalogVoice = true;
+      }
+    } else if (!identityKey && aliasedVoiceId) {
+      // Only match VOICE_CATALOG by voiceId when unambiguous (avoids collapsing shared RyanNeural/SoniaNeural presets)
+      if (VOICE_CATALOG[aliasedVoiceId]) {
+        catalogEntry = VOICE_CATALOG[aliasedVoiceId];
+        useCatalogVoice = true;
+      } else {
+        const matchingEntries = Object.values(VOICE_CATALOG).filter(
+          (entry) => (LEGACY_VOICE_ALIASES[entry.primary] || entry.primary) === requestedEdgeVoice
+        );
+        if (matchingEntries.length === 1) {
+          catalogEntry = matchingEntries[0];
+          useCatalogVoice = true;
+        }
+      }
+    }
+
+    let prosody = catalogEntry?.prosody ? { ...catalogEntry.prosody } : { rate: '+0%', pitch: '+0%' };
+    let baseRatePct = parseInt(prosody.rate, 10) || 0;
+    let basePitchNum = parseInt(prosody.pitch, 10) || 0;
+
+    let edgeVoice =
+      useCatalogVoice && catalogEntry?.primary
+        ? (LEGACY_VOICE_ALIASES[catalogEntry.primary] || catalogEntry.primary)
+        : (requestedEdgeVoice || narratorDefaultEdge);
+
+    // Deterministic per-character prosody differentiation so non-narrator characters sharing
+    // a base Edge voice (or lacking distinct catalog prosody) stay acoustically & byte-distinct
+    if (!isNarrator && identityKey && (!useCatalogVoice || (baseRatePct === 0 && basePitchNum === 0))) {
+      const PITCH_OFFSETS_HZ = [-8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8];
+      const RATE_OFFSETS_PCT = [-6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6];
+      const digest = crypto.createHash('md5').update(identityKey.toLowerCase()).digest();
+      const pitchOffset = PITCH_OFFSETS_HZ[digest.readUInt32BE(0) % PITCH_OFFSETS_HZ.length];
+      const rateOffset = RATE_OFFSETS_PCT[digest.readUInt32BE(4) % RATE_OFFSETS_PCT.length];
+      baseRatePct += rateOffset;
+      basePitchNum += pitchOffset;
+      prosody = {
+        rate: `${baseRatePct >= 0 ? '+' : ''}${baseRatePct}%`,
+        pitch: `${basePitchNum >= 0 ? '+' : ''}${basePitchNum}Hz`,
+      };
+    }
+
+    let effectiveSpeed = speed || 1.0;
+    if (baseRatePct !== 0) {
+      effectiveSpeed = Number((effectiveSpeed * (1 + baseRatePct / 100)).toFixed(2));
+    }
+
+    // 1. Explicit Machine TTS
     if (engineChoice === 'machine-tts') {
-      return await this.synthesizeWithMachine(trimmed, voiceId, speed);
+      return await this.synthesizeWithMachine(trimmed, useCatalogVoice ? edgeVoice : voiceId, effectiveSpeed, mixContext);
     }
 
     // 2. Explicit Paradee-8M + Machine Mixed Mode
     if (engineChoice === 'paradee-mixed') {
-      return await this.synthesizeWithParadeeMixed(trimmed, voiceId, speed, mixContext);
+      return await this.synthesizeWithParadeeMixed(trimmed, voiceId, effectiveSpeed, mixContext);
     }
 
     // 3. Explicit Paradee-8M Neural TTS
     if (engineChoice === 'paradee-tts') {
-      return await this.synthesizeWithParadee(trimmed, voiceId, speed);
+      return await this.synthesizeWithParadee(trimmed, voiceId, effectiveSpeed, mixContext);
     }
 
-    // 4. Explicit Kokoro TTS
+    // 4. Explicit Kokoro TTS - fails honestly, no silent fallback to macOS say
     if (engineChoice === 'kokoro-tts') {
-      try {
-        return await this.synthesizeWithKokoro(trimmed, voiceId, speed);
-      } catch (err) {
-        console.warn(`[TTSEngine] Kokoro engine failed (${err.message}). Falling back to Machine TTS.`);
-        return await this.synthesizeWithMachine(trimmed, voiceId, speed);
-      }
+      const kokoroVoice =
+        useCatalogVoice && catalogEntry?.fallback
+          ? (LEGACY_VOICE_ALIASES[catalogEntry.fallback] || catalogEntry.fallback)
+          : resolveKokoroVoice(voiceId, { ...mixContext, skipCatalogLookup: !useCatalogVoice });
+      return await this.synthesizeWithKokoro(trimmed, kokoroVoice, effectiveSpeed, { failHonestly: true });
     }
 
-    // 3. 'msedge-tts' or 'auto' (Chain: msedge-tts -> kokoro-tts -> machine-tts)
-    let edgeVoice = KOKORO_TO_EDGE_MAP[voiceId] || voiceId;
-    let prosody = { rate: '+0%', pitch: '+0%' };
-
-    for (const [key, entry] of Object.entries(VOICE_CATALOG)) {
-      if (entry.primary === voiceId || key === voiceId) {
-        edgeVoice = entry.primary;
-        prosody = entry.prosody ? { ...entry.prosody } : { rate: '+0%', pitch: '+0%' };
-        break;
-      }
-    }
-
+    // 5. 'msedge-tts' or 'auto' (Fallback Chain: msedge-tts -> kokoro-tts -> paradee-tts -> machine-tts)
     if (speed && speed !== 1.0) {
-      const ratePct = Math.round((speed - 1.0) * 100);
-      prosody.rate = `${ratePct >= 0 ? '+' : ''}${ratePct}%`;
+      const speedPct = Math.round((speed - 1.0) * 100);
+      const totalRate = baseRatePct + speedPct;
+      prosody.rate = `${totalRate >= 0 ? '+' : ''}${totalRate}%`;
     }
 
-    // Try Primary Engine (Microsoft Edge Neural TTS)
     try {
       return await this.synthesizeWithEdge(trimmed, edgeVoice, { prosody });
     } catch (edgeErr) {
       console.warn(
-        `[TTSEngine] Primary Edge TTS failed for voice '${edgeVoice}' (${edgeErr.message}). Activating Kokoro-TTS fallback.`
+        `[TTSEngine] Edge TTS failed for voice '${edgeVoice}' (${edgeErr.message}). Activating Kokoro-TTS fallback.`
       );
-      // Fall back to Kokoro-TTS
       try {
-        return await this.synthesizeWithKokoro(trimmed, voiceId, speed);
+        const fallbackKokoroVoice =
+          useCatalogVoice && catalogEntry?.fallback
+            ? (LEGACY_VOICE_ALIASES[catalogEntry.fallback] || catalogEntry.fallback)
+            : resolveKokoroVoice(voiceId, { ...mixContext, skipCatalogLookup: !useCatalogVoice });
+        return await this.synthesizeWithKokoro(trimmed, fallbackKokoroVoice, effectiveSpeed, { failHonestly: true });
       } catch (kokoroErr) {
         console.warn(
-          `[TTSEngine] Kokoro-TTS failed (${kokoroErr.message}). Activating Machine-TTS fallback.`
+          `[TTSEngine] Kokoro-TTS failed (${kokoroErr.message}). Activating Paradee-TTS fallback.`
         );
-        // Fall back to Machine-TTS
-        return await this.synthesizeWithMachine(trimmed, voiceId, speed);
+        try {
+          return await this.synthesizeWithParadee(trimmed, voiceId, effectiveSpeed, {
+            ...mixContext,
+            failHonestly: true,
+          });
+        } catch (paradeeErr) {
+          console.warn(
+            `[TTSEngine] Paradee-TTS failed (${paradeeErr.message}). Activating Machine-TTS fallback.`
+          );
+          return await this.synthesizeWithMachine(trimmed, edgeVoice || voiceId, effectiveSpeed, mixContext);
+        }
       }
     }
   }
@@ -966,4 +1207,13 @@ const ttsEngine = new TTSEngine();
 module.exports = {
   ttsEngine,
   TTSEngine,
+  convertPitchToHz,
+  resolveKokoroVoice,
+  resolveMacVoice,
+  VALID_KOKORO_VOICES,
+  MAC_VOICE_MAP,
+  MAC_VOICE_CANDIDATES,
+  INSTALLED_MAC_VOICES,
+  KOKORO_TO_EDGE_MAP,
+  EDGE_TO_KOKORO_MAP,
 };

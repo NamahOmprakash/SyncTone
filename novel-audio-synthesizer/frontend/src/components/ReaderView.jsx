@@ -38,11 +38,15 @@ export default function ReaderView({
   onNextChapter,
   useTtsSanitizer: propUseTtsSanitizer,
   onToggleTtsSanitizer: propOnToggleTtsSanitizer,
+  isFollowingAlong: propIsFollowingAlong,
+  onToggleFollowAlong,
 }) {
   const { fontFamily, setFontFamily, fontSize, increaseFontSize, decreaseFontSize } = useTheme();
   const activeElementRef = useRef(null);
   const prevActiveIdRef = useRef(-1);
   const isAutoScrollingRef = useRef(false);
+  const autoScrollTimerRef = useRef(null);
+  const isScrolledAwayRef = useRef(false);
 
   const currentChapterIdx = React.useMemo(() => {
     if (!chapters || !currentChapter) return -1;
@@ -66,6 +70,10 @@ export default function ReaderView({
   const [showExperiencePopup, setShowExperiencePopup] = useState(false);
 
   const [isScrolledAway, setIsScrolledAway] = useState(false);
+  const setScrolledAway = useCallback((val) => {
+    isScrolledAwayRef.current = val;
+    setIsScrolledAway(val);
+  }, []);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isTabVisible, setIsTabVisible] = useState(
     typeof document !== 'undefined' ? !document.hidden : true
@@ -87,7 +95,9 @@ export default function ReaderView({
   );
 
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isFollowingAlong, setIsFollowingAlong] = useState(true);
+  const [localIsFollowingAlong, setLocalIsFollowingAlong] = useState(true);
+  const isFollowingAlong =
+    propIsFollowingAlong !== undefined ? propIsFollowingAlong : localIsFollowingAlong;
   const [scrollProgress, setScrollProgress] = useState(0);
 
   // Track active segment index for page counter
@@ -149,10 +159,11 @@ export default function ReaderView({
       if (window.scrollY <= 50 && prevChapter && onSelectChapter) {
         onSelectChapter(prevChapter.id);
       } else {
+        setScrolledAway(true);
         window.scrollBy({ top: -window.innerHeight * 0.75, behavior: 'smooth' });
       }
     }
-  }, [prevChapter, onSelectChapter]);
+  }, [prevChapter, onSelectChapter, setScrolledAway]);
 
   const handleGutterNext = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -162,10 +173,11 @@ export default function ReaderView({
         if (onSelectChapter) onSelectChapter(nextChapter.id);
         else if (onNextChapter) onNextChapter();
       } else {
+        setScrolledAway(true);
         window.scrollBy({ top: window.innerHeight * 0.75, behavior: 'smooth' });
       }
     }
-  }, [nextChapter, onSelectChapter, onNextChapter]);
+  }, [nextChapter, onSelectChapter, onNextChapter, setScrolledAway]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -212,6 +224,21 @@ export default function ReaderView({
     return () => document.removeEventListener('visibilitychange', handleVisChange);
   }, []);
 
+  // Reset scroll tracking when switching chapters
+  useEffect(() => {
+    setScrolledAway(false);
+    prevActiveIdRef.current = -1;
+  }, [currentChapter?.id, setScrolledAway]);
+
+  useEffect(() => {
+    return () => {
+      if (autoScrollTimerRef.current) {
+        clearTimeout(autoScrollTimerRef.current);
+        autoScrollTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // Auto-scroll to active element only when activeSegmentId actually changes
   useEffect(() => {
     if (readerMode !== 'normal') return;
@@ -219,18 +246,24 @@ export default function ReaderView({
     if (activeSegmentId !== -1 && activeSegmentId !== prevActiveIdRef.current) {
       prevActiveIdRef.current = activeSegmentId;
 
-      if (!isScrolledAway && typeof activeElementRef.current?.scrollIntoView === 'function') {
+      if (
+        isFollowingAlong &&
+        !isScrolledAwayRef.current &&
+        typeof activeElementRef.current?.scrollIntoView === 'function'
+      ) {
         isAutoScrollingRef.current = true;
         activeElementRef.current.scrollIntoView({
           behavior: 'smooth',
           block: 'center',
         });
-        setTimeout(() => {
+        if (autoScrollTimerRef.current) clearTimeout(autoScrollTimerRef.current);
+        autoScrollTimerRef.current = setTimeout(() => {
           isAutoScrollingRef.current = false;
-        }, 500);
+          autoScrollTimerRef.current = null;
+        }, 900);
       }
     }
-  }, [activeSegmentId, isScrolledAway, readerMode]);
+  }, [activeSegmentId, readerMode, isFollowingAlong]);
 
   // Track user manual scrolling in Normal mode
   useEffect(() => {
@@ -242,22 +275,47 @@ export default function ReaderView({
 
       const rect = activeElementRef.current.getBoundingClientRect();
       const inViewport = rect.top >= 0 && rect.bottom <= window.innerHeight;
-      setIsScrolledAway(!inViewport);
+      setScrolledAway(!inViewport);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [readerMode]);
+  }, [readerMode, setScrolledAway]);
 
   const handleReturnToNow = useCallback(() => {
-    setIsScrolledAway(false);
+    setScrolledAway(false);
     if (typeof activeElementRef.current?.scrollIntoView === 'function') {
+      isAutoScrollingRef.current = true;
       activeElementRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
       });
+      if (autoScrollTimerRef.current) clearTimeout(autoScrollTimerRef.current);
+      autoScrollTimerRef.current = setTimeout(() => {
+        isAutoScrollingRef.current = false;
+        autoScrollTimerRef.current = null;
+      }, 900);
     }
-  }, []);
+  }, [setScrolledAway]);
+
+  const handleFollowAlongClick = useCallback(() => {
+    if (isScrolledAwayRef.current) {
+      if (!isFollowingAlong) {
+        if (onToggleFollowAlong) onToggleFollowAlong(true);
+        else setLocalIsFollowingAlong(true);
+      }
+      handleReturnToNow();
+      return;
+    }
+
+    const next = !isFollowingAlong;
+    if (onToggleFollowAlong) onToggleFollowAlong(next);
+    else setLocalIsFollowingAlong(next);
+
+    if (next && readerMode === 'normal') {
+      handleReturnToNow();
+    }
+  }, [isFollowingAlong, onToggleFollowAlong, handleReturnToNow, readerMode]);
 
   const handleChooseMode = (mode) => {
     setReaderMode(mode);
@@ -412,7 +470,7 @@ export default function ReaderView({
       className={`reader-canvas-container ${
         readerMode === 'normal'
           ? 'pb-36 min-h-[calc(100vh-56px-var(--dock-safe-bottom,72px))]'
-          : 'h-[calc(100vh-56px-var(--dock-safe-bottom,72px))] max-h-[calc(100vh-56px-var(--dock-safe-bottom,72px))] overflow-hidden reader-mode-opengl'
+          : 'h-[calc(100vh-56px)] max-h-[calc(100vh-56px)] pb-28 overflow-hidden reader-mode-opengl'
       } transition-opacity duration-300 ${isFocusMode ? 'focus-mode-active' : ''}`}
     >
       {/* Floating Focus Mode Banner */}
@@ -518,9 +576,13 @@ export default function ReaderView({
       )}
 
       {/* Floating Monospace Noir Reader Toolbar */}
-      <div className="reader-floating-toolbar" role="toolbar" aria-label="Reader Controls">
+      <div
+        className="reader-floating-toolbar flex-wrap overflow-x-hidden"
+        role="toolbar"
+        aria-label="Reader Controls"
+      >
         {/* Left Toolbar Group */}
-        <div className="reader-toolbar-group">
+        <div className="reader-toolbar-group flex-wrap min-w-0">
           <span className="mono-xs desktop-only-tag" style={{ color: 'var(--text-muted)' }}>
             // READER CONTROL
           </span>
@@ -658,7 +720,7 @@ export default function ReaderView({
         </div>
 
         {/* Right Toolbar Group */}
-        <div className="reader-toolbar-group">
+        <div className="reader-toolbar-group flex-wrap min-w-0">
           {/* Chapter Selector Dropdown */}
           {chapters && chapters.length > 1 && (
             <div className="inline-flex items-center gap-1">
@@ -716,7 +778,7 @@ export default function ReaderView({
           {/* FOLLOW ALONG Toggle Button (Signal Dot strictly when active per Section 9.4) */}
           <button
             type="button"
-            onClick={() => setIsFollowingAlong((prev) => !prev)}
+            onClick={handleFollowAlongClick}
             className={`badge ${isFollowingAlong && isPlaying ? 'badge-active' : ''} cursor-pointer`}
             title={isFollowingAlong ? 'Follow Along: Active' : 'Follow Along: Paused'}
             aria-pressed={isFollowingAlong}
@@ -787,6 +849,7 @@ export default function ReaderView({
             fontFamily={fontFamily}
             fontSize={fontSize}
             isFocusMode={isFocusMode}
+            isFollowingAlong={isFollowingAlong}
             onToggleFocusMode={() => setIsFocusMode((prev) => !prev)}
             onPageChange={setOpenGlPageInfo}
           />

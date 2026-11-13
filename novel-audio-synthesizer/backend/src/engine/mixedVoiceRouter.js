@@ -45,6 +45,8 @@ const FEMALE_VOICE_HINTS = new Set([
   'af_sky',
   'en-GB-LibbyNeural',
   'en-GB-SoniaNeural',
+  'en-GB-MaisieNeural',
+  'en-IE-EmilyNeural',
   'mac_moira',
   'mac_shelley',
   'mac_flo',
@@ -67,10 +69,32 @@ function inferGender({ characterId = '', speakerName = '', voiceId = '', gender 
 
 function inferAccent(voiceId = '') {
   const v = String(voiceId || '');
-  if (v.startsWith('en-GB') || v.startsWith('bm_') || v.startsWith('bf_') || v === 'mac_daniel' || v === 'mac_serena') {
+  if (
+    v.startsWith('en-GB') ||
+    v.startsWith('en-IE') ||
+    v.startsWith('en-AU') ||
+    v.startsWith('en-NZ') ||
+    v.startsWith('bm_') ||
+    v.startsWith('bf_') ||
+    v === 'mac_daniel' ||
+    v === 'mac_serena'
+  ) {
     return 'british';
   }
   return 'american';
+}
+
+/**
+ * Deterministically hashes a string to an integer >= 0.
+ */
+function stableHash(str = '') {
+  let h = 2166136261;
+  const s = String(str);
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h >>> 0);
 }
 
 /**
@@ -93,19 +117,26 @@ function mapToParadeeVoice(voiceId = '', { isNarrator = false, gender = '', acce
     'en-GB-RyanNeural': 'bm_fable',
     'en-GB-ArthurNeural': 'bm_fable',
     'en-GB-NoahNeural': 'bm_fable',
+    'en-US-RogerNeural': 'bm_fable',
+    'en-NZ-MitchellNeural': 'bm_fable',
     'bm_george': 'bm_fable',
+    'bm_lewis': 'bm_fable',
     'am_george': 'bm_fable',
     'am_adam': 'bm_fable',
     'en-GB-ThomasNeural': 'am_puck',
     'en-GB-AlfieNeural': 'am_puck',
     'en-GB-OliverNeural': 'am_puck',
+    'en-IE-ConnorNeural': 'am_puck',
+    'en-AU-WilliamMultilingualNeural': 'am_puck',
     'bm_daniel': 'am_puck',
     'am_michael': 'am_puck',
     'am_onyx': 'am_puck',
     'en-GB-LibbyNeural': 'bf_isabella',
     'en-GB-SoniaNeural': 'bf_isabella',
+    'en-GB-MaisieNeural': 'bf_isabella',
     'bf_emma': 'bf_isabella',
     'af_sarah': 'bf_isabella',
+    'en-IE-EmilyNeural': 'af_heart',
     'af_heart': 'af_heart',
     'af_bella': 'af_heart',
     'af_nicole': 'af_heart',
@@ -120,19 +151,6 @@ function mapToParadeeVoice(voiceId = '', { isNarrator = false, gender = '', acce
     return resolvedAccent === 'british' ? 'bf_isabella' : 'af_heart';
   }
   return resolvedAccent === 'british' ? 'bm_fable' : 'am_puck';
-}
-
-/**
- * Deterministically hashes a string to an integer >= 0.
- */
-function stableHash(str = '') {
-  let h = 2166136261;
-  const s = String(str);
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h >>> 0);
 }
 
 /**
@@ -228,17 +246,25 @@ function buildMixedCastPlan(segments = [], characters = []) {
         slotType: 'manual_machine',
       });
     } else if (
-      (vId === 'bm_fable' || vId === 'bf_isabella' || vId === 'am_puck') ||
-      (vId === 'af_heart' && stat.explicitParadee)
+      vId === 'bm_fable' ||
+      vId === 'bf_isabella' ||
+      vId === 'am_puck' ||
+      vId === 'af_heart'
     ) {
       usedParadeeVoices.add(vId);
+      const isNarr = stat.isNarrator;
+      let rateMultiplier = 1.0;
+      if (!isNarr) {
+        const rateSteps = [0.94, 0.97, 1.0, 1.03, 1.06];
+        rateMultiplier = rateSteps[stableHash(key) % rateSteps.length];
+      }
       plan.set(key, {
         speakerKey: key,
         engine: 'paradee-tts',
         voiceId: vId,
-        rateMultiplier: 1.0,
+        rateMultiplier,
         pitchOffset: 0.0,
-        slotType: stat.isNarrator ? 'narrator' : 'manual_paradee',
+        slotType: isNarr ? 'narrator' : 'manual_paradee',
       });
     }
   }
@@ -305,12 +331,17 @@ function buildMixedCastPlan(segments = [], characters = []) {
       }
 
       usedParadeeVoices.add(chosen);
+
+      // Deterministic subtle rate variation so characters don't sound identical
+      const rateSteps = [0.94, 0.97, 1.0, 1.03, 1.06];
+      const rateMultiplier = rateSteps[stableHash(stat.key) % rateSteps.length];
+
       plan.set(stat.key, {
         speakerKey: stat.key,
         slotRank: primaryRank,
         engine: 'paradee-tts',
         voiceId: chosen,
-        rateMultiplier: 1.0,
+        rateMultiplier,
         pitchOffset: 0.0,
         slotType: 'primary_paradee',
       });
@@ -391,14 +422,24 @@ function resolveMixedVoiceForCharacter({
     };
   }
 
-  // 2. Explicit manual override to a Paradee neural voice (`bm_fable`, `bf_isabella`, `am_puck`)
-  if (vId === 'bm_fable' || vId === 'bf_isabella' || vId === 'am_puck') {
+  // 2. Explicit manual override to a Paradee neural voice (`bm_fable`, `bf_isabella`, `am_puck`, `af_heart`)
+  if (vId === 'bm_fable' || vId === 'bf_isabella' || vId === 'am_puck' || vId === 'af_heart') {
+    const isNarr = Boolean(
+      isNarrator ||
+      String(characterId).toLowerCase() === 'narrator' ||
+      String(speakerName).toLowerCase() === 'narrator'
+    );
+    let rateMultiplier = 1.0;
+    if (!isNarr && (characterId || speakerName)) {
+      const rateSteps = [0.94, 0.97, 1.0, 1.03, 1.06];
+      rateMultiplier = rateSteps[stableHash(String(characterId || speakerName)) % rateSteps.length];
+    }
     return {
       engine: 'paradee-tts',
       voiceId: vId,
-      rateMultiplier: 1.0,
+      rateMultiplier,
       pitchOffset: 0.0,
-      slotType: 'manual_paradee',
+      slotType: isNarr ? 'narrator' : 'manual_paradee',
     };
   }
 
@@ -436,17 +477,28 @@ function resolveMixedVoiceForCharacter({
   }
 
   // 5. Default primary / narrator resolution -> Paradee-8M
+  const isNarr = Boolean(
+    isNarrator ||
+    String(characterId).toLowerCase() === 'narrator' ||
+    String(speakerName).toLowerCase() === 'narrator'
+  );
   const paradeeVoice = mapToParadeeVoice(vId, {
-    isNarrator: isNarrator || String(characterId).toLowerCase() === 'narrator' || String(speakerName).toLowerCase() === 'narrator',
+    isNarrator: isNarr,
     gender,
   });
+
+  let rateMultiplier = 1.0;
+  if (!isNarr && (characterId || speakerName)) {
+    const rateSteps = [0.94, 0.97, 1.0, 1.03, 1.06];
+    rateMultiplier = rateSteps[stableHash(String(characterId || speakerName)) % rateSteps.length];
+  }
 
   return {
     engine: 'paradee-tts',
     voiceId: paradeeVoice,
-    rateMultiplier: 1.0,
+    rateMultiplier,
     pitchOffset: 0.0,
-    slotType: isNarrator ? 'narrator' : 'primary_paradee',
+    slotType: isNarr ? 'narrator' : 'primary_paradee',
   };
 }
 
@@ -455,6 +507,7 @@ module.exports = {
   PARADEE_VOICE_IDS,
   MACHINE_EXTRA_POOL,
   MACHINE_VOICE_MAP,
+  stableHash,
   mapToParadeeVoice,
   buildMixedCastPlan,
   resolveMixedVoiceForCharacter,

@@ -1,9 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api, ApiError } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { preloadUploadChapterModal, preloadReaderView } from '../App';
 import {
+  CANONICAL_NEURAL_VOICES,
+  buildCanonicalVoiceGroups,
+  VoiceOptionGroups,
+  buildNovelCastList,
+  useVoiceAudition,
+} from './VoicesView';
+import {
   IconPlay,
+  IconPause,
   IconRefresh,
   IconUpload,
 } from './icons';
@@ -28,14 +36,6 @@ function formatTotalDuration(ms) {
   return `${String(minutes).padStart(2, '0')}M ${String(seconds).padStart(2, '0')}S`;
 }
 
-const ARCHIVED_MODELS = [
-  { id: 'Neural-Docu-UK-M', role: 'DOCUMENTARIAN', timbre: 'Warm British Tenor, balanced literary tone', freq: '48kHz PCM // Latency: 42ms' },
-  { id: 'Neural-Analytical-V2', role: 'RP ANALYTICAL', timbre: 'Sharp Victorian RP, crisp consonants', freq: '48kHz PCM // Latency: 38ms' },
-  { id: 'Neural-Warm-Male-UK', role: 'WARM MALE', timbre: 'Resonant, intimate companionable baritone', freq: '48kHz PCM // Latency: 40ms' },
-  { id: 'Neural-Cockney-Male', role: 'COCKNEY MALE', timbre: 'Raspy authentic 19th-c urban dialect', freq: '48kHz PCM // Latency: 45ms' },
-  { id: 'Neural-Matron-Female', role: 'MATRON FEMALE', timbre: 'Warm maternal Victorian cadence', freq: '48kHz PCM // Latency: 44ms' },
-];
-
 export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenUploadChapter, initialTab }) {
   const { isWriterOrAdmin } = useAuth();
   const [data, setData] = useState(null);
@@ -49,6 +49,29 @@ export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenU
   const [studioTab, setStudioTab] = useState('cast'); // 'cast' | 'voices' | 'settings' | 'generate'
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [availableVoices, setAvailableVoices] = useState({});
+  const [updatingCharKey, setUpdatingCharKey] = useState(null);
+  const [castFeedback, setCastFeedback] = useState(null);
+
+  // Inline + ADD CHARACTER state
+  const [showAddCharForm, setShowAddCharForm] = useState(false);
+  const [newCharName, setNewCharName] = useState('');
+  const [newCharGender, setNewCharGender] = useState('unknown');
+  const [newCharVoice, setNewCharVoice] = useState(CANONICAL_NEURAL_VOICES[1]?.id || 'en-GB-ThomasNeural');
+  const [addingChar, setAddingChar] = useState(false);
+
+  // Voices sub-tab Assign-to-Character state
+  const [voiceCharTargets, setVoiceCharTargets] = useState({});
+  const [assigningModelId, setAssigningModelId] = useState(null);
+
+  const {
+    playingId: auditionPlayingId,
+    loadingId: auditionLoadingId,
+    auditionError,
+    setAuditionError,
+    toggleAudition,
+  } = useVoiceAudition();
+
   const [inLibrary, setInLibrary] = useState(() => {
     try {
       return typeof window !== 'undefined' && localStorage.getItem(`synctone_library_${novelId}`) === 'true';
@@ -123,6 +146,161 @@ export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenU
     if (novelId) fetchDetails();
   }, [novelId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    api.voices?.list?.()
+      .then((res) => {
+        if (!cancelled && res?.available_voices) {
+          setAvailableVoices(res.available_voices);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const baseVoiceGroups = useMemo(
+    () => buildCanonicalVoiceGroups(availableVoices),
+    [availableVoices]
+  );
+
+  const applyCharacterVoiceState = (charIdOrName, newVoiceId, extraFields = {}) => {
+    const targetLower = String(charIdOrName || '').toLowerCase();
+    setData((prev) => {
+      if (!prev) return prev;
+      const prevChars = Array.isArray(prev.characters) ? prev.characters : [];
+      const found = prevChars.some(
+        (c) =>
+          String(c.id || '').toLowerCase() === targetLower ||
+          String(c.canonical_name || c.name || '').toLowerCase() === targetLower
+      );
+      const nextChars = found
+        ? prevChars.map((c) =>
+            String(c.id || '').toLowerCase() === targetLower ||
+            String(c.canonical_name || c.name || '').toLowerCase() === targetLower
+              ? { ...c, voice_id: newVoiceId, ...extraFields }
+              : c
+          )
+        : [
+            ...prevChars,
+            {
+              id: targetLower === 'narrator' ? (prev.novel?.narrator_character_id || 'narrator') : charIdOrName,
+              canonical_name: targetLower === 'narrator' ? 'Narrator' : charIdOrName,
+              is_narrator: targetLower === 'narrator',
+              role: targetLower === 'narrator' ? 'NARRATOR' : 'CAST',
+              voice_id: newVoiceId,
+              gender: extraFields.gender || 'unknown',
+              sample_quote: extraFields.sample_quote || '',
+              ...extraFields,
+            },
+          ];
+      const nextNovel =
+        targetLower === 'narrator' && prev.novel
+          ? { ...prev.novel, narrator_voice_id: newVoiceId, narrator_voice_label: newVoiceId }
+          : prev.novel;
+      return { ...prev, novel: nextNovel, characters: nextChars };
+    });
+  };
+
+  const handleCastVoiceChange = async (char, newVoiceId) => {
+    if (!data?.novel || !newVoiceId) return;
+    const charName = char.canonical_name || char.name || 'Character';
+    const charKey = char.id || charName;
+    const prevVoice = char.voice_id || 'en-GB-RyanNeural';
+    const firstChapterId = data.chapters?.[0]?.id;
+
+    setUpdatingCharKey(charKey);
+    setCastFeedback(null);
+    applyCharacterVoiceState(charKey, newVoiceId);
+    if (char.is_narrator) applyCharacterVoiceState('narrator', newVoiceId);
+
+    try {
+      await api.voices.assign({
+        novel_id: data.novel.id,
+        character_id: charKey,
+        new_voice_id: newVoiceId,
+        ...(firstChapterId ? { chapter_id: firstChapterId } : {}),
+      });
+      setCastFeedback(`Assigned ${newVoiceId} to ${charName}`);
+    } catch (err) {
+      applyCharacterVoiceState(charKey, prevVoice);
+      if (char.is_narrator) applyCharacterVoiceState('narrator', prevVoice);
+      setCastFeedback(err instanceof ApiError ? err.message : err?.message || `Failed to assign voice for ${charName}`);
+    } finally {
+      setUpdatingCharKey(null);
+    }
+  };
+
+  const handleAddCharacterSubmit = async (e) => {
+    e.preventDefault();
+    if (!data?.novel) return;
+    const trimmedName = newCharName.trim();
+    if (!trimmedName) {
+      setCastFeedback('Please enter a character name.');
+      return;
+    }
+
+    const isNarrator = trimmedName.toLowerCase() === 'narrator';
+    const firstChapterId = data.chapters?.[0]?.id;
+    setAddingChar(true);
+    setCastFeedback(null);
+
+    try {
+      await api.voices.assign({
+        novel_id: data.novel.id,
+        character_id: isNarrator ? 'narrator' : trimmedName,
+        new_voice_id: newCharVoice,
+        ...(firstChapterId ? { chapter_id: firstChapterId } : {}),
+      });
+      applyCharacterVoiceState(isNarrator ? 'narrator' : trimmedName, newCharVoice, {
+        canonical_name: isNarrator ? 'Narrator' : trimmedName,
+        gender: newCharGender,
+        is_narrator: isNarrator,
+        role: isNarrator ? 'NARRATOR' : 'CAST',
+      });
+      setCastFeedback(`Added ${trimmedName} with ${newCharVoice}`);
+      setNewCharName('');
+      setNewCharGender('unknown');
+      setShowAddCharForm(false);
+    } catch (err) {
+      setCastFeedback(err instanceof ApiError ? err.message : err?.message || 'Failed to add character');
+    } finally {
+      setAddingChar(false);
+    }
+  };
+
+  const handleAssignFromVoicesTab = async (voiceModel, castList) => {
+    if (!data?.novel) return;
+    const fallbackTarget = castList[0]?.id || castList[0]?.canonical_name || 'Narrator';
+    const targetCharKey = voiceCharTargets[voiceModel.id] || fallbackTarget;
+    const targetChar = castList.find(
+      (c) => (c.id || c.canonical_name || c.name) === targetCharKey
+    );
+    const targetLabel = targetChar?.canonical_name || targetChar?.name || targetCharKey;
+    const firstChapterId = data.chapters?.[0]?.id;
+
+    setAssigningModelId(voiceModel.id);
+    setCastFeedback(null);
+    try {
+      await api.voices.assign({
+        novel_id: data.novel.id,
+        character_id: targetCharKey,
+        new_voice_id: voiceModel.id,
+        ...(firstChapterId ? { chapter_id: firstChapterId } : {}),
+      });
+      applyCharacterVoiceState(targetCharKey, voiceModel.id);
+      if (targetChar?.is_narrator || String(targetLabel).toLowerCase() === 'narrator') {
+        applyCharacterVoiceState('narrator', voiceModel.id);
+      }
+      setCastFeedback(`Assigned ${voiceModel.id} to ${targetLabel}`);
+    } catch (err) {
+      setCastFeedback(err instanceof ApiError ? err.message : err?.message || 'Failed to assign voice');
+    } finally {
+      setAssigningModelId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="detail-stage space-y-6 animate-pulse">
@@ -175,6 +353,7 @@ export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenU
   }
 
   const { novel, characters = [], chapters = [] } = data;
+  const castCharacters = buildNovelCastList(novel, characters);
   const isVerified = novel.channel === 'verified';
   const narratorDisplay =
     novel.narrator ||
@@ -456,7 +635,7 @@ export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenU
                 className={`tab-btn ${studioTab === 'cast' ? 'active' : ''}`}
                 data-tab="cast"
               >
-                CAST ({characters.length})
+                CAST ({castCharacters.length})
               </button>
               <button
                 type="button"
@@ -512,6 +691,25 @@ export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenU
                 </div>
               </section>
 
+              {(castFeedback || auditionError) && (
+                <div
+                  role="status"
+                  className="mb-4 p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-strong)] text-xs font-mono text-[var(--text-main)] flex items-center justify-between gap-2"
+                >
+                  <span>{auditionError || castFeedback}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCastFeedback(null);
+                      setAuditionError(null);
+                    }}
+                    className="text-[10px] uppercase text-[var(--text-sub)] hover:text-[var(--text-main)] cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
               {/* Sub-Tab 1: Cast */}
               {studioTab === 'cast' && (
                 <div>
@@ -519,38 +717,149 @@ export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenU
                     <span className="mono-xs text-[var(--text-muted)]">// CHARACTER VOICE ASSIGNMENTS</span>
                     <button
                       type="button"
+                      onClick={() => setShowAddCharForm((prev) => !prev)}
                       className="boxed-btn px-3 py-1 text-[11px] font-mono cursor-pointer flex items-center gap-1.5 rounded-full active:scale-95 transition-all shadow-xs hover:scale-105"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-main)]" />
-                      <span>+ ADD CHARACTER</span>
+                      <span>{showAddCharForm ? 'CANCEL' : '+ ADD CHARACTER'}</span>
                     </button>
                   </div>
 
+                  {showAddCharForm && (
+                    <form
+                      onSubmit={handleAddCharacterSubmit}
+                      className="mb-4 p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-strong)] space-y-3 font-mono text-xs"
+                    >
+                      <div className="text-[11px] font-bold uppercase text-[var(--text-main)]">
+                        Add Character to Ensemble
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <input
+                          type="text"
+                          aria-label="Character Name"
+                          value={newCharName}
+                          onChange={(e) => setNewCharName(e.target.value)}
+                          placeholder="Character Name"
+                          className="px-3 py-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-strong)]"
+                        />
+                        <select
+                          aria-label="Character Gender"
+                          value={newCharGender}
+                          onChange={(e) => setNewCharGender(e.target.value)}
+                          className="px-3 py-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-strong)]"
+                        >
+                          <option value="unknown">Gender: Unknown</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="neutral">Neutral</option>
+                        </select>
+                        <select
+                          aria-label="Character Voice Model"
+                          value={newCharVoice}
+                          onChange={(e) => setNewCharVoice(e.target.value)}
+                          className="px-3 py-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-main)] focus:outline-none focus:border-[var(--border-strong)]"
+                        >
+                          <VoiceOptionGroups groups={baseVoiceGroups} />
+                        </select>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddCharForm(false)}
+                          className="px-3 py-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-sub)] cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={addingChar}
+                          className="px-3.5 py-1 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] font-bold cursor-pointer disabled:opacity-50"
+                        >
+                          {addingChar ? 'Adding...' : 'Save Character'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
                   <div className="roster-grid">
-                    {characters.length === 0 ? (
+                    {castCharacters.length === 0 ? (
                       <div className="col-span-full p-8 text-center bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)] font-mono text-xs">
                         No character profiles generated.
                       </div>
                     ) : (
-                      characters.map((char) => {
+                      castCharacters.map((char) => {
                         const charName = char.canonical_name || char.name || 'Character';
+                        const charKey = char.id || charName;
                         const charRole = char.role || (char.is_narrator ? 'NARRATOR' : 'CAST');
                         const charVoice = char.voice_id || 'en-GB-RyanNeural';
+                        const charVoiceGroups = buildCanonicalVoiceGroups(availableVoices, [charVoice]);
+                        const auditionKey = `cast:${charKey}`;
+                        const isAuditionPlaying = auditionPlayingId === auditionKey;
+                        const isAuditionLoading = auditionLoadingId === auditionKey;
+
                         return (
-                          <div key={char.id || charName} className="character-card">
+                          <div key={charKey} className="character-card">
                             <div className="char-header-row">
                               <span className="char-name">{charName}</span>
                               <span className="char-role-badge">{charRole.toUpperCase()}</span>
                             </div>
                             <div className="char-traits-list">
-                              <div className="flex justify-between items-center">
-                                <span>MODEL:</span>
-                                <span className="text-[var(--text-main)] font-semibold">{charVoice}</span>
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between items-center gap-2">
+                                  <span>MODEL:</span>
+                                  <span className="text-[11px] font-mono text-[var(--text-main)] font-semibold truncate">
+                                    {charVoice}
+                                  </span>
+                                </div>
+                                <select
+                                  aria-label={`Voice model for ${charName}`}
+                                  value={charVoice}
+                                  disabled={updatingCharKey === charKey}
+                                  onChange={(e) => handleCastVoiceChange(char, e.target.value)}
+                                  className="w-full px-2.5 py-1.5 rounded-lg text-[11px] font-mono bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-strong)] focus:outline-none focus:border-[var(--text-main)] disabled:opacity-50"
+                                >
+                                  <VoiceOptionGroups groups={charVoiceGroups} />
+                                </select>
                               </div>
                               <div>PITCH OFFSET: +0.00 ST</div>
                               <div>CADENCE PACE: 1.00×</div>
-                              <div>
-                                STATUS: <span className="text-[var(--text-main)]">● ASSIGNED</span>
+                              <div className="flex items-center justify-between gap-2 pt-1">
+                                <span>
+                                  STATUS: <span className="text-[var(--text-main)]">● ASSIGNED</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    toggleAudition({
+                                      key: auditionKey,
+                                      voiceId: charVoice,
+                                      text: char.sample_quote || `Hello, I am ${charName}.`,
+                                      characterId: charKey,
+                                      speakerName: charName,
+                                      isNarrator: Boolean(char.is_narrator),
+                                      gender: char.gender || '',
+                                    })
+                                  }
+                                  className="boxed-btn px-2.5 py-1 text-[10px] font-mono uppercase inline-flex items-center gap-1 rounded-full cursor-pointer"
+                                  aria-label={`Audition voice for ${charName}`}
+                                >
+                                  {isAuditionLoading ? (
+                                    <>
+                                      <IconRefresh className="w-3 h-3 animate-spin" />
+                                      <span>Loading</span>
+                                    </>
+                                  ) : isAuditionPlaying ? (
+                                    <>
+                                      <IconPause className="w-3 h-3 fill-current" />
+                                      <span>Stop</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <IconPlay className="w-3 h-3 fill-current" />
+                                      <span>Audition</span>
+                                    </>
+                                  )}
+                                </button>
                               </div>
                               {char.sample_quote && (
                                 <div className="italic font-serif text-xs text-[var(--text-sub)] line-clamp-2 pt-2 mt-1 border-t border-[var(--border-subtle)]">
@@ -571,26 +880,99 @@ export default function NovelDetails({ novelId, onBack, onSelectChapter, onOpenU
                 <div>
                   <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                     <span className="mono-xs text-[var(--text-muted)]">// NEURAL VOICE LIBRARY</span>
-                    <span className="mono-xs text-[var(--text-sub)]">5 ARCHIVED MODELS</span>
+                    <span className="mono-xs text-[var(--text-sub)]">{CANONICAL_NEURAL_VOICES.length} NEURAL MODELS</span>
                   </div>
 
                   <div className="roster-grid">
-                    {ARCHIVED_MODELS.map((m) => (
-                      <div key={m.id} className="character-card">
-                        <div className="char-header-row">
-                          <span className="char-name">{m.id}</span>
-                          <span className="char-role-badge">{m.role}</span>
-                        </div>
-                        <div className="char-traits-list">
-                          <div>TIMBRE: {m.timbre}</div>
-                          <div>FREQUENCY: {m.freq}</div>
-                          <div className="pt-2 mt-1 border-t border-[var(--border-subtle)] flex items-center justify-between">
-                            <span className="text-[10px] text-[var(--text-muted)] font-mono">STATUS: REGISTERED</span>
-                            <span className="text-[10px] text-[var(--text-main)] font-mono font-bold">● ACTIVE</span>
+                    {CANONICAL_NEURAL_VOICES.map((m) => {
+                      const auditionKey = `lib:${m.id}`;
+                      const isAuditionPlaying = auditionPlayingId === auditionKey;
+                      const isAuditionLoading = auditionLoadingId === auditionKey;
+                      const defaultTarget = castCharacters[0]?.id || castCharacters[0]?.canonical_name || 'Narrator';
+                      const targetCharKey = voiceCharTargets[m.id] || defaultTarget;
+
+                      return (
+                        <div key={m.id} className="character-card">
+                          <div className="char-header-row">
+                            <span className="char-name">{m.id}</span>
+                            <span className="char-role-badge">{m.role}</span>
+                          </div>
+                          <div className="char-traits-list space-y-2">
+                            <div>PROFILE: {m.label}</div>
+                            <div>TIMBRE: {m.timbre}</div>
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                              <span className="text-[10px] text-[var(--text-muted)] font-mono">GENDER: {m.gender.toUpperCase()}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  toggleAudition({
+                                    key: auditionKey,
+                                    voiceId: m.id,
+                                    text: `This is ${m.label}, speaking with ${m.timbre}.`,
+                                    characterId: m.id,
+                                    speakerName: m.label,
+                                    isNarrator: m.id === 'en-GB-RyanNeural',
+                                    gender: m.gender,
+                                  })
+                                }
+                                className="boxed-btn px-2.5 py-1 text-[10px] font-mono uppercase inline-flex items-center gap-1 rounded-full cursor-pointer"
+                                aria-label={`Audition ${m.id}`}
+                              >
+                                {isAuditionLoading ? (
+                                  <>
+                                    <IconRefresh className="w-3 h-3 animate-spin" />
+                                    <span>Loading</span>
+                                  </>
+                                ) : isAuditionPlaying ? (
+                                  <>
+                                    <IconPause className="w-3 h-3 fill-current" />
+                                    <span>Stop</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <IconPlay className="w-3 h-3 fill-current" />
+                                    <span>Audition</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                            <div className="pt-2 mt-1 border-t border-[var(--border-subtle)] space-y-1.5">
+                              <span className="block text-[10px] text-[var(--text-muted)] font-mono uppercase">
+                                Assign to Character
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <select
+                                  aria-label={`Assign ${m.id} to character`}
+                                  value={targetCharKey}
+                                  onChange={(e) =>
+                                    setVoiceCharTargets((prev) => ({ ...prev, [m.id]: e.target.value }))
+                                  }
+                                  className="flex-1 min-w-0 px-2 py-1 rounded-lg text-[11px] font-mono bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-subtle)] focus:outline-none focus:border-[var(--border-strong)]"
+                                >
+                                  {castCharacters.map((c) => {
+                                    const cKey = c.id || c.canonical_name || c.name || 'Narrator';
+                                    const cName = c.canonical_name || c.name || 'Narrator';
+                                    return (
+                                      <option key={cKey} value={cKey}>
+                                        {cName}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                <button
+                                  type="button"
+                                  disabled={assigningModelId === m.id}
+                                  onClick={() => handleAssignFromVoicesTab(m, castCharacters)}
+                                  className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase bg-[var(--accent)] text-[var(--on-accent)] cursor-pointer disabled:opacity-50"
+                                >
+                                  {assigningModelId === m.id ? '...' : 'Assign'}
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

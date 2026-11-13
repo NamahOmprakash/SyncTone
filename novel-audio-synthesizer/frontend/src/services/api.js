@@ -157,10 +157,13 @@ export const api = {
         )
       ),
     uploadChapter: (novelId, chapterData) => api.post(`/novels/${novelId}/chapters`, chapterData),
-    parseFile: (payload, parserEngine = 'heuristic') => {
+    parseFile: (payload, parserEngine = 'heuristic', parserConfig = null) => {
       if (typeof FormData !== 'undefined' && payload instanceof FormData) {
         if (parserEngine && !payload.has('parser_engine')) {
           payload.append('parser_engine', parserEngine);
+        }
+        if (parserConfig && !payload.has('parser_config')) {
+          payload.append('parser_config', JSON.stringify(parserConfig));
         }
         const resolvedEngine = payload.get('parser_engine') || parserEngine || 'heuristic';
         return request(
@@ -170,7 +173,11 @@ export const api = {
       }
       const bodyPayload =
         payload && typeof payload === 'object'
-          ? { parser_engine: parserEngine, ...payload }
+          ? {
+              parser_engine: parserEngine,
+              ...(parserConfig ? { parser_config: parserConfig } : {}),
+              ...payload,
+            }
           : payload;
       return api.post('/novels/parse-file', bodyPayload);
     },
@@ -189,8 +196,12 @@ export const api = {
     getSegments: (id) => api.get(`/chapters/${id}/segments`),
     getManifest: (id) => api.get(`/manifest/${id}`),
     uploadDirect: (text, title) => api.post('/upload', { text, title }),
-    parse: (chapterId, parserEngine) =>
-      api.post(`/parse/${chapterId}`, parserEngine ? { parser_engine: parserEngine } : undefined),
+    parse: (chapterId, parserEngine, parserConfig) => {
+      const body = {};
+      if (parserEngine) body.parser_engine = parserEngine;
+      if (parserConfig && typeof parserConfig === 'object') body.parser_config = parserConfig;
+      return api.post(`/parse/${chapterId}`, Object.keys(body).length > 0 ? body : undefined);
+    },
     synthesize: (chapterId, engine) =>
       api.post(`/synthesize/${chapterId}`, engine ? { engine } : undefined),
   },
@@ -198,8 +209,11 @@ export const api = {
   // Voices Endpoints
   voices: {
     list: () => api.get('/voices'),
-    assign: ({ character_id, new_voice_id, chapter_id }) =>
-      api.post('/voices/assign', { character_id, new_voice_id, chapter_id }),
+    assign: ({ character_id, new_voice_id, chapter_id, novel_id }) => {
+      const payload = { character_id, new_voice_id, chapter_id };
+      if (novel_id) payload.novel_id = novel_id;
+      return api.post('/voices/assign', payload);
+    },
   },
 
   // Playback Endpoints
@@ -216,6 +230,9 @@ export const api = {
   // Status & Health
   status: {
     models: (opts = {}) => api.get(`/status/models${opts && opts.probe ? '?probe=true' : ''}`),
+    getParserConfig: () => api.get('/status/parser-config'),
+    updateParserConfig: (config) => api.post('/status/parser-config', config),
+    testParserConnection: (payload) => api.post('/status/parser-test', payload),
     health: () => request('/health'),
   },
 };

@@ -32,6 +32,18 @@ describe('CONTRACT 1 — fitBook Pure Sizing Logic', () => {
     expect(res.page.h / res.page.w).toBeCloseTo(PAGE_ASPECT, 1);
   });
 
+  it('expands adaptive spread width beyond 772px on wide laptop viewports (e.g. 1280x580, 1024x583)', () => {
+    const laptopWide = fitBook({ w: 1280, h: 580 });
+    expect(laptopWide.layout).toBe('spread');
+    expect(laptopWide.book.w).toBe(1180);
+    expect(laptopWide.page.w).toBe(590);
+
+    const laptopCompact = fitBook({ w: 1024, h: 583 });
+    expect(laptopCompact.layout).toBe('spread');
+    expect(laptopCompact.book.w).toBeGreaterThan(900);
+    expect(laptopCompact.page.w).toBeGreaterThan(450);
+  });
+
   it('applies ~8% hysteresis when near layout boundary', () => {
     // Stage dimensions near threshold where spread area and single area are comparable
     const stage = { w: 720, h: 500 };

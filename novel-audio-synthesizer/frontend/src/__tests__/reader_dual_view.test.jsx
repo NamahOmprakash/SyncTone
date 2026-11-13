@@ -76,6 +76,34 @@ describe('Moon+ Reader Pro v10.8 Architecture & Dual-View Engine', () => {
       expect(allPaginatedSegments.length).toBe(sampleSegments.length);
     });
 
+    it('measureAndPaginateSegments reserves firstPageExtraReservePx on Page 1 (150 vs 240)', () => {
+      const denseSegments = Array.from({ length: 8 }, (_, idx) => ({
+        order: idx + 1,
+        segment_id: idx + 1,
+        type: 'narration',
+        text: 'Mr. Sherlock Holmes examined the curious telegram on his breakfast table carefully.',
+        speaker_name: 'Narrator',
+      }));
+
+      const pagesDefault = measureAndPaginateSegments(denseSegments, {
+        containerWidth: 460,
+        containerHeight: 500,
+        fontSize: 18,
+        maxSegmentsPerPage: 6,
+        firstPageExtraReservePx: 150,
+      });
+      const pagesWithCrest = measureAndPaginateSegments(denseSegments, {
+        containerWidth: 460,
+        containerHeight: 500,
+        fontSize: 18,
+        maxSegmentsPerPage: 6,
+        firstPageExtraReservePx: 240,
+      });
+
+      expect(pagesWithCrest[0].length).toBeLessThanOrEqual(pagesDefault[0].length);
+      expect(pagesWithCrest[0].length).toBeLessThan(pagesWithCrest.flat().length);
+    });
+
     it('createBookSpreads creates paired two-page spreads with left and right indices', () => {
       const pages = [['seg1', 'seg2'], ['seg3'], ['seg4']];
       const spreads = createBookSpreads(pages);
@@ -198,6 +226,19 @@ describe('Moon+ Reader Pro v10.8 Architecture & Dual-View Engine', () => {
 
       fireEvent.click(exitBtn);
       expect(handleToggleFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders Left and Right page content containers with overflow-hidden and zero overflow-y-auto', () => {
+      const { container } = render(
+        <OpenGLPageReader
+          segments={sampleSegments}
+          activeSegmentId={1}
+          currentNovel={mockNovelNoCover}
+        />
+      );
+
+      expect(container.querySelectorAll('.overflow-y-auto').length).toBe(0);
+      expect(container.querySelectorAll('.overflow-hidden').length).toBeGreaterThanOrEqual(2);
     });
   });
 });

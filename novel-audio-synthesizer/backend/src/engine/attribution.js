@@ -27,7 +27,11 @@ class AttributionEngine {
     segments.forEach((seg, idx) => {
       if (
         seg.type === 'dialogue' &&
-        (seg.speaker_id === 'unresolved' || !seg.speaker_name || seg.speaker_name === 'Unknown Speaker')
+        (seg.speaker_id === 'unresolved' ||
+          seg.attribution_source === 'alternation' ||
+          seg.attribution_source === 'context_alternation' ||
+          !seg.speaker_name ||
+          seg.speaker_name === 'Unknown Speaker')
       ) {
         unresolvedIndices.push(idx);
       }
@@ -84,6 +88,8 @@ ${JSON.stringify(windowLines)}`;
         ...seg,
         speaker_name: name,
         speaker_id: name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+        voice_id: null,
+        assigned_voice_id: null,
         attribution_confidence: typeof match.confidence === 'number' ? match.confidence : 0.9,
         attribution_source: 'gemini_ai',
       };
@@ -112,13 +118,21 @@ ${JSON.stringify(windowLines)}`;
       const seg = updated[i];
       if (seg.type !== 'dialogue') continue;
 
-      if (seg.speaker_id !== 'unresolved' && seg.speaker_name && seg.speaker_name !== 'Unknown Speaker') {
+      const isUnresolvedCandidate =
+        seg.speaker_id === 'unresolved' ||
+        seg.attribution_source === 'alternation' ||
+        seg.attribution_source === 'context_alternation' ||
+        !seg.speaker_name ||
+        seg.speaker_name === 'Unknown Speaker';
+
+      if (!isUnresolvedCandidate) {
         secondLastSpeaker = lastKnownSpeaker;
         lastKnownSpeaker = seg.speaker_name;
         continue;
       }
 
       let resolvedName = '';
+      let resolvedViaOllama = false;
       if (isOllamaUp && knownCharacters.length > 0) {
         try {
           const contextBefore = updated
@@ -142,6 +156,7 @@ ${JSON.stringify(windowLines)}`;
           for (const c of knownCharacters) {
             if (answer.toLowerCase().includes(c.toLowerCase())) {
               resolvedName = c;
+              resolvedViaOllama = true;
               break;
             }
           }
@@ -158,7 +173,7 @@ ${JSON.stringify(windowLines)}`;
         } else if (knownCharacters.length > 0) {
           resolvedName = knownCharacters[0];
         } else {
-          resolvedName = 'Speaker';
+          resolvedName = seg.speaker_name || 'Speaker';
         }
       }
 
@@ -166,8 +181,10 @@ ${JSON.stringify(windowLines)}`;
         ...seg,
         speaker_name: resolvedName,
         speaker_id: resolvedName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-        attribution_confidence: isOllamaUp ? 0.75 : 0.5,
-        attribution_source: isOllamaUp ? 'llm_fallback' : 'regex_rule',
+        voice_id: null,
+        assigned_voice_id: null,
+        attribution_confidence: resolvedViaOllama ? 0.75 : 0.5,
+        attribution_source: resolvedViaOllama ? 'llm_fallback' : 'alternation',
       };
 
       secondLastSpeaker = lastKnownSpeaker;

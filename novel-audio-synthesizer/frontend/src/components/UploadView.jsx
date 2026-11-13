@@ -1,7 +1,14 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { api, ApiError } from '../services/api';
-import { parseEbookWithFoliate, parsePdfWithPdfJs } from '../utils/ebookParser';
+import { parseEbookWithFoliate, parsePdfWithPdfJs, extractChaptersFromText } from '../utils/ebookParser';
+import {
+  buildCanonicalVoiceGroups,
+  VoiceOptionGroups,
+  normalizeParsedCharacters,
+  encodeUtf8Base64,
+  useVoiceAudition,
+} from './VoicesView';
 import {
   IconUpload,
   IconBook,
@@ -11,10 +18,48 @@ import {
   IconX,
   IconUser,
   IconPlay,
+  IconPause,
 } from './icons';
 
-export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth, onNavigate }) {
-  const { user, isAuthenticated, isWriterOrAdmin, login } = useAuth();
+const PARSER_ENGINE_OPTIONS = [
+  { id: 'heuristic', label: 'Heuristic (Fast Local Rules)' },
+  { id: 'gemini', label: 'Gemini AI (Cloud Dialogue LLM)' },
+  { id: 'ollama', label: 'Ollama (Local LLM Attribution)' },
+  { id: 'unlimited-ocr', label: 'Vision OCR (Scanned PDF / vLLM)' },
+];
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function readStoredParserConfig() {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem('synctone_parser_config');
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+export default function UploadView({
+  onNovelCreated,
+  onSelectChapter,
+  onOpenAuth,
+  onNavigate,
+  defaultParserEngine: propParserEngine,
+  onSelectParserEngine,
+}) {
+  const { user, isAuthenticated, isWriterOrAdmin, login, register } = useAuth();
 
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
@@ -22,13 +67,33 @@ export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth
   const [parseProgress, setParseProgress] = useState('');
   const [parseError, setParseError] = useState(null);
 
+  const [localParserEngine, setLocalParserEngine] = useState(() => {
+    try {
+      return (typeof localStorage !== 'undefined' && localStorage.getItem('synctone_parser_engine')) || 'heuristic';
+    } catch (_) {
+      return 'heuristic';
+    }
+  });
+  const parserEngine = propParserEngine || localParserEngine;
+  const [parserConfig, setParserConfig] = useState(readStoredParserConfig);
+
   // Form Fields
   const [title, setTitle] = useState('');
   const [synopsis, setSynopsis] = useState('');
+  const [pastedText, setPastedText] = useState('');
   const [globalTone, setGlobalTone] = useState('Victorian Mystery');
   const [channel, setChannel] = useState('community');
   const [parsedChapters, setParsedChapters] = useState([]);
+  const [parsedCharacters, setParsedCharacters] = useState([]);
   const [coverUrl, setCoverUrl] = useState('');
+
+  const {
+    playingId: auditionPlayingId,
+    loadingId: auditionLoadingId,
+    auditionError,
+    setAuditionError,
+    toggleAudition,
+  } = useVoiceAudition();
 
   // Submission State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,16 +102,67 @@ export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth
   const [quickLoginLoading, setQuickLoginLoading] = useState(false);
 
   const fileInputRef = useRef(null);
+  const parserEngineRef = useRef(parserEngine);
+  const parserConfigRef = useRef(parserConfig);
+  parserEngineRef.current = parserEngine;
+  parserConfigRef.current = parserConfig;
 
-  // Quick 1-click Demo Writer Login for testing/guest access
+  React.useEffect(() => {
+    let cancelled = false;
+    const maybePromise = api.status?.getParserConfig?.();
+    if (maybePromise && typeof maybePromise.then === 'function') {
+      maybePromise
+        .then((res) => {
+          if (cancelled || !res) return;
+          const nextCfg = res.config && typeof res.config === 'object' ? res.config : res;
+          setParserConfig(nextCfg);
+          try {
+            localStorage.setItem('synctone_parser_config', JSON.stringify(nextCfg));
+          } catch (_) {}
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleParserEngineChange = (nextEngine) => {
+    setLocalParserEngine(nextEngine);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('synctone_parser_engine', nextEngine);
+      }
+    } catch (_) {}
+    onSelectParserEngine?.(nextEngine);
+  };
+
+  // Quick 1-click Demo Writer Login for testing/guest access (auto-registers if account missing)
   const handleQuickDemoLogin = async () => {
     setQuickLoginLoading(true);
     setSubmitError(null);
     try {
-      await login('demo_writer@synctone.internal', 'demo1234');
+      const loginRes = await login('demo_writer@synctone.internal', 'demo1234');
+      if (!loginRes?.success) {
+        if (typeof register === 'function') {
+          const regRes = await register('Demo Writer', 'demo_writer@synctone.internal', 'demo1234', 'writer');
+          if (!regRes?.success) {
+            setSubmitError(regRes?.error || 'Quick demo writer sign-in failed. Please use standard Sign In.');
+          }
+        } else {
+          setSubmitError(loginRes?.error || 'Quick demo writer sign-in failed. Please use standard Sign In.');
+        }
+      }
     } catch (_) {
       try {
-        await login('writer_demo@synctone.internal', 'demo1234');
+        if (typeof register === 'function') {
+          const regRes = await register('Demo Writer', 'demo_writer@synctone.internal', 'demo1234', 'writer');
+          if (!regRes?.success) {
+            setSubmitError(regRes?.error || 'Quick demo writer sign-in failed. Please use standard Sign In.');
+          }
+        } else {
+          setSubmitError('Quick demo writer sign-in failed. Please use standard Sign In.');
+        }
       } catch (err) {
         setSubmitError('Quick demo writer sign-in failed. Please use standard Sign In.');
       }
@@ -74,46 +190,81 @@ export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth
 
     try {
       const ext = selectedFile.name.split('.').pop().toLowerCase();
+      const activeParserEngine = parserEngineRef.current || 'heuristic';
+      const activeParserConfig = parserConfigRef.current || readStoredParserConfig();
       let extractedData = null;
 
-      if (ext === 'pdf') {
-        setParseProgress('Extracting text chapters via PDF.js...');
-        extractedData = await parsePdfWithPdfJs(selectedFile, api.novels.uploadAsset);
-      } else if (['epub', 'mobi', 'azw3', 'fb2'].includes(ext)) {
-        setParseProgress('Extracting book structure via Foliate parser...');
-        extractedData = await parseEbookWithFoliate(selectedFile, api.novels.uploadAsset);
-      } else {
-        // Plain text / markdown fallback
-        setParseProgress('Parsing plain text chapters...');
-        const text = await selectedFile.text();
-        const rawChapters = text.split(/(?=^Chapter\s+\d+|^PART\s+\d+|^BOOK\s+\d+)/gmi);
-        extractedData = {
-          title: selectedFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
-          author: user?.username || 'SyncTone Author',
-          chapters: rawChapters.map((ch, idx) => {
-            const body = ch.trim() || 'Chapter text preview.';
-            return {
-              chapter_number: idx + 1,
-              title: `Chapter ${idx + 1}`,
-              raw_text: body,
-              text: body,
-              content: body,
-            };
-          }),
-        };
+      // Run backend parser first across all 4 engines (heuristic, gemini, ollama, unlimited-ocr)
+      if (typeof api.novels?.parseFile === 'function') {
+        setParseProgress(`Extracting & attributing manuscript via ${activeParserEngine}...`);
+        try {
+          const formData = new FormData();
+          formData.append('file', selectedFile);
+          formData.append('parser_engine', activeParserEngine);
+          if (activeParserConfig) {
+            formData.append('parser_config', JSON.stringify(activeParserConfig));
+          }
+          extractedData = await api.novels.parseFile(formData, activeParserEngine, activeParserConfig);
+        } catch (uploadErr) {
+          if (selectedFile.size < 50 * 1024 * 1024) {
+            try {
+              const base64 = await readFileAsBase64(selectedFile);
+              extractedData = await api.novels.parseFile(
+                {
+                  file_name: selectedFile.name,
+                  file_base64: base64,
+                  parser_engine: activeParserEngine,
+                  ...(activeParserConfig ? { parser_config: activeParserConfig } : {}),
+                },
+                activeParserEngine,
+                activeParserConfig
+              );
+            } catch (_) {}
+          }
+        }
+      }
+
+      if (!extractedData || !Array.isArray(extractedData.chapters) || extractedData.chapters.length === 0) {
+        if (ext === 'pdf') {
+          setParseProgress('Extracting text chapters via PDF.js...');
+          extractedData = await parsePdfWithPdfJs(selectedFile, api.novels.uploadAsset);
+        } else if (['epub', 'mobi', 'azw3', 'fb2'].includes(ext)) {
+          setParseProgress('Extracting book structure via Foliate parser...');
+          extractedData = await parseEbookWithFoliate(selectedFile, api.novels.uploadAsset);
+        } else {
+          // Plain text / markdown fallback
+          setParseProgress('Parsing plain text chapters...');
+          const text = await selectedFile.text();
+          const rawChapters = text.split(/(?=^Chapter\s+\d+|^PART\s+\d+|^BOOK\s+\d+)/gmi);
+          extractedData = {
+            title: selectedFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
+            author: user?.username || 'SyncTone Author',
+            chapters: rawChapters.map((ch, idx) => {
+              const body = ch.trim() || 'Chapter text preview.';
+              return {
+                chapter_number: idx + 1,
+                title: `Chapter ${idx + 1}`,
+                raw_text: body,
+                text: body,
+                content: body,
+              };
+            }),
+          };
+        }
       }
 
       if (extractedData) {
         if (extractedData.title && !title) setTitle(extractedData.title);
         if (extractedData.synopsis && !synopsis) setSynopsis(extractedData.synopsis);
         if (extractedData.cover_object) setCoverUrl(extractedData.cover_object);
-        if (Array.isArray(extractedData.chapters) && extractedData.chapters.length > 0) {
-          setParsedChapters(extractedData.chapters);
-        } else {
-          setParsedChapters([
-            { chapter_number: 1, title: 'Chapter 1', raw_text: 'Extracted chapter prose.', text: 'Extracted chapter prose.', content: 'Extracted chapter prose.' },
-          ]);
-        }
+        const resolvedChapters =
+          Array.isArray(extractedData.chapters) && extractedData.chapters.length > 0
+            ? extractedData.chapters
+            : [
+                { chapter_number: 1, title: 'Chapter 1', raw_text: 'Extracted chapter prose.', text: 'Extracted chapter prose.', content: 'Extracted chapter prose.' },
+              ];
+        setParsedChapters(resolvedChapters);
+        setParsedCharacters(normalizeParsedCharacters(extractedData.characters, resolvedChapters));
       }
     } catch (err) {
       console.warn('[Upload Studio Parser Warning]:', err);
@@ -125,11 +276,84 @@ export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth
           { chapter_number: 1, title: 'Chapter 1', raw_text: 'Manual manuscript upload.', text: 'Manual manuscript upload.', content: 'Manual manuscript upload.' },
         ]);
       }
+      setParsedCharacters((prev) => (prev.length > 0 ? prev : normalizeParsedCharacters([])));
     } finally {
       setIsParsing(false);
       setParseProgress('');
     }
   };
+
+  const handleParsePastedText = async () => {
+    const sourceText =
+      pastedText.trim() ||
+      parsedChapters.map((c) => c.raw_text || c.text || c.content || '').filter(Boolean).join('\n\n') ||
+      synopsis.trim();
+
+    if (!sourceText) {
+      setParseError('Paste manuscript text or upload a file first to detect characters.');
+      return;
+    }
+
+    setIsParsing(true);
+    setParseError(null);
+    const activeParserEngine = parserEngineRef.current || 'heuristic';
+    const activeParserConfig = parserConfigRef.current || readStoredParserConfig();
+    setParseProgress(`Parsing text & detecting characters via ${activeParserEngine}...`);
+
+    try {
+      let extractedData = null;
+      const safeName = `${(title || 'manuscript').trim().replace(/[^a-z0-9_-]+/gi, '_')}.txt`;
+
+      if (typeof api.novels?.parseFile === 'function') {
+        try {
+          extractedData = await api.novels.parseFile(
+            {
+              file_name: safeName,
+              file_base64: encodeUtf8Base64(sourceText),
+              parser_engine: activeParserEngine,
+              ...(activeParserConfig ? { parser_config: activeParserConfig } : {}),
+            },
+            activeParserEngine,
+            activeParserConfig
+          );
+        } catch (_) {}
+      }
+
+      if (!extractedData || !Array.isArray(extractedData.chapters) || extractedData.chapters.length === 0) {
+        const chapters = extractChaptersFromText(sourceText, title || 'Manuscript');
+        extractedData = { title: title || 'Manuscript', chapters, characters: [] };
+      }
+
+      const resolvedChapters = extractedData.chapters.map((ch, idx) => {
+        const body = ch.raw_text || ch.text || ch.content || '';
+        return {
+          ...ch,
+          chapter_number: ch.chapter_number || idx + 1,
+          title: ch.title || `Chapter ${idx + 1}`,
+          raw_text: body,
+          text: body,
+          content: body,
+        };
+      });
+
+      setParsedChapters(resolvedChapters);
+      setParsedCharacters(normalizeParsedCharacters(extractedData.characters, resolvedChapters));
+      if (extractedData.title && !title) setTitle(extractedData.title);
+    } catch (err) {
+      setParseError(err?.message || 'Failed to parse pasted manuscript text.');
+    } finally {
+      setIsParsing(false);
+      setParseProgress('');
+    }
+  };
+
+  const handleCharacterUpdate = (charId, patch) => {
+    setParsedCharacters((prev) =>
+      prev.map((c) => (c.character_id === charId ? { ...c, ...patch } : c))
+    );
+  };
+
+  const baseVoiceGroups = useMemo(() => buildCanonicalVoiceGroups({}), []);
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
@@ -169,6 +393,7 @@ export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth
     setSubmitSuccess(null);
 
     try {
+      const activeParserConfig = parserConfigRef.current || readStoredParserConfig();
       const payload = {
         title: title.trim(),
         synopsis: synopsis.trim() || 'Dramatic multi-voice audio adaptation.',
@@ -176,15 +401,18 @@ export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth
         channel,
         portfolio_source: 'manual',
         cover_object: coverUrl || null,
+        parser_engine: parserEngine,
+        ...(activeParserConfig ? { parser_config: activeParserConfig } : {}),
+        characters: parsedCharacters,
         chapters: (parsedChapters.length > 0
           ? parsedChapters
           : [
               {
                 chapter_number: 1,
                 title: 'Chapter 1',
-                raw_text: synopsis.trim() || 'Initial manuscript prose.',
-                text: synopsis.trim() || 'Initial manuscript prose.',
-                content: synopsis.trim() || 'Initial manuscript prose.',
+                raw_text: pastedText.trim() || synopsis.trim() || 'Initial manuscript prose.',
+                text: pastedText.trim() || synopsis.trim() || 'Initial manuscript prose.',
+                content: pastedText.trim() || synopsis.trim() || 'Initial manuscript prose.',
               },
             ]
         ).map((c, i) => {
@@ -195,6 +423,7 @@ export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth
             raw_text: body,
             text: body,
             content: body,
+            ...(Array.isArray(c.segments) && c.segments.length > 0 ? { segments: c.segments } : {}),
           };
         }),
       };
@@ -420,7 +649,7 @@ export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div className="space-y-1.5">
             <label className="text-xs font-mono uppercase text-[var(--text-sub)]">
               Catalog Channel
@@ -436,6 +665,28 @@ export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth
           </div>
 
           <div className="space-y-1.5">
+            <label
+              htmlFor="upload-parser-engine"
+              className="text-xs font-mono uppercase text-[var(--text-sub)]"
+            >
+              AI Manuscript Parser
+            </label>
+            <select
+              id="upload-parser-engine"
+              aria-label="AI Manuscript Parser"
+              value={parserEngine}
+              onChange={(e) => handleParserEngineChange(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--text-main)] font-mono"
+            >
+              {PARSER_ENGINE_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
             <label className="text-xs font-mono uppercase text-[var(--text-sub)]">
               Extracted Chapters ({parsedChapters.length})
             </label>
@@ -445,6 +696,153 @@ export default function UploadView({ onNovelCreated, onSelectChapter, onOpenAuth
             </div>
           </div>
         </div>
+
+        {/* Paste Manuscript Text & Parse Characters */}
+        <div className="space-y-2 pt-2 border-t border-[var(--border-subtle)]">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <label htmlFor="upload-pasted-text" className="text-xs font-mono uppercase text-[var(--text-sub)]">
+              Paste Manuscript Text (Optional)
+            </label>
+            <button
+              type="button"
+              onClick={handleParsePastedText}
+              disabled={isParsing}
+              className="boxed-btn px-3.5 py-1.5 text-[11px] font-mono uppercase inline-flex items-center gap-1.5 rounded-full cursor-pointer disabled:opacity-50"
+            >
+              <IconSparkles className="w-3.5 h-3.5" />
+              <span>{isParsing ? 'Parsing...' : 'Parse & Detect Characters'}</span>
+            </button>
+          </div>
+          <textarea
+            id="upload-pasted-text"
+            rows={4}
+            value={pastedText}
+            onChange={(e) => setPastedText(e.target.value)}
+            placeholder="Paste chapter prose and dialogue here to detect characters and assign voices before publishing..."
+            className="w-full px-4 py-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--text-main)] font-sans"
+          />
+        </div>
+
+        {/* Detected Characters & Voice Assignment Panel */}
+        {parsedCharacters.length > 0 && (
+          <div className="p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-strong)] space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <span className="text-[10px] font-mono uppercase text-[var(--text-muted)] block">
+                  // PRE-PUBLISH VOICE CAST
+                </span>
+                <h3 className="text-sm font-bold font-sans uppercase text-[var(--text-main)]">
+                  Detected Characters &amp; Voice Assignment ({parsedCharacters.length})
+                </h3>
+              </div>
+              {auditionError && (
+                <button
+                  type="button"
+                  onClick={() => setAuditionError(null)}
+                  className="text-[10px] font-mono text-[var(--text-main)] underline cursor-pointer"
+                >
+                  {auditionError}
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {parsedCharacters.map((char) => {
+                const groups = buildCanonicalVoiceGroups({}, [char.voice_id]);
+                const auditionKey = `upload:${char.character_id}`;
+                const isPlaying = auditionPlayingId === auditionKey;
+                const isLoading = auditionLoadingId === auditionKey;
+
+                return (
+                  <div
+                    key={char.character_id}
+                    className="p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                  >
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold font-sans uppercase text-[var(--text-main)] truncate">
+                          {char.name}
+                        </span>
+                        {char.is_narrator && (
+                          <span className="px-2 py-0.5 text-[9px] font-mono font-bold rounded-full bg-[var(--bg-surface)] border border-[var(--border-strong)] text-[var(--text-main)]">
+                            NARRATOR
+                          </span>
+                        )}
+                        {char.line_count > 0 && (
+                          <span className="text-[10px] font-mono text-[var(--text-muted)]">
+                            {char.line_count} line{char.line_count === 1 ? '' : 's'}
+                          </span>
+                        )}
+                      </div>
+                      {char.sample_quote && (
+                        <p className="text-[11px] font-serif italic text-[var(--text-sub)] line-clamp-1">
+                          &ldquo;{char.sample_quote}&rdquo;
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <select
+                        aria-label={`Gender for ${char.name}`}
+                        value={char.gender || 'unknown'}
+                        onChange={(e) => handleCharacterUpdate(char.character_id, { gender: e.target.value })}
+                        className="px-2 py-1 rounded-lg text-[11px] font-mono bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-subtle)] focus:outline-none focus:border-[var(--border-strong)]"
+                      >
+                        <option value="unknown">Unknown</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="neutral">Neutral</option>
+                      </select>
+
+                      <select
+                        aria-label={`Voice for ${char.name}`}
+                        value={char.voice_id}
+                        onChange={(e) => handleCharacterUpdate(char.character_id, { voice_id: e.target.value })}
+                        className="max-w-[200px] px-2.5 py-1 rounded-lg text-[11px] font-mono bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-strong)] focus:outline-none focus:border-[var(--text-main)]"
+                      >
+                        <VoiceOptionGroups groups={groups} />
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggleAudition({
+                            key: auditionKey,
+                            voiceId: char.voice_id,
+                            text: char.sample_quote || `Hello, I am ${char.name}.`,
+                            characterId: char.character_id,
+                            speakerName: char.name,
+                            isNarrator: Boolean(char.is_narrator),
+                            gender: char.gender || '',
+                          })
+                        }
+                        className="boxed-btn px-2.5 py-1 text-[10px] font-mono uppercase inline-flex items-center gap-1 rounded-full cursor-pointer"
+                        aria-label={`Audition voice for ${char.name}`}
+                      >
+                        {isLoading ? (
+                          <>
+                            <IconRefresh className="w-3 h-3 animate-spin" />
+                            <span>Loading</span>
+                          </>
+                        ) : isPlaying ? (
+                          <>
+                            <IconPause className="w-3 h-3 fill-current" />
+                            <span>Stop</span>
+                          </>
+                        ) : (
+                          <>
+                            <IconPlay className="w-3 h-3 fill-current" />
+                            <span>Audition</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Submit Actions */}
         <div className="pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-3">
