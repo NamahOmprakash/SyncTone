@@ -12,11 +12,11 @@ async function runTests() {
   assert.ok(Array.isArray(status.engines), 'status.engines must be an array');
   assert.deepStrictEqual(
     status.engines,
-    ['msedge-tts', 'kokoro-tts', 'paradee-tts', 'paradee-mixed', 'machine-tts'],
-    'Must list all 5 distinct TTS engines'
+    ['msedge-tts', 'kokoro-tts', 'machine-tts'],
+    'Must list all 3 distinct TTS engines'
   );
   assert.strictEqual(status.initialized, true);
-  console.log('  ✔ Model status returns all 5 TTS engines:', status.engines);
+  console.log('  ✔ Model status returns all 3 TTS engines:', status.engines);
 
   // Test 2: Engine 1: msedge-tts
   console.log('▶ [Test 2] Testing Engine 1: msedge-tts (Microsoft Edge Cloud Neural)...');
@@ -71,7 +71,7 @@ async function runTests() {
     1.0,
     'auto'
   );
-  assert.ok(['msedge-tts', 'kokoro-tts', 'paradee-tts', 'paradee-mixed', 'machine-tts'].includes(autoRes.engine));
+  assert.ok(['msedge-tts', 'kokoro-tts', 'machine-tts'].includes(autoRes.engine));
   assert.ok(autoRes.audio_buffer.length > 0);
   console.log(`  ✔ Fallback chain succeeded using engine: ${autoRes.engine} (${autoRes.duration_ms}ms)`);
 
@@ -80,11 +80,7 @@ async function runTests() {
   console.log('================================================================');
 }
 
-runTests()
-  .then(() => {
-    process.exit(0);
-  })
-  .catch((err) => {
-    console.error('❌ TTS 3-ENGINE TEST FAILED:', err);
-    process.exit(1);
-  });
+runTests().catch((err) => {
+  console.error('❌ TTS 3-ENGINE TEST FAILED:', err);
+  process.exit(1);
+});

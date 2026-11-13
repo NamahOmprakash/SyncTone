@@ -35,7 +35,7 @@ describe('ReaderView & Chapter Playback Regression Suite', () => {
     expect(screen.getByText(/Mr. and Mrs. Dursley/i)).toBeInTheDocument();
     expect(screen.getByText(/Fancy seeing you here/i)).toBeInTheDocument();
     expect(screen.getByText('Albus Dumbledore')).toBeInTheDocument();
-    expect(screen.getByText(/Narrator/i)).toBeInTheDocument();
+    expect(screen.getByText('Narrator')).toBeInTheDocument();
   });
 
   it('opens and renders The Great Gatsby Chapter 1 segments', () => {

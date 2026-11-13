@@ -13,31 +13,6 @@ from ..core.logger import get_logger
 
 logger = get_logger(__name__)
 
-EDGE_TO_KOKORO_MAP = {
-    "en-GB-RyanNeural": "bm_george",
-    "en-GB-ArthurNeural": "am_george",
-    "en-GB-SoniaNeural": "af_sarah",
-    "en-GB-LibbyNeural": "bf_emma",
-    "en-GB-ThomasNeural": "am_adam",
-    "en-GB-AlfieNeural": "bm_daniel",
-    "en-GB-NoahNeural": "am_michael",
-    "en-GB-OliverNeural": "bm_daniel",
-}
-VALID_KOKORO_VOICES = {
-    "af_heart", "af_bella", "af_nicole", "af_sky", "af_sarah",
-    "am_adam", "am_michael", "am_george", "am_onyx",
-    "bm_george", "bf_emma", "bm_daniel",
-}
-
-
-def resolve_kokoro_voice(voice_id: str) -> str:
-    if not voice_id:
-        return "bm_george"
-    if voice_id in VALID_KOKORO_VOICES:
-        return voice_id
-    return EDGE_TO_KOKORO_MAP.get(voice_id, "bm_george")
-
-
 
 class TTSEngine:
     """Wraps Kokoro-TTS for multi-voice synthesis."""
@@ -80,17 +55,8 @@ class TTSEngine:
 
         try:
             try:
-                import os, shutil, espeakng_loader
-                from kokoro_onnx import Kokoro, EspeakConfig
-                orig_dp = espeakng_loader.get_data_path()
-                if len(orig_dp) > 130:
-                    short_dp = "/tmp/espeak-ng-data"
-                    if os.path.islink(short_dp):
-                        os.unlink(short_dp)
-                    if not os.path.exists(short_dp):
-                        shutil.copytree(orig_dp, short_dp, symlinks=True)
-                    orig_dp = short_dp
-                self._model = Kokoro(str(model_file), str(voices_file), espeak_config=EspeakConfig(data_path=orig_dp))
+                from kokoro_onnx import Kokoro
+                self._model = Kokoro(str(model_file), str(voices_file))
             except ImportError:
                 from kokoro import KPipeline
                 self._model = KPipeline(lang_code='a')
@@ -127,17 +93,14 @@ class TTSEngine:
             return silence, 100
 
         try:
-            kokoro_voice = resolve_kokoro_voice(voice_id)
-            lang = "en-gb" if kokoro_voice.startswith("b") else "en-us"
             if hasattr(self._model, 'create'):
                 samples, sr = self._model.create(
                     text=text,
-                    voice=kokoro_voice,
+                    voice=voice_id,
                     speed=speed,
-                    lang=lang,
                 )
             elif callable(self._model):
-                generator = self._model(text, voice=kokoro_voice, speed=speed)
+                generator = self._model(text, voice=voice_id, speed=speed)
                 all_samples = []
                 sr = self._sample_rate
                 for _, _, audio in generator:

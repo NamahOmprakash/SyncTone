@@ -50,7 +50,7 @@ export function Card({
 
       {/* Eyebrow / Genre */}
       {eyebrow && (
-        <p className="font-mono text-[11px] font-semibold uppercase tracking-wider text-[var(--accent-text)] mb-1 truncate">
+        <p className="font-mono text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)] mb-1 truncate">
           {eyebrow}
         </p>
       )}

@@ -52,7 +52,6 @@ function createApp() {
   app.use('/static/audio', express.static(config.paths.outputDir));
   app.use('/static/covers', express.static(path.join(config.paths.outputDir, 'covers')));
   app.use('/static/covers', express.static(path.resolve(__dirname, '../output/covers')));
-  app.use('/static/covers', express.static(path.resolve(__dirname, '../../frontend/public/covers')));
 
   // Health check endpoint (root & /api alias)
   app.get(['/health', '/api/health'], (_req, res) => {

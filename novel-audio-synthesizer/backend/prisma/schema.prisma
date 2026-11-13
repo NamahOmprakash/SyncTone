@@ -43,8 +43,7 @@ model Voice {
   reserved_narrator Boolean  @default(false)
   created_at        DateTime @default(now()) @db.Timestamptz(6)
 
-  characters  Character[]
-  age_stages  CharacterAgeStage[]
+  characters Character[]
 
   @@map("voices")
 }
@@ -63,13 +62,11 @@ model Novel {
   created_at       DateTime @default(now()) @db.Timestamptz(6)
   updated_at       DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
-  author                User                      @relation(fields: [added_by], references: [id], onDelete: Cascade)
+  author                User                    @relation(fields: [added_by], references: [id], onDelete: Cascade)
   chapters              Chapter[]
   characters            Character[]
   profile_job_targets   NovelProfileJobTarget[]
   playback_history      PlaybackHistory[]
-  analysis              NovelAnalysis?
-  pronunciation_dict    PronunciationDictionary[]
 
   @@index([added_by], map: "ix_novels_added_by")
   @@map("novels")
@@ -92,7 +89,6 @@ model Chapter {
   novel                 Novel                       @relation(fields: [novel_id], references: [id], onDelete: Cascade)
   synthesis_job_targets ChapterSynthesisJobTarget[]
   playback_positions    PlaybackPosition[]
-  timeline_anchor       ChapterTimelineAnchor?
 
   @@unique([novel_id, chapter_number], map: "uq_chapters_novel_chapter_number")
   @@index([novel_id], map: "ix_chapters_novel_id")
@@ -113,18 +109,12 @@ model Character {
   is_narrator      Boolean  @default(false)
   needs_review     Boolean  @default(false)
   source           String   @default("ai") @db.VarChar(20)
-  description      String?  @db.Text
-  role             String   @default("minor") @db.VarChar(20)
-  dialogue_count   Int      @default(0)
-  first_chapter    Int?
-  last_chapter     Int?
   created_at       DateTime @default(now()) @db.Timestamptz(6)
   updated_at       DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
-  novel      Novel              @relation(fields: [novel_id], references: [id], onDelete: Cascade)
-  voice      Voice?             @relation(fields: [voice_id], references: [id], onDelete: SetNull)
-  aliases    CharacterAlias[]
-  age_stages CharacterAgeStage[]
+  novel   Novel            @relation(fields: [novel_id], references: [id], onDelete: Cascade)
+  voice   Voice?           @relation(fields: [voice_id], references: [id], onDelete: SetNull)
+  aliases CharacterAlias[]
 
   @@unique([novel_id, canonical_name], map: "uq_characters_novel_canonical_name")
   @@index([novel_id], map: "ix_characters_novel_id")
@@ -239,73 +229,4 @@ model PlaybackPosition {
 
   @@index([chapter_id], map: "ix_playback_positions_chapter_id")
   @@map("playback_positions")
-}
-
-
-// 13. Novel Analyses Table (AI Understanding Results)
-model NovelAnalysis {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  novel_id        String   @unique @db.Uuid
-  status          String   @default("pending") @db.VarChar(30)
-  analysis_data   Json?
-  character_count Int      @default(0)
-  dialogue_count  Int      @default(0)
-  error_message   String?  @db.Text
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(6)
-
-  novel Novel @relation(fields: [novel_id], references: [id], onDelete: Cascade)
-
-  @@index([novel_id], map: "ix_novel_analyses_novel_id")
-  @@map("novel_analyses")
-}
-
-// 14. Character Age Stages Table (Voice Evolution Across Story Chronology)
-model CharacterAgeStage {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  character_id     String   @db.Uuid
-  stage_name       String   @db.VarChar(50)
-  approx_age_min   Int?
-  approx_age_max   Int?
-  base_voice_id    String   @db.VarChar(64)
-  pitch_adjustment String   @default("+0%") @db.VarChar(10)
-  rate_adjustment  String   @default("+0%") @db.VarChar(10)
-  created_at       DateTime @default(now()) @db.Timestamptz(6)
-
-  character Character @relation(fields: [character_id], references: [id], onDelete: Cascade)
-  voice     Voice     @relation(fields: [base_voice_id], references: [id])
-
-  @@unique([character_id, stage_name], map: "uq_character_age_stage")
-  @@index([character_id], map: "ix_character_age_stages_character_id")
-  @@map("character_age_stages")
-}
-
-// 15. Chapter Timeline Anchors Table (Story Chronology Independent of Chapter Order)
-model ChapterTimelineAnchor {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  chapter_id   String   @unique @db.Uuid
-  story_order  Int
-  story_year   Decimal? @db.Decimal(8, 2)
-  is_flashback Boolean  @default(false)
-  is_time_jump Boolean  @default(false)
-  created_at   DateTime @default(now()) @db.Timestamptz(6)
-
-  chapter Chapter @relation(fields: [chapter_id], references: [id], onDelete: Cascade)
-
-  @@map("chapter_timeline_anchors")
-}
-
-// 16. Pronunciation Dictionaries Table (Novel-Scoped Phonetic Overrides)
-model PronunciationDictionary {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  novel_id   String   @db.Uuid
-  word       String   @db.VarChar(100)
-  phonetic   String   @db.VarChar(200)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-
-  novel Novel @relation(fields: [novel_id], references: [id], onDelete: Cascade)
-
-  @@unique([novel_id, word], map: "uq_pronunciation_dict_novel_word")
-  @@index([novel_id], map: "ix_pronunciation_dictionaries_novel_id")
-  @@map("pronunciation_dictionaries")
 }

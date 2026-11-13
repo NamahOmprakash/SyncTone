@@ -154,8 +154,8 @@ class SynthesisEventDispatcher extends EventEmitter {
       chapter_id: id,
       status,
       percent_complete: Math.max(0, Math.min(100, Math.round(percentComplete))),
-      current_segment: event.current_segment != null ? Number(event.current_segment) : null,
-      total_segments: event.total_segments != null ? Number(event.total_segments) : null,
+      current_segment: Number(event.current_segment || 0),
+      total_segments: Number(event.total_segments || 0),
       error: event.error ? String(event.error) : null,
       timestamp: event.timestamp || new Date().toISOString(),
     };

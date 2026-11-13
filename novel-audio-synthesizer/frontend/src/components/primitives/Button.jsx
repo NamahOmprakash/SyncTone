@@ -28,23 +28,23 @@ export function Button({
 
   const variantClasses = {
     primary:
-      'bg-[var(--cta-primary-bg)] hover:bg-[var(--cta-primary-hover)] text-[var(--cta-primary-text)] font-semibold shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary-bg)]',
+      'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--on-accent)] font-semibold shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]',
     secondary:
-      'bg-[var(--bg-surface)] text-[var(--text-main)] border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-hover)] font-semibold shadow-xs',
+      'theme-surface border border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] font-semibold shadow-xs',
     ghost:
       'bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-sub)] hover:text-[var(--text-main)] font-medium',
     outline:
       'bg-transparent border border-[var(--border-subtle)] hover:border-[var(--accent)] text-[var(--text-main)] font-semibold',
     danger:
-      'bg-[var(--danger)] text-white font-semibold shadow-sm hover:opacity-90',
-  }[variant] || 'bg-[var(--cta-primary-bg)] text-[var(--cta-primary-text)] font-semibold';
+      'bg-[var(--color-status-danger)] text-white font-semibold shadow-sm hover:opacity-90',
+  }[variant] || 'bg-[var(--accent)] text-[var(--on-accent)] font-semibold';
 
   return (
     <button
       type={type}
       disabled={disabled || isLoading}
       onClick={onClick}
-      className={`inline-flex items-center justify-center gap-2 rounded-full transition-all duration-200 ease-out cursor-pointer select-none hover:scale-[1.03] hover:-translate-y-0.5 active:scale-[0.96] disabled:hover:scale-100 disabled:hover:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${sizeClasses} ${variantClasses} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${sizeClasses} ${variantClasses} ${className}`}
       {...props}
     >
       {isLoading ? (

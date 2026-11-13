@@ -29,7 +29,7 @@ export function Toast({
     success: 'border-[var(--success)] text-[var(--success)]',
     warning: 'border-[var(--warning)] text-[var(--warning)]',
     danger: 'border-[var(--danger)] text-[var(--danger)]',
-  }[type] || 'border-[var(--accent)] text-[var(--accent-text)]';
+  }[type] || 'border-[var(--accent)] text-[var(--accent)]';
 
   return (
     <aside
