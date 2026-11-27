@@ -10,7 +10,7 @@ const { Chapter } = require('../models');
 const { parseChapter } = require('../engine/textParser');
 const { voiceProfiler } = require('../engine/voiceProfiler');
 const { parseUploadedManuscript } = require('../engine/parsers');
-const { authenticateUser, optionalAuth } = require('../middleware/auth');
+const { authenticateUser, requireRole } = require('../middleware/auth');
 const { config } = require('../config');
 const { storageService } = require('../services/storageService');
 const statusRouter = require('./status');
@@ -243,7 +243,7 @@ router.post('/novels/parse-file', upload.single('file'), async (req, res) => {
  */
 const ALLOWED_IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
-router.post('/novels/upload-asset', upload.single('file'), async (req, res) => {
+router.post('/novels/upload-asset', authenticateUser, requireRole('writer', 'admin'), upload.single('file'), async (req, res) => {
   const uploadedTmpPath = req.file?.path || null;
   try {
     const coversDirs = Array.from(
@@ -319,13 +319,13 @@ router.post('/novels/upload-asset', upload.single('file'), async (req, res) => {
  * Inserts a new novel using specified fields: title, synopsis, channel, added_by
  * If `chapters` array is provided, automatically ingests up to 50 chapters into PostgreSQL & MongoDB!
  */
-router.post('/novels', optionalAuth, async (req, res) => {
+router.post('/novels', authenticateUser, requireRole('writer', 'admin'), async (req, res) => {
   try {
     const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
     const {
       title,
       synopsis = '',
-      channel = 'verified',
+      channel: requestedChannel,
       added_by: requestedAddedBy,
       global_tone = null,
       cover_object = null,
@@ -346,20 +346,30 @@ router.post('/novels', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'synopsis must be a string.' });
     }
 
-    // Prevent IDOR: an authenticated user (unless admin) can only create novels for their own id
-    const added_by = (req.user && req.user.role !== 'admin')
-      ? req.user.id
-      : (requestedAddedBy || req.user?.id);
+    // Prevent IDOR: non-admins cannot specify another user's added_by
+    if (req.user.role !== 'admin' && requestedAddedBy !== undefined && requestedAddedBy !== null && requestedAddedBy !== '' && requestedAddedBy !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden: you cannot create novels on behalf of another user.' });
+    }
+    const added_by = (req.user.role === 'admin' && requestedAddedBy)
+      ? requestedAddedBy
+      : req.user.id;
     if (!added_by || typeof added_by !== 'string' || !UUID_REGEX.test(added_by)) {
-      return res.status(400).json({
-        error: 'A valid added_by user UUID is required (or provide an authenticated session).',
-      });
+      return res.status(400).json({ error: 'Invalid user UUID for added_by.' });
     }
 
-    const normalizedChannel = typeof channel === 'string' && channel.trim() ? channel.toLowerCase().trim() : 'verified';
+    const defaultChannel = req.user.role === 'admin' ? 'verified' : 'community';
+    const normalizedChannel =
+      requestedChannel !== undefined && requestedChannel !== null && String(requestedChannel).trim() !== ''
+        ? String(requestedChannel).toLowerCase().trim()
+        : defaultChannel;
     if (!ALLOWED_CHANNELS.includes(normalizedChannel)) {
       return res.status(400).json({
         error: `Invalid channel. Allowed values: ${ALLOWED_CHANNELS.join(', ')}.`,
+      });
+    }
+    if (normalizedChannel === 'verified' && req.user.role !== 'admin') {
+      return res.status(403).json({
+        error: 'Forbidden: only administrators may publish directly into the verified channel.',
       });
     }
 
@@ -893,7 +903,7 @@ router.get('/novels/:id', async (req, res) => {
  * PATCH /api/novels/:id
  * Updates specific novel metadata fields: cover_object, title, synopsis, global_tone, channel.
  */
-router.patch('/novels/:id', authenticateUser, async (req, res) => {
+router.patch('/novels/:id', authenticateUser, requireRole('writer', 'admin'), async (req, res) => {
   try {
     const { id } = req.params;
     if (!id || !UUID_REGEX.test(id)) {
@@ -951,8 +961,8 @@ router.patch('/novels/:id', authenticateUser, async (req, res) => {
           error: `Invalid channel. Allowed values: ${ALLOWED_CHANNELS.join(', ')}.`,
         });
       }
-      if (normalizedChannel === 'verified' && req.user.role === 'reader') {
-        return res.status(403).json({ error: 'Forbidden: readers cannot promote a novel to verified.' });
+      if (normalizedChannel === 'verified' && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Forbidden: only administrators can move novels into the verified channel.' });
       }
       fields.push(`channel = $${idx++}`);
       values.push(normalizedChannel);
@@ -992,7 +1002,7 @@ router.patch('/novels/:id', authenticateUser, async (req, res) => {
  * DELETE /api/novels and DELETE /api/novels/:id
  * Permanent deletion of novels is prohibited. SyncTone preserves all literary works.
  */
-router.delete(['/novels', '/novels/:id'], optionalAuth, async (req, res) => {
+router.delete(['/novels', '/novels/:id'], authenticateUser, async (req, res) => {
   return res.status(403).json({
     error: 'Permanent deletion of novels is prohibited. SyncTone preserves all literary works.',
     code: 'PERMANENT_DELETION_DISABLED',

@@ -1,20 +1,23 @@
 """Application configuration using Pydantic Settings."""
 
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 from pathlib import Path
 import os
 
 
 class Settings(BaseSettings):
-    """Central configuration. Override via environment variables prefixed with NAS_."""
+    """Central configuration. Override via environment variables."""
 
     # --- Paths ---
     base_dir: Path = Path(__file__).resolve().parent.parent.parent  # backend/
     models_dir: Path = Path("models_cache")
-    output_dir: Path = Path("output")
-    chapters_dir: Path = Path("chapters")
-    kokoro_model_path: str = "models_cache/kokoro-v1.0.pth"
+    output_dir: Path = Path(os.getenv("AUDIO_OUTPUT_DIR", "output"))
+    chapters_dir: Path = Path(os.getenv("CHAPTERS_DIR", "chapters"))
+    kokoro_model_path: str = "models_cache/kokoro-v1.0.onnx"
     kokoro_voices_path: str = "models_cache/voices-v1.0.bin"
+    mongo_uri: str = "mongodb://localhost:27017/synctone"
+    worker_lock_timeout_sec: int = 300
 
     # --- LLM (Ollama) ---
     ollama_base_url: str = "http://localhost:11434"
@@ -23,7 +26,7 @@ class Settings(BaseSettings):
     # --- Audio ---
     sample_rate: int = 24000
     inter_speaker_pause_ms: int = 150
-    default_audio_format: str = "opus"
+    default_audio_format: str = "mp3"
 
     # --- Server ---
     host: str = "0.0.0.0"
@@ -33,14 +36,27 @@ class Settings(BaseSettings):
     # --- SpaCy ---
     spacy_model: str = "en_core_web_sm"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    @property
+    def AUDIO_OUTPUT_DIR(self) -> Path:
+        return self.output_dir
 
     def resolve_path(self, relative: Path | str) -> Path:
-        """Resolve a relative path against the backend base directory."""
-        return self.base_dir / relative
+        """Resolve a path against backend base directory (or shared repo output if present)."""
+        p = Path(relative)
+        if p.is_absolute():
+            return p
+        candidate = self.base_dir / p
+        if str(p) == "output" and not candidate.exists():
+            parent_output = self.base_dir.parent / "output"
+            if parent_output.exists():
+                return parent_output
+        return candidate
 
 
 settings = Settings()

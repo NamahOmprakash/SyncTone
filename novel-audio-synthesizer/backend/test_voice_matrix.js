@@ -548,11 +548,27 @@ async function runVoiceMatrixTests() {
           manifest: { total_duration_ms: 0, audio_url: `/api/stream/${testChapterId}`, timeline: [] },
         });
 
-        // Anonymous POST /api/parse/:chapter_id (optionalAuth)
-        const parseResp = await axios.post(`${baseUrl}/parse/${testChapterId}`, {
-          parser_engine: 'heuristic',
-          parser_config: { heuristic: { sensitivity: 'balanced', turnTaking: true, quoteStyle: 'auto' } },
-        });
+        const jwt = require('jsonwebtoken');
+        const ownerJwt = jwt.sign(
+          { id: testUserId, username: `vm_tester_${Date.now()}`, role: 'writer' },
+          config.jwtSecret,
+          { expiresIn: '1h' }
+        );
+        const ownerCookieHeader = { headers: { Cookie: `token=${ownerJwt}` } };
+
+        // Unauthenticated POST /api/parse/:chapter_id rejected with 401
+        const unauthParseResp = await axios.post(`${baseUrl}/parse/${testChapterId}`, {}, { validateStatus: () => true });
+        assert.strictEqual(unauthParseResp.status, 401, 'Unauthenticated /parse must return 401');
+
+        // Authenticated owner POST /api/parse/:chapter_id
+        const parseResp = await axios.post(
+          `${baseUrl}/parse/${testChapterId}`,
+          {
+            parser_engine: 'heuristic',
+            parser_config: { heuristic: { sensitivity: 'balanced', turnTaking: true, quoteStyle: 'auto' } },
+          },
+          ownerCookieHeader
+        );
         assert.strictEqual(parseResp.status, 200);
         assert.ok(Array.isArray(parseResp.data.segments) && parseResp.data.segments.length >= 7);
 
@@ -562,7 +578,7 @@ async function runVoiceMatrixTests() {
 
         const pgChars = await pool.query('SELECT canonical_name, voice_id FROM characters WHERE novel_id = $1', [testNovelId]);
         assert.ok(pgChars.rows.length >= 3, `Expected >= 3 PG characters after /api/parse, got ${pgChars.rows.length}`);
-        console.log(`  ✔ POST /api/parse/:chapter_id (optionalAuth) verified (${pgChars.rows.length} PG characters, ${refreshedDoc.segments.length} segments)`);
+        console.log(`  ✔ POST /api/parse/:chapter_id (owner auth) verified (${pgChars.rows.length} PG characters, ${refreshedDoc.segments.length} segments)`);
 
         // GET /api/voices returns populated available_voices catalog (no TypeError regression)
         const voicesListResp = await axios.get(`${baseUrl}/voices`);
@@ -575,16 +591,20 @@ async function runVoiceMatrixTests() {
         );
         console.log(`  ✔ GET /api/voices verified (${Object.keys(voicesListResp.data.available_voices).length} palette voices)`);
 
-        // Anonymous POST /api/voices/assign (optionalAuth)
+        // Authenticated owner POST /api/voices/assign
         const targetChar = pgChars.rows.find((c) => c.canonical_name !== 'Narrator');
         assert.ok(targetChar, 'Expected at least one non-narrator character in PG');
         const newVoice = targetChar.voice_id === 'en-GB-ThomasNeural' ? 'en-US-GuyNeural' : 'en-GB-ThomasNeural';
 
-        const assignResp = await axios.post(`${baseUrl}/voices/assign`, {
-          character_id: targetChar.canonical_name,
-          new_voice_id: newVoice,
-          chapter_id: testChapterId,
-        });
+        const assignResp = await axios.post(
+          `${baseUrl}/voices/assign`,
+          {
+            character_id: targetChar.canonical_name,
+            new_voice_id: newVoice,
+            chapter_id: testChapterId,
+          },
+          ownerCookieHeader
+        );
         assert.strictEqual(assignResp.status, 200);
         assert.strictEqual(assignResp.data.ok, true);
         assert.strictEqual(assignResp.data.voice_id, newVoice);
@@ -603,7 +623,7 @@ async function runVoiceMatrixTests() {
           [testNovelId, targetChar.canonical_name]
         );
         assert.strictEqual(updatedPgChar.rows[0]?.voice_id, newVoice, 'PostgreSQL characters table must reflect new voice_id');
-        console.log(`  ✔ POST /api/voices/assign (optionalAuth) verified (${targetChar.canonical_name} -> ${newVoice} across Mongo & PG)\n`);
+        console.log(`  ✔ POST /api/voices/assign (owner auth) verified (${targetChar.canonical_name} -> ${newVoice} across Mongo & PG)\n`);
       }
     } finally {
       if (createdDbFixtures) {

@@ -474,11 +474,11 @@ export default function AudioPlayer({
       </div>
 
       {/* Main 3-zone container */}
-      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-2.5 lg:gap-4 min-w-0">
+      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-3 xl:gap-5">
         {/* Left: Track Information */}
-        <div className="audio-track-info flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 max-w-[165px] sm:max-w-[170px] lg:max-w-[220px] xl:max-w-[250px]">
-          {/* 36x36 on mobile, 44x44 on desktop Book Jacket Artwork */}
-          <div className="audio-track-art w-9 h-9 sm:w-11 sm:h-11 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-lg flex items-center justify-center font-mono text-[10px] text-[var(--text-sub)] shrink-0 overflow-hidden shadow-xs">
+        <div className="audio-track-info flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 max-w-[130px] xs:max-w-[165px] sm:max-w-[190px] xl:max-w-[240px]">
+          {/* 40x40 on mobile, 48x48 on desktop Book Jacket Artwork */}
+          <div className="audio-track-art w-10 h-10 sm:w-12 sm:h-12 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-lg flex items-center justify-center font-mono text-[10px] text-[var(--text-sub)] shrink-0 overflow-hidden shadow-xs">
             {novelObj?.cover_object ? (
               <img src={novelObj.cover_object} alt="" className="w-full h-full object-cover" />
             ) : (
@@ -488,16 +488,16 @@ export default function AudioPlayer({
             )}
           </div>
 
-          <div className="audio-track-text min-w-0 flex-1 flex flex-col justify-center">
-            <h4 className="audio-track-title text-[11px] sm:text-[13px] font-semibold text-[var(--text-main)] truncate leading-tight font-sans">
+          <div className="audio-track-text min-w-0 flex flex-col justify-center">
+            <h4 className="audio-track-title text-[12px] sm:text-[13px] font-semibold text-[var(--text-main)] truncate leading-tight font-sans">
               {currentChapter?.title || 'Chapter Audio Track'}
             </h4>
-            <p className="audio-track-sub text-[10px] text-[var(--text-sub)] font-mono truncate mt-0.5 hidden md:block">
+            <p className="audio-track-sub text-[10px] text-[var(--text-sub)] font-mono truncate mt-0.5 hidden sm:block">
               {sublineText}
             </p>
-            <div className="audio-track-timecode text-[10px] font-mono text-[var(--text-muted)] tabular-nums mt-0.5 flex items-center gap-1 whitespace-nowrap">
-              <span className="hidden lg:inline">{formatTimecodeWithMs(currentTimeMs)} / {formatTimecodeWithMs(totalDurationMs)}</span>
-              <span className="lg:hidden">{formatTime(currentTimeMs)} / {formatTime(totalDurationMs)}</span>
+            <div className="audio-track-timecode text-[10px] font-mono text-[var(--text-muted)] tabular-nums mt-0.5 flex items-center gap-1.5 truncate">
+              <span className="hidden sm:inline">{formatTimecodeWithMs(currentTimeMs)} / {formatTimecodeWithMs(totalDurationMs)}</span>
+              <span className="sm:hidden">{formatTime(currentTimeMs)} / {formatTime(totalDurationMs)}</span>
               {isBuffering && (
                 <span className="text-[var(--text-main)] font-semibold tracking-wider animate-pulse">
                   [BUFFERING]
@@ -513,13 +513,13 @@ export default function AudioPlayer({
         </div>
 
         {/* Center: Playback Transport Buttons & Scrubber */}
-        <div className="audio-central-cluster hidden sm:flex flex-1 min-w-0 max-w-[270px] md:max-w-[310px] lg:max-w-[380px] xl:max-w-[440px] mx-auto flex-col justify-center gap-1 px-1">
+        <div className="audio-central-cluster hidden sm:flex flex-1 min-w-[200px] max-w-[330px] lg:max-w-[360px] xl:max-w-[420px] mx-auto flex-col justify-center gap-1 px-1">
           {/* Transport Buttons Row */}
-          <div className="audio-control-buttons flex items-center justify-center gap-1 lg:gap-2 flex-nowrap">
+          <div className="audio-control-buttons flex items-center justify-center gap-1.5 sm:gap-2">
             {/* Skip -10s */}
             <button
               onClick={() => handleSkip(-10)}
-              className="boxed-btn px-2 lg:px-3 py-1 text-[10px] lg:text-[11px] font-mono text-[var(--text-main)] hover:bg-[var(--bg-hover)] cursor-pointer rounded-full active:scale-90 transition-transform whitespace-nowrap shrink-0"
+              className="boxed-btn px-2.5 sm:px-3 py-1 text-[11px] font-mono text-[var(--text-main)] hover:bg-[var(--bg-hover)] cursor-pointer rounded-full active:scale-90 transition-transform"
               title="Skip back 10 seconds (J)"
               aria-label="Skip back 10 seconds"
             >
@@ -530,7 +530,7 @@ export default function AudioPlayer({
             {playbackMode === 'tts' && onSeekSegment && (
               <button
                 onClick={() => onSeekSegment(-1)}
-                className="boxed-btn px-2 py-1 text-[11px] font-mono text-[var(--text-main)] hover:bg-[var(--bg-hover)] cursor-pointer rounded-full active:scale-90 transition-transform shrink-0"
+                className="boxed-btn px-2 sm:px-2.5 py-1 text-[11px] font-mono text-[var(--text-main)] hover:bg-[var(--bg-hover)] cursor-pointer rounded-full active:scale-90 transition-transform"
                 title="Previous dialogue turn"
                 aria-label="Previous turn"
               >
@@ -541,23 +541,23 @@ export default function AudioPlayer({
             {/* Play / Pause Toggle Button (Inverted Primary CTA) */}
             <button
               onClick={onToggle}
-              className="btn-play-pause boxed-btn-primary px-3 lg:px-5 py-1.5 text-[11px] font-mono cursor-pointer flex items-center gap-1.5 rounded-full shadow-md hover:scale-105 active:scale-90 transition-all duration-200 whitespace-nowrap shrink-0"
+              className="btn-play-pause boxed-btn-primary px-4 sm:px-5 py-1.5 text-[11px] font-mono cursor-pointer flex items-center gap-1.5 rounded-full shadow-md hover:scale-105 active:scale-90 transition-all duration-200"
               aria-label={isBuffering ? 'Audio buffering' : isPlaying ? 'Pause audio' : 'Play audio'}
             >
               {isBuffering ? (
                 <>
                   <span className="w-3.5 h-3.5 border-2 border-[var(--on-accent)] border-t-transparent animate-spin inline-block" />
-                  <span className="hidden lg:inline">BUFFERING</span>
+                  <span className="hidden sm:inline">BUFFERING</span>
                 </>
               ) : isPlaying ? (
                 <>
                   <IconPause className="w-3.5 h-3.5 fill-current" />
-                  <span className="hidden lg:inline">PAUSE</span>
+                  <span className="hidden sm:inline">PAUSE</span>
                 </>
               ) : (
                 <>
                   <IconPlay className="w-3.5 h-3.5 fill-current ml-0.5" />
-                  <span className="hidden lg:inline">PLAY</span>
+                  <span className="hidden sm:inline">PLAY</span>
                 </>
               )}
             </button>
@@ -566,7 +566,7 @@ export default function AudioPlayer({
             {playbackMode === 'tts' && onSeekSegment && (
               <button
                 onClick={() => onSeekSegment(1)}
-                className="boxed-btn px-2 py-1 text-[11px] font-mono text-[var(--text-main)] hover:bg-[var(--bg-hover)] cursor-pointer rounded-full active:scale-90 transition-transform shrink-0"
+                className="boxed-btn px-2 sm:px-2.5 py-1 text-[11px] font-mono text-[var(--text-main)] hover:bg-[var(--bg-hover)] cursor-pointer rounded-full active:scale-90 transition-transform"
                 title="Next dialogue turn"
                 aria-label="Next turn"
               >
@@ -577,7 +577,7 @@ export default function AudioPlayer({
             {/* Skip +10s */}
             <button
               onClick={() => handleSkip(10)}
-              className="boxed-btn px-2 lg:px-3 py-1 text-[10px] lg:text-[11px] font-mono text-[var(--text-main)] hover:bg-[var(--bg-hover)] cursor-pointer rounded-full active:scale-90 transition-transform whitespace-nowrap shrink-0"
+              className="boxed-btn px-2.5 sm:px-3 py-1 text-[11px] font-mono text-[var(--text-main)] hover:bg-[var(--bg-hover)] cursor-pointer rounded-full active:scale-90 transition-transform"
               title="Skip forward 10 seconds (L)"
               aria-label="Skip forward 10 seconds"
             >

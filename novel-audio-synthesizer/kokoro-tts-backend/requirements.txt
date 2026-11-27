@@ -40,6 +40,7 @@ psycopg-binary==3.3.6
 pycparser==3.12
 pyparsing==3.3.3
 pypdf==6.21.4
+pymongo>=4.6.0
 python-dateutil==3.0.0
 python-dotenv==1.2.4
 rdflib==7.6.0

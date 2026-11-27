@@ -24,10 +24,27 @@ EDGE_TO_KOKORO_MAP = {
     "en-GB-NoahNeural": "am_michael",
     "en-GB-OliverNeural": "bm_daniel",
 }
+KOKORO_TO_EDGE_MAP = {
+    "bm_george": "en-GB-RyanNeural",
+    "bm_fable": "en-GB-RyanNeural",
+    "bm_lewis": "en-GB-RyanNeural",
+    "bm_daniel": "en-GB-ThomasNeural",
+    "bf_emma": "en-GB-LibbyNeural",
+    "bf_isabella": "en-GB-SoniaNeural",
+    "am_adam": "en-US-GuyNeural",
+    "am_michael": "en-US-AndrewNeural",
+    "am_onyx": "en-US-RogerNeural",
+    "am_puck": "en-US-SteffanNeural",
+    "af_heart": "en-US-AriaNeural",
+    "af_bella": "en-US-AvaNeural",
+    "af_nicole": "en-US-EmmaNeural",
+    "af_sarah": "en-GB-SoniaNeural",
+    "af_sky": "en-GB-MaisieNeural",
+}
 VALID_KOKORO_VOICES = {
     "af_heart", "af_bella", "af_nicole", "af_sky", "af_sarah",
-    "am_adam", "am_michael", "am_onyx",
-    "bm_george", "bm_lewis", "bf_emma", "bm_daniel",
+    "am_adam", "am_michael", "am_onyx", "am_puck",
+    "bm_george", "bm_lewis", "bf_emma", "bf_isabella", "bm_daniel", "bm_fable",
 }
 
 
@@ -37,6 +54,81 @@ def resolve_kokoro_voice(voice_id: str) -> str:
     if voice_id in VALID_KOKORO_VOICES:
         return voice_id
     return EDGE_TO_KOKORO_MAP.get(voice_id, "bm_george")
+
+
+def resolve_edge_voice(voice_id: str) -> str:
+    raw = str(voice_id or "").strip()
+    if raw.startswith("en-") and raw.endswith("Neural"):
+        return raw
+    return KOKORO_TO_EDGE_MAP.get(raw, "en-GB-RyanNeural")
+
+
+async def synthesize_with_edge_tts(
+    text: str,
+    voice_id: str,
+    speed: float = 1.0,
+    sample_rate: int = 24000,
+) -> tuple[np.ndarray, int]:
+    """Synthesize real neural speech using edge-tts and decode to 24kHz mono float32 PCM via ffmpeg."""
+    import subprocess
+    import edge_tts
+
+    clean_text = (text or "").strip()
+    if not clean_text:
+        silence = np.zeros(int(sample_rate * 0.1), dtype=np.float32)
+        return silence, 100
+
+    edge_voice = resolve_edge_voice(voice_id)
+    clamped_speed = max(0.5, min(2.0, float(speed or 1.0)))
+    rate_pct = int(round((clamped_speed - 1.0) * 100))
+    rate_str = f"+{rate_pct}%" if rate_pct >= 0 else f"{rate_pct}%"
+
+    last_err: Optional[Exception] = None
+    mp3_bytes = b""
+    for attempt in range(2):
+        try:
+            communicate = edge_tts.Communicate(clean_text, edge_voice, rate=rate_str)
+            chunks = []
+            async for chunk in communicate.stream():
+                if chunk.get("type") == "audio" and chunk.get("data"):
+                    chunks.append(chunk["data"])
+            mp3_bytes = b"".join(chunks)
+            if mp3_bytes:
+                break
+        except Exception as err:
+            last_err = err
+            if attempt == 0:
+                await asyncio.sleep(0.35)
+
+    if not mp3_bytes:
+        raise RuntimeError(f"Edge TTS produced no audio bytes for voice '{edge_voice}': {last_err}")
+
+    def _decode_mp3_to_pcm() -> tuple[np.ndarray, int]:
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i", "pipe:0",
+                "-f", "f32le",
+                "-acodec", "pcm_f32le",
+                "-ac", "1",
+                "-ar", str(sample_rate),
+                "pipe:1",
+            ],
+            input=mp3_bytes,
+            capture_output=True,
+            timeout=60,
+        )
+        if proc.returncode != 0 or not proc.stdout:
+            stderr_msg = proc.stderr.decode(errors="ignore")[:300]
+            raise RuntimeError(f"ffmpeg failed decoding Edge TTS audio: {stderr_msg}")
+        pcm = np.frombuffer(proc.stdout, dtype=np.float32).copy()
+        if pcm.size == 0:
+            raise RuntimeError("Decoded Edge TTS PCM buffer is empty")
+        dur_ms = int(round(pcm.size / sample_rate * 1000))
+        return pcm, dur_ms
+
+    return await asyncio.to_thread(_decode_mp3_to_pcm)
 
 
 

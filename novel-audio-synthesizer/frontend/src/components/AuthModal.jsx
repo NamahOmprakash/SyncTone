@@ -661,8 +661,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
                 &ldquo;Mr. and Mrs. Dursley, of number four, Privet Drive, were proud to say that they were perfectly normal, thank you very much.&rdquo;
               </p>
 
-              <div className="pt-2 border-t theme-border flex items-center justify-between text-[11px] font-mono">
-                <span className="text-[var(--text-main)] font-semibold">Narrated by a full dramatic cast</span>
+              <div className="pt-2 border-t theme-border flex items-center justify-between text-[11px] font-mono theme-muted">
+                <span>Narrated by a full dramatic cast</span>
                 <span className="text-status-success font-bold font-mono">Synchronized Reading</span>
               </div>
             </div>

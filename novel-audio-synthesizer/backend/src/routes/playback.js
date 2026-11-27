@@ -1,21 +1,28 @@
 const { Router } = require('express');
 const { pool } = require('../db');
-const { optionalAuth } = require('../middleware/auth');
+const { authenticateUser } = require('../middleware/auth');
 
 const router = Router();
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // POST /api/playback/progress
-router.post('/playback/progress', optionalAuth, async (req, res) => {
+router.post('/playback/progress', authenticateUser, async (req, res) => {
   let client;
   try {
     const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
     const { novel_id, chapter_id, segment_order = 0, position_ms = 0 } = body;
-    // Prevent IDOR: authenticated users always use their own id; admin or unauthenticated caller can pass user_id
-    const user_id = (req.user && req.user.role !== 'admin')
-      ? req.user.id
-      : (body.user_id || req.user?.id);
+    if (
+      req.user.role !== 'admin' &&
+      body.user_id !== undefined &&
+      body.user_id !== null &&
+      body.user_id !== '' &&
+      body.user_id !== req.user.id
+    ) {
+      return res.status(403).json({ error: 'Forbidden: cannot modify another user playback progress.' });
+    }
+    // Derive user identity exclusively from authenticated session (unless admin targeting another user)
+    const user_id = req.user.role === 'admin' && body.user_id ? body.user_id : req.user.id;
 
     if (!user_id || !novel_id || !chapter_id) {
       return res.status(400).json({ error: 'user_id, novel_id, and chapter_id are required' });
@@ -108,13 +115,19 @@ router.post('/playback/progress', optionalAuth, async (req, res) => {
 });
 
 // GET /api/playback/progress
-router.get('/playback/progress', optionalAuth, async (req, res) => {
+router.get('/playback/progress', authenticateUser, async (req, res) => {
   try {
     const novel_id = req.query.novel_id;
-    // Prevent IDOR: authenticated users always query their own id; admin or unauthenticated caller can pass user_id
-    const user_id = (req.user && req.user.role !== 'admin')
-      ? req.user.id
-      : (req.query.user_id || req.user?.id);
+    if (
+      req.user.role !== 'admin' &&
+      req.query.user_id !== undefined &&
+      req.query.user_id !== null &&
+      req.query.user_id !== '' &&
+      req.query.user_id !== req.user.id
+    ) {
+      return res.status(403).json({ error: 'Forbidden: cannot read another user playback progress.' });
+    }
+    const user_id = req.user.role === 'admin' && req.query.user_id ? req.query.user_id : req.user.id;
 
     if (!user_id || !novel_id) {
       return res.status(400).json({ error: 'user_id and novel_id query parameters are required' });

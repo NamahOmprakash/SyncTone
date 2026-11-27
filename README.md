@@ -12,7 +12,7 @@
 [![OpenStack Swift](https://img.shields.io/badge/Storage-OpenStack%20Swift-EB1B24.svg)](https://wiki.openstack.org/wiki/Swift)
 [![React](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite-61DAFB.svg)](https://react.dev/)
 
-*An intelligent, multi-character digital library and neural audiobook synthesis platform that parses literary novels, extracts grounded character personas, synthesizes distinct neural character voices, and delivers 60fps synchronized text-audio reading.*
+*An intelligent, multi-character digital library and neural audiobook synthesis platform that parses literary novels, extracts grounded character personas, synthesizes distinct neural character voices, and delivers synchronized text-audio reading.*
 
 </div>
 
@@ -22,18 +22,20 @@
 
 Traditional digital audiobooks rely on single-narrator voice acting, which flattens multi-character dialogue into monotonous narration and lacks visual synchronization. Modern web novel readers (e.g., WTR-Lab, Webnovel) offer extensive text libraries but lack expressive, automated voice immersion. 
 
-**SyncTone** solves this problem by introducing an end-to-end, multi-agent audiobook generation pipeline paired with an interactive web reader. When a novel or chapter is ingested, SyncTone strips web scraping artifacts using the client-side [`tts-dom-cleaner`](https://www.npmjs.com/package/tts-dom-cleaner) engine. The system then analyzes character interactions using deterministic grammatical dependency parsing (`nsubj` $\to$ speech verb) combined with a strictly grounded 3-stage Character Profiler. Unlike unconstrained LLM generators, SyncTone enforces regex substring checks, pronoun distribution validation, and quote verification—guaranteeing **zero hallucinated character names**.
+**SyncTone** addresses this with an end-to-end audiobook generation pipeline paired with an interactive web reader. When a novel or chapter is ingested, SyncTone optionally strips web scraping artifacts using the client-side [`tts-dom-cleaner`](https://www.npmjs.com/package/tts-dom-cleaner) engine. The system analyzes character interactions using deterministic grammatical dependency parsing combined with a grounded Character Profiler that enforces regex substring checks and pronoun validation.
 
-Dialogue and narration segments are synthesized in parallel using **Kokoro-ONNX** (82M parameters), stitched with sample-level accuracy (`round(cursor * 1000 / sample_rate)`) to prevent timing drift, and encoded into low-latency Opus audio streamed from **OpenStack Swift**. In the frontend, an optimized `requestAnimationFrame` loop synchronizes playback at 60fps, highlighting words and sentences in real time as each distinct character speaks.
+Dialogue and narration segments are synthesized across multiple TTS engines (**Edge Neural TTS**, **Kokoro-ONNX**, optional **Paradee-8M**, and local OS speech), stitched into aligned audio with timeline manifests, and streamed via **OpenStack Swift** / S3 / MongoDB GridFS / local HTTP range endpoints. In the frontend, `requestAnimationFrame` audio clock polling highlights sentences and words in sync during playback.
+
+*(Note: Dynamic voice ageing across timeline eras is not implemented and remains an unimplemented future concept.)*
 
 ---
 
 ## ✨ Core Features
 
 - 🎭 **Automated Multi-Voice Synthesis**: Distinct neural voices assigned dynamically to dialogue lines and narrators based on character gender, age, and archetype.
-- 🛡️ **Zero-Hallucination Character Profiling**: 3-stage candidate extraction combining SpaCy NER, whole-novel context analysis, and strict substring/pronoun grounding.
-- 🎯 **Verbatim Recounted Dialogue Switching**: Seamless voice switches when narrators quote or recount a character's dialogue without modifying the original text.
-- ⚡ **60fps Synchronized Highlighting**: Sub-millisecond text-audio tracking via continuous `requestAnimationFrame` polling of the audio clock.
+- 🛡️ **Zero-Hallucination Character Profiling**: Grounded candidate extraction combining SpaCy/heuristic parsing, whole-novel context analysis, and strict substring/pronoun grounding.
+- 🎯 **Verbatim Recounted Dialogue Switching**: Voice switches when narrators quote or recount dialogue without modifying the original text.
+- ⚡ **Synchronized Read-Along Highlighting**: Continuous `requestAnimationFrame` audio clock polling for synchronized sentence/word tracking.
 - 📦 **Polyglot Database Architecture**: 
   - **PostgreSQL 16**: Relational core for users, auth (RBAC), novel metadata, character portfolios, and `FOR UPDATE SKIP LOCKED` task queues.
   - **MongoDB 7**: High-throughput document store for raw chapter texts, segmented dialogue arrays, and read-optimized timeline manifests.
@@ -123,21 +125,19 @@ Multi-voice-synthesizer/
 
 ## 👥 2-Person Team Workload Division
 
-This project is engineered as a collaborative 2-person Capstone effort with strict separation of concerns:
+This project is engineered as a collaborative 2-person effort with clear separation of ownership:
 
-### 👤 Project Owner (Systems & Audio Architecture Lead)
-- **NLP & Parsing Engine**: Quote extraction regex, SpaCy dependency parsing (`nsubj` $\to$ verb attribution), dialogue turn reconstruction.
-- **Grounded Character Profiler**: 3-stage candidate extraction, pronoun verification, and whole-novel context aggregation.
-- **Neural TTS Synthesis Daemon**: Kokoro-ONNX worker loop, ONNX Runtime CPU inference, model management.
-- **Audio Stitching & Alignment**: Cumulative sample-accurate audio clock math (`round(cursor * 1000 / sample_rate)`), FFmpeg Opus pipeline.
-- **Document & Object Integration**: MongoDB chapter/segment persistence and OpenStack Swift audio uploads.
+### 👤 Project Initiator & Audio/NLP Lead (Namah Omprakash)
+- **Novel Analysis & Parsing**: Heuristic/LLM/OCR chapter parsing, quote extraction regex, SpaCy dependency attribution, and dialogue turn reconstruction.
+- **Character Detection & Voice Casting**: Grounded character extraction (`attribution`, `voiceProfiler`), character-to-voice mapping, and `/api/voices/assign` cast customization.
+- **Text-to-Speech Implementation**: Multi-engine TTS architecture (Edge Neural TTS, Kokoro-ONNX, Paradee-8M, OS machine fallback), audio stitching, and cloud object storage integration.
 
-### 👤 Project Partner (Full-Stack Web & Platform Lead)
-- **Express.js API Gateway**: REST routing, JWT authentication, and Role-Based Access Control (Reader / Author / Admin).
-- **Relational Data Layer**: PostgreSQL 16 schema definitions, migrations, and playback history upsert logic.
-- **OpenStack Swift Streaming Proxy**: Express HTTP Range header streaming (`206 Partial Content`) with dynamic token refreshing.
-- **Frontend Web Reader**: React 18 SPA, novel library catalog (Verified vs. Community), and author upload workflows.
-- **Real-Time Playback Sync**: `requestAnimationFrame` audio clock polling for smooth 60fps text and line highlighting.
+### 👤 Co-Contributor & Platform/Frontend Lead (Mohd Faizan Khan)
+- **Transactional Novel & Chapter Ingestion**: Atomic PostgreSQL + MongoDB multi-store ingestion transactions (`POST /api/novels`, `POST /api/novels/:id/chapters`, `POST /api/upload`), row-level `FOR UPDATE` numbering serialization, and compensating rollback safety.
+- **Fourth Normal Form (4NF) Database Migrations**: PostgreSQL 16 strict 3NF/4NF schema normalization, subtype target integrity triggers (`synthesis_jobs`, `character_aliases`, `playback_positions`), and Alembic migrations.
+- **Authentication & RBAC Implementation**: JWT httpOnly cookie authentication, password hashing, passkey/OAuth flows, and role/ownership enforcement (`Reader` / `Writer` / `Admin`).
+- **Reader-Facing Frontend Development**: React 18 SPA, library catalog (Verified vs. Community), chapter reader modes, playback progress/audio synchronization UI, and upload workflows.
+- **Future Scope (Unimplemented)**: Dynamic voice ageing across timeline eras is **not implemented** and remains a conceptual future enhancement only.
 
 ---
 
@@ -182,10 +182,16 @@ SWIFT_PROJECT_NAME=synctone_audio
 SWIFT_CONTAINER_AUDIO=novel-chapters
 SWIFT_CONTAINER_COVERS=novel-covers
 
-# JWT & API Secrets
-JWT_SECRET=super_secret_jwt_key_synctone_2026
+# JWT & API Secrets (Required: minimum 32 high-entropy characters; never commit real secrets)
+# Generate securely with: openssl rand -hex 32
+JWT_SECRET=<replace-with-output-of-openssl-rand-hex-32>
 PORT=4000
 ```
+
+### Production Deployment & Secret Management
+- `docker-compose.prod.yml` requires `JWT_SECRET` in `.env` or environment and fails startup if missing or empty (no hardcoded production fallback).
+- The API backend refuses to start when `NODE_ENV=production` if `JWT_SECRET` is missing, shorter than 32 characters, low-entropy, or equal to any example/placeholder string.
+- Run `./scripts/deploy-prod.sh` to deploy or update: it generates a 256-bit `JWT_SECRET` cleanly into `.env` (`chmod 600`, never printed to stdout/logs) on fresh installs, upgrades placeholder secrets automatically, and **preserves** valid existing `.env` secrets across redeployments.
 
 ### 3. Install Dependencies
 ```bash

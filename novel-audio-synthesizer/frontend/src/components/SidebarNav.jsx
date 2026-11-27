@@ -52,14 +52,14 @@ export default function SidebarNav({
     <>
       {/* Mobile Bottom Navigation Bar (Hidden in Reader View for Immersive Reading) */}
       <nav
-        className={`sm:hidden fixed bottom-0 left-0 right-0 z-50 h-14 bg-[var(--bg-bar)] border-t border-[var(--border-subtle)] items-center justify-around px-1.5 ${
+        className={`md:hidden fixed bottom-0 left-0 right-0 z-50 h-14 bg-[var(--bg-bar)] border-t border-[var(--border-subtle)] items-center justify-around px-4 ${
           currentView === 'reader' ? 'hidden' : 'flex'
         }`}
         aria-label="Mobile Navigation"
       >
         <button
           onClick={() => onNavigate('catalog')}
-          className={`flex flex-col items-center gap-0.5 py-1 px-2 text-[9px] font-mono uppercase tracking-wider transition-all duration-100 ease-out active:scale-95 cursor-pointer ${
+          className={`flex flex-col items-center gap-1 py-1 px-3 text-[10px] font-mono uppercase tracking-wider transition-all duration-100 ease-out active:scale-95 cursor-pointer ${
             currentView === 'catalog' ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-sub)]'
           }`}
           aria-label="Library"
@@ -68,49 +68,70 @@ export default function SidebarNav({
           <span>Library</span>
         </button>
 
+        {isWriterOrAdmin && onOpenAddNovel && (
+          <button
+            onClick={onOpenAddNovel}
+            className="flex flex-col items-center gap-1 py-1 px-3 text-[10px] font-mono uppercase tracking-wider text-[var(--text-sub)] hover:text-[var(--text-main)] transition-all duration-100 ease-out active:scale-95 cursor-pointer"
+            aria-label="Upload Studio"
+          >
+            <Icon name="plus" className="w-4 h-4" />
+            <span>Upload Studio</span>
+          </button>
+        )}
+
         <button
-          onClick={() => onNavigate('archive')}
-          className={`flex flex-col items-center gap-0.5 py-1 px-2 text-[9px] font-mono uppercase tracking-wider transition-all duration-100 ease-out active:scale-95 cursor-pointer ${
-            currentView === 'archive' ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-sub)]'
-          }`}
-          aria-label="Archive"
+          onClick={cycleTheme}
+          className="flex flex-col items-center gap-1 py-1 px-3 text-[10px] font-mono uppercase tracking-wider text-[var(--text-sub)] hover:text-[var(--text-main)] transition-all duration-100 ease-out active:scale-95 cursor-pointer"
+          aria-label={`Switch Theme (${theme})`}
+          aria-pressed={theme === 'dark'}
+          title={`Switch Theme (${themeLabel})`}
         >
-          <Icon name="scroll" className="w-4 h-4" />
-          <span>Archive</span>
+          <Icon name={theme === 'dark' ? 'moon' : 'sun'} className="w-4 h-4" />
+          <span className="capitalize">{theme}</span>
         </button>
 
         <button
-          onClick={() => onNavigate('voices')}
-          className={`flex flex-col items-center gap-0.5 py-1 px-2 text-[9px] font-mono uppercase tracking-wider transition-all duration-100 ease-out active:scale-95 cursor-pointer ${
-            currentView === 'voices' ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-sub)]'
-          }`}
-          aria-label="Voices"
+          onClick={onOpenSettings}
+          className="flex flex-col items-center gap-1 py-1 px-3 text-[10px] font-mono uppercase tracking-wider text-[var(--text-sub)] hover:text-[var(--text-main)] transition-all duration-100 ease-out active:scale-95 cursor-pointer"
+          aria-label="Settings"
         >
-          <Icon name="soundwave" className="w-4 h-4" />
-          <span>Voices</span>
+          <Icon name="settings" className="w-4 h-4" />
+          <span>Settings</span>
         </button>
 
-        <button
-          onClick={() => onNavigate('reader')}
-          className={`flex flex-col items-center gap-0.5 py-1 px-2 text-[9px] font-mono uppercase tracking-wider transition-all duration-100 ease-out active:scale-95 cursor-pointer ${
-            currentView === 'reader' ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-sub)]'
-          }`}
-          aria-label="Reader"
-        >
-          <Icon name="book" className="w-4 h-4" />
-          <span>Reader</span>
-        </button>
-
-        <button
-          onClick={() => onNavigate('upload')}
-          className={`flex flex-col items-center gap-0.5 py-1 px-2 text-[9px] font-mono uppercase tracking-wider transition-all duration-100 ease-out active:scale-95 cursor-pointer ${
-            currentView === 'upload' ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-sub)]'
-          }`}
-          aria-label="Upload Studio"
-        >
-          <Icon name="plus" className="w-4 h-4" />
-          <span>Upload</span>
-        </button>
+        {isAuthenticated ? (
+          <>
+            <button
+              onClick={() => onNavigate('profile')}
+              className={`flex flex-col items-center gap-1 py-1 px-3 text-[10px] font-mono uppercase tracking-wider transition-all duration-100 ease-out active:scale-95 cursor-pointer ${
+                currentView === 'profile' ? 'text-[var(--text-main)] font-bold' : 'text-[var(--text-sub)]'
+              }`}
+              aria-label="Profile & Passkeys"
+            >
+              <span className="w-5 h-5 rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[9px] font-mono flex items-center justify-center font-bold shadow-xs">
+                {user?.username?.[0]?.toUpperCase() || 'U'}
+              </span>
+              <span>Profile</span>
+            </button>
+            <button
+              onClick={logout}
+              className="flex flex-col items-center gap-1 py-1 px-3 text-[10px] font-mono uppercase tracking-wider text-[var(--text-sub)] hover:text-[var(--text-main)] transition-all duration-100 ease-out active:scale-95 cursor-pointer"
+              aria-label="Sign Out"
+            >
+              <Icon name="user" className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => onOpenAuth('login')}
+            className="flex flex-col items-center gap-1 py-1 px-3 text-[10px] font-mono uppercase tracking-wider text-[var(--text-sub)] hover:text-[var(--text-main)] transition-all duration-100 ease-out active:scale-95 cursor-pointer"
+            aria-label="Mobile Sign In"
+          >
+            <Icon name="user" className="w-4 h-4" />
+            <span>Sign In</span>
+          </button>
+        )}
       </nav>
     </>
   );

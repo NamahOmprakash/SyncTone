@@ -79,10 +79,29 @@ function parseCorsOrigins(rawOrigins) {
   return Array.from(new Set([...DEFAULT_CORS_ORIGINS, ...extras]));
 }
 
+const INSECURE_JWT_DEFAULTS = new Set([
+  'synctone_production_jwt_secret_token_key_2026',
+  'synctone_super_secret_jwt_key_2026_dev_mode',
+  'super_secret_jwt_key_synctone_2026',
+  'replace_with_a_cryptographically_secure_random_jwt_secret_key_2026',
+]);
+
+function isWeakOrPlaceholderJwtSecret(secret) {
+  if (typeof secret !== 'string') return true;
+  const trimmed = secret.trim();
+  if (trimmed.length < 32) return true;
+  if (INSECURE_JWT_DEFAULTS.has(trimmed)) return true;
+  if (/^replace_with_/i.test(trimmed) || /^(changeme|secret|default|password)/i.test(trimmed)) return true;
+  if (new Set(trimmed).size < 10) return true;
+  return false;
+}
+
 const isProdRuntime = process.env.NODE_ENV === 'production' || IS_VERCEL;
 const resolvedJwtSecret = process.env.JWT_SECRET || (isProdRuntime ? '' : 'synctone_super_secret_jwt_key_2026_dev_mode');
-if (isProdRuntime && (!resolvedJwtSecret || resolvedJwtSecret.length < 32)) {
-  throw new Error('Fatal security configuration: JWT_SECRET must be set to at least 32 characters in production.');
+if (isProdRuntime && isWeakOrPlaceholderJwtSecret(resolvedJwtSecret)) {
+  throw new Error(
+    'Fatal security configuration: JWT_SECRET must be configured with at least 32 high-entropy characters (never a hardcoded default or placeholder) in production.'
+  );
 }
 
 const config = {

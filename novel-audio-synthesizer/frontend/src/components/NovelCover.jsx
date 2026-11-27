@@ -118,22 +118,7 @@ export default function NovelCover({
           src={resolvedCoverUrl}
           alt={title}
           className="volume-cover-img w-full h-full object-cover"
-          onError={(e) => {
-            const img = e.currentTarget;
-            const src = img.getAttribute('src') || '';
-            if (!img.dataset.fallbackTried) {
-              img.dataset.fallbackTried = '1';
-              if (src.startsWith('/static/covers/')) {
-                img.src = src.replace('/static/covers/', '/covers/');
-                return;
-              }
-              if (src.startsWith('/covers/')) {
-                img.src = src.replace('/covers/', '/static/covers/');
-                return;
-              }
-            }
-            setImgError(true);
-          }}
+          onError={() => setImgError(true)}
           loading="lazy"
         />
         <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-black/60 to-transparent pointer-events-none" />

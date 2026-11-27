@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { getSpeakerColor } from '../utils/speakerColors';
-import { parseSegmentImage, handleCoverImageError } from '../utils/segmentUtils';
+import { parseSegmentImage } from '../utils/segmentUtils';
 import { measureAndPaginateSegments } from '../utils/readerLayoutEngine';
 import NovelCover from './NovelCover';
 import { paginateSegments } from '../reader/paginate';
@@ -616,7 +616,9 @@ export default function OpenGLPageReader({
             src={imgUrl}
             alt="Book illustration"
             className="max-h-[480px] sm:max-h-[540px] w-auto mx-auto rounded-lg shadow-md object-contain"
-            onError={(e) => handleCoverImageError(e)}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
           />
         </div>
       );
@@ -628,7 +630,9 @@ export default function OpenGLPageReader({
           src={imgUrl}
           alt="Book illustration"
           className="my-4 mx-auto max-h-72 rounded-xl border border-white/15 shadow-lg object-contain"
-          onError={(e) => handleCoverImageError(e)}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
         />
       </div>
     ) : null;
@@ -889,7 +893,7 @@ export default function OpenGLPageReader({
           />
 
           {/* Two-Page Side-by-Side Spread or Single-Page Mobile Surface */}
-          <div className={`relative z-10 flex-1 h-full min-h-0 grid ${isSingleLayout ? 'grid-cols-1' : 'grid-cols-2 divide-x divide-[var(--border-subtle)]'}`}>
+          <div className={`relative z-10 flex-1 h-full min-h-0 grid ${isSingleLayout ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2 lg:divide-x lg:divide-[var(--border-subtle)]'}`}>
             {/* ========================================================================= */}
             {/* LEFT PAGE: (Page 2k) or Single Page on Mobile                             */}
             {/* ========================================================================= */}
@@ -996,11 +1000,12 @@ export default function OpenGLPageReader({
                           src={currentNovel.cover_object}
                           alt={currentNovel?.title || 'Book Cover Artwork'}
                           className="w-full h-full object-cover rounded-xl shadow-inner mx-auto"
-                          onError={(e) => handleCoverImageError(e, (img) => {
-                            if (img.nextElementSibling) {
-                              img.nextElementSibling.style.display = 'block';
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextElementSibling) {
+                              e.currentTarget.nextElementSibling.style.display = 'block';
                             }
-                          })}
+                          }}
                         />
                       ) : isHarryPotter ? (
                         <img
@@ -1126,9 +1131,8 @@ export default function OpenGLPageReader({
             type="button"
             onClick={handlePrevPage}
             disabled={isPrevDisabled}
-            className="px-2.5 py-1.5 rounded-xl theme-card border hover:border-[var(--accent)] text-xs font-semibold theme-sub hover:theme-main transition flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:pointer-events-none shadow-xs whitespace-nowrap"
+            className="px-2.5 py-1.5 rounded-xl theme-card border hover:border-[var(--accent)] text-xs font-semibold theme-sub hover:theme-main transition flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:pointer-events-none shadow-xs"
             title="Previous Page (Left Arrow)"
-            aria-label="Prev Page Spread"
           >
             <IconChevronLeft className="w-3.5 h-3.5" />
             <span>Prev Page</span>
@@ -1137,9 +1141,8 @@ export default function OpenGLPageReader({
             type="button"
             onClick={handleNextPage}
             disabled={isNextDisabled}
-            className="px-2.5 py-1.5 rounded-xl theme-card border hover:border-[var(--accent)] text-xs font-semibold theme-sub hover:theme-main transition flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:pointer-events-none shadow-xs whitespace-nowrap"
+            className="px-2.5 py-1.5 rounded-xl theme-card border hover:border-[var(--accent)] text-xs font-semibold theme-sub hover:theme-main transition flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:pointer-events-none shadow-xs"
             title={nextSpreadTitle}
-            aria-label={isOnFinalSpread && nextChapter ? 'Next Chapter' : 'Next Page Spread'}
           >
             <span>{isOnFinalSpread && nextChapter ? 'Next Chapter' : 'Next Page'}</span>
             <IconChevronRight className="w-3.5 h-3.5" />
@@ -1148,7 +1151,7 @@ export default function OpenGLPageReader({
 
         {/* Spread Scrubber Slider */}
         <div className="flex-1 flex items-center gap-2 sm:gap-3 min-w-[140px] sm:min-w-[180px]">
-          <span className="text-xs font-mono font-bold theme-muted whitespace-nowrap text-right flex-shrink-0">
+          <span className="text-xs font-mono font-bold theme-muted w-14 text-right flex-shrink-0">
             Spread {currentSpreadIndex + 1}
           </span>
           <input

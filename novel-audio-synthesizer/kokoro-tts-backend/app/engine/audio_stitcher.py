@@ -6,6 +6,7 @@ to Opus format via ffmpeg.
 """
 
 import numpy as np
+import re
 import subprocess
 import struct
 import wave

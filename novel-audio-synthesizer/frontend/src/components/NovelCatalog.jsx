@@ -69,7 +69,6 @@ export default function NovelCatalog({
   const searchInputRef = useRef(null);
   const carouselRef = useRef(null);
   const tabRefs = useRef([]);
-  const fetchSeqRef = useRef(0);
   const CHANNELS = ['verified', 'community', 'all'];
 
   const handleSelectChannel = useCallback((nextChannel) => {
@@ -102,13 +101,12 @@ export default function NovelCatalog({
 
   // Fetch novels by channel filter
   const fetchNovels = async (selectedChannel, signal) => {
-    const seq = ++fetchSeqRef.current;
     setIsLoading(true);
     setError(null);
     try {
       const channelParam = selectedChannel === 'all' ? undefined : selectedChannel;
       const data = await api.novels.list(channelParam);
-      if (seq !== fetchSeqRef.current || (signal && signal.aborted)) return;
+      if (signal && signal.aborted) return;
       const loadedNovels = data?.novels || [];
       setNovels(loadedNovels);
       setHasLoadedOnce(true);
@@ -122,12 +120,12 @@ export default function NovelCatalog({
         } catch (_) {}
       }
     } catch (err) {
-      if (err.name === 'AbortError' || seq !== fetchSeqRef.current || (signal && signal.aborted)) return;
+      if (err.name === 'AbortError' || (signal && signal.aborted)) return;
       const msg = err instanceof ApiError ? err.message : err.message || 'Failed to load novel catalog';
       setError(msg);
       setNovels([]);
     } finally {
-      if (seq === fetchSeqRef.current) {
+      if (!signal || !signal.aborted) {
         setIsLoading(false);
       }
     }
@@ -403,7 +401,10 @@ export default function NovelCatalog({
           {/* ================================================================= */}
           {featuredNovel && !searchQuery.trim() && (
             <section
-              className="relative w-full -mx-4 sm:-mx-8 -mt-6 mb-10 px-4 sm:px-8 lg:px-12 pt-8 pb-14 border-b border-[var(--border-subtle)] flex flex-col justify-between transition-all duration-300 bg-[var(--bg-surface)]"
+              className="relative w-full -mx-4 sm:-mx-8 -mt-6 mb-10 px-4 sm:px-8 lg:px-12 pt-8 pb-14 border-b border-[var(--border-subtle)] flex flex-col justify-between transition-all duration-300"
+              style={{
+                background: 'var(--stage-gradient)',
+              }}
               aria-label="Featured Novel Billboard"
               data-testid="featured-novel-billboard"
               onTouchStart={handleTouchStart}
@@ -427,7 +428,7 @@ export default function NovelCatalog({
                 <div className="w-full mb-8 sm:mb-10">
                   <h1 className="font-sans font-black text-5xl sm:text-7xl md:text-8xl lg:text-[7.2rem] xl:text-[8.2rem] tracking-tighter uppercase leading-[0.85] text-[var(--text-main)]">
                     <span className="headline-gradient block">STORIES THAT</span>
-                    <span className="headline-gradient headline-skew block opacity-75">SPEAK</span>
+                    <span className="headline-gradient headline-skew block opacity-45">SPEAK</span>
                   </h1>
                 </div>
 
@@ -725,7 +726,7 @@ export default function NovelCatalog({
                     <h2 className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--text-main)]">
                       Novel Library
                     </h2>
-                    {isLoading && novels.length === 0 && (
+                    {isLoading && (
                       <span
                         className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-sub)]"
                         role="status"
@@ -863,8 +864,8 @@ export default function NovelCatalog({
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search by title, author, or narrator..."
-                      className="w-full pl-9 pr-11 py-2 text-xs font-mono bg-[var(--bg-card)] border border-[var(--border-strong)] rounded-full text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--text-main)] focus:ring-1 focus:ring-[var(--text-main)] transition shadow-xs"
+                      placeholder="Search by title, author, or narrator... (/ to focus)"
+                      className="w-full pl-9 pr-9 py-2 text-xs font-mono bg-[var(--bg-card)] border border-[var(--border-strong)] rounded-full text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--text-main)] focus:ring-1 focus:ring-[var(--text-main)] transition shadow-xs"
                       aria-label="Search novels"
                     />
                     <span className="hidden sm:flex absolute inset-y-0 right-2 items-center pointer-events-none text-[10px] font-mono text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-1.5 py-0.5 my-auto">

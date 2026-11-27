@@ -494,7 +494,6 @@ export default function VoicesView({
   const [ensembleStatus, setEnsembleStatus] = useState(null);
   const [isLoadingNovels, setIsLoadingNovels] = useState(false);
   const [modelsStatus, setModelsStatus] = useState(null);
-  const [browserVoiceCount, setBrowserVoiceCount] = useState(0);
   const [isProbingEngines, setIsProbingEngines] = useState(false);
   const [probeError, setProbeError] = useState(null);
   const [localEngine, setLocalEngine] = useState(() => {
@@ -615,26 +614,8 @@ export default function VoicesView({
       })
       .catch(() => {});
 
-    const scanBrowserVoices = () => {
-      try {
-        if (typeof window !== 'undefined' && window.speechSynthesis) {
-          const list = window.speechSynthesis.getVoices();
-          if (!cancelled && Array.isArray(list)) {
-            setBrowserVoiceCount(list.length);
-          }
-        }
-      } catch (_) {}
-    };
-    scanBrowserVoices();
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.addEventListener?.('voiceschanged', scanBrowserVoices);
-    }
-
     return () => {
       cancelled = true;
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.removeEventListener?.('voiceschanged', scanBrowserVoices);
-      }
     };
   }, []);
 
@@ -668,12 +649,6 @@ export default function VoicesView({
     setIsProbingEngines(true);
     setProbeError(null);
     try {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        try {
-          const voices = window.speechSynthesis.getVoices();
-          if (Array.isArray(voices)) setBrowserVoiceCount(voices.length);
-        } catch (_) {}
-      }
       const res = await api.status.models({ probe: true });
       if (res) {
         setModelsStatus(res);
@@ -1329,9 +1304,8 @@ export default function VoicesView({
         const kokoroReady = Boolean(modelsStatus?.kokoro?.available || (tts.model_exists && tts.voices_exists));
         const edgeReady = Boolean(tts.cloud_ready);
         const paradeeReady = Boolean(modelsStatus?.paradee?.available || tts.paradee_ready);
-        const machineReady = Boolean(tts.machine_ready || browserVoiceCount > 0);
-        const mixedReady = paradeeReady && machineReady;
-        const mixedBadge = mixedReady ? 'ONLINE' : machineReady ? 'HYBRID READY' : 'OFFLINE';
+        const machineReady = Boolean(tts.machine_ready);
+        const mixedBadge = paradeeReady && machineReady ? 'ONLINE' : machineReady ? 'FALLBACK' : 'OFFLINE';
 
         const parsers = modelsStatus?.parsers || {};
         const geminiReady = Boolean(parsers.gemini?.available || parsers.gemini?.configured);
@@ -1367,16 +1341,14 @@ export default function VoicesView({
           {
             title: '4. Paradee + Machine Mixed',
             badge: mixedBadge,
-            active: mixedBadge === 'ONLINE' || mixedBadge === 'HYBRID READY',
+            active: mixedBadge === 'ONLINE',
             detail: 'Assigns Paradee-8M ONNX to Narrator + top cast and Device Speech to extra cast.',
           },
           {
             title: '5. Device Speech',
-            badge: browserVoiceCount > 0 ? `DEVICE READY (${browserVoiceCount})` : (tts.machine_ready ? 'ONLINE' : 'OFFLINE'),
+            badge: machineReady ? 'ONLINE' : 'OFFLINE',
             active: machineReady,
-            detail: browserVoiceCount > 0
-              ? `Browser SpeechSynthesis active with ${browserVoiceCount} native voices available.`
-              : machineReady
+            detail: machineReady
               ? 'Host OS speech synthesizer available for zero-dependency offline playback.'
               : 'Host OS speech binary unavailable in current runtime environment.',
           },

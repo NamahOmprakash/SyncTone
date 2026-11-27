@@ -27,34 +27,34 @@ export default function TopHeader({
 
   return (
     <header className="top-app-header sticky top-0 z-40 bg-[var(--bg-bar)] border-b border-[var(--border-subtle)] h-14 backdrop-blur-md bg-opacity-95">
-      <div className="max-w-7xl mx-auto px-2.5 sm:px-5 lg:px-8 h-full flex items-center justify-between gap-2 sm:gap-3">
+      <div className="max-w-7xl mx-auto px-2 sm:px-8 h-full flex items-center justify-between gap-2 sm:gap-4">
         {/* Brand & Primary Navigation Links */}
-        <div className="flex items-center gap-2 sm:gap-3.5 lg:gap-5 min-w-0 flex-1">
+        <div className="flex items-center gap-3 sm:gap-5 min-w-0 flex-1">
           {/* Brand Logo */}
           <button
             onClick={() => onNavigate('catalog')}
-            className="flex items-center gap-2 sm:gap-2.5 group text-left outline-none flex-shrink-0 cursor-pointer active:scale-95 transition-all duration-200"
+            className="flex items-center gap-2.5 group text-left outline-none flex-shrink-0 cursor-pointer active:scale-95 transition-all duration-200"
             aria-label="SyncTone Home"
           >
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[var(--text-main)] text-[var(--bg-page)] flex items-center justify-center shadow-md group-hover:scale-105 group-hover:shadow-lg transition-all duration-200 border border-[var(--border-subtle)]">
-              <IconSyncToneLogo className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+            <div className="w-8 h-8 rounded-full bg-[var(--text-main)] text-[var(--bg-page)] flex items-center justify-center shadow-md group-hover:scale-105 group-hover:shadow-lg transition-all duration-200 border border-[var(--border-subtle)]">
+              <IconSyncToneLogo className="w-4.5 h-4.5" />
             </div>
-            <div className="flex flex-col shrink-0">
-              <span className="text-[12px] sm:text-[13px] font-mono font-bold tracking-[0.14em] sm:tracking-[0.18em] uppercase text-[var(--text-main)] group-hover:opacity-90 transition-opacity leading-none whitespace-nowrap">
+            <div className="flex flex-col">
+              <span className="text-[13px] font-mono font-bold tracking-[0.18em] uppercase text-[var(--text-main)] group-hover:opacity-90 transition-opacity leading-none">
                 SYNCTONE
               </span>
-              <span className="text-[8px] font-mono tracking-[0.22em] uppercase text-[var(--text-sub)] leading-tight mt-0.5 hidden xl:inline">
+              <span className="text-[8px] font-mono tracking-[0.22em] uppercase text-[var(--text-sub)] leading-tight mt-0.5 hidden lg:inline">
                 AUDIO STUDIO
               </span>
             </div>
           </button>
 
           {/* Monospace Editorial Nav Links */}
-          <nav className="hidden sm:flex items-center gap-0.5 md:gap-1 lg:gap-1.5 text-[10px] md:text-[11px] lg:text-xs font-mono tracking-normal lg:tracking-wider min-w-0 flex-1 whitespace-nowrap" aria-label="Main Navigation">
+          <nav className="hidden sm:flex items-center gap-1 lg:gap-1.5 text-[11px] lg:text-xs font-mono tracking-wider min-w-0 flex-1 overflow-x-auto no-scrollbar whitespace-nowrap" aria-label="Main Navigation">
             <button
               onClick={() => onNavigate?.('catalog')}
               aria-current={view === 'catalog' ? 'page' : undefined}
-              className={`transition-all duration-200 px-2 lg:px-3 py-1 rounded-full cursor-pointer uppercase shrink-0 ${
+              className={`transition-all duration-200 px-3 py-1 rounded-full cursor-pointer uppercase ${
                 view === 'catalog'
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs'
                   : 'text-[var(--text-sub)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
@@ -68,7 +68,7 @@ export default function TopHeader({
                 else if (onOpenArchive) onOpenArchive();
               }}
               aria-current={view === 'archive' ? 'page' : undefined}
-              className={`transition-all duration-200 px-2 lg:px-3 py-1 rounded-full cursor-pointer uppercase shrink-0 ${
+              className={`transition-all duration-200 px-3 py-1 rounded-full cursor-pointer uppercase ${
                 view === 'archive'
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs'
                   : 'text-[var(--text-sub)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
@@ -82,7 +82,7 @@ export default function TopHeader({
                 else if (onOpenVoices) onOpenVoices();
               }}
               aria-current={view === 'voices' ? 'page' : undefined}
-              className={`transition-all duration-200 px-2 lg:px-3 py-1 rounded-full cursor-pointer uppercase shrink-0 ${
+              className={`transition-all duration-200 px-3 py-1 rounded-full cursor-pointer uppercase ${
                 view === 'voices'
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs'
                   : 'text-[var(--text-sub)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
@@ -97,7 +97,7 @@ export default function TopHeader({
                 else onNavigate?.('reader');
               }}
               aria-current={view === 'reader' ? 'page' : undefined}
-              className={`transition-all duration-200 px-2 lg:px-3 py-1 rounded-full cursor-pointer uppercase shrink-0 ${
+              className={`transition-all duration-200 px-3 py-1 rounded-full cursor-pointer uppercase ${
                 view === 'reader'
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs'
                   : 'text-[var(--text-sub)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
@@ -108,20 +108,20 @@ export default function TopHeader({
             <button
               onClick={() => onNavigate?.('upload')}
               aria-current={view === 'upload' ? 'page' : undefined}
-              className={`transition-all duration-200 px-2 lg:px-3 py-1 rounded-full cursor-pointer uppercase shrink-0 ${
+              className={`transition-all duration-200 px-2.5 lg:px-3 py-1 rounded-full cursor-pointer uppercase shrink-0 ${
                 view === 'upload'
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs'
                   : 'text-[var(--text-sub)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
               }`}
               title="Upload Studio"
             >
-              + UPLOAD<span className="hidden lg:inline"> STUDIO</span>
+              + UPLOAD STUDIO
             </button>
             {isAuthenticated && (
               <button
                 onClick={() => onNavigate?.('profile')}
                 aria-current={view === 'profile' ? 'page' : undefined}
-                className={`transition-all duration-200 px-2 lg:px-3 py-1 rounded-full cursor-pointer uppercase shrink-0 ${
+                className={`transition-all duration-200 px-2.5 lg:px-3 py-1 rounded-full cursor-pointer uppercase shrink-0 ${
                   view === 'profile'
                     ? 'bg-[var(--accent)] text-[var(--on-accent)] font-bold shadow-xs'
                     : 'text-[var(--text-sub)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
@@ -135,7 +135,7 @@ export default function TopHeader({
         </div>
 
         {/* Right Action Controls: Cast Roster, Theme Toggle, Settings & Auth */}
-        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
           {/* Cast Toggle (active only in reader view) */}
           {view === 'reader' && (
             <button
@@ -144,7 +144,7 @@ export default function TopHeader({
               onFocus={preloadCharacterRoster}
               aria-expanded={Boolean(showRoster)}
               aria-controls="character-roster-drawer"
-              className={`boxed-btn px-2 sm:px-2.5 py-1 text-[10px] sm:text-[11px] font-mono flex items-center gap-1 sm:gap-1.5 cursor-pointer rounded-full active:scale-95 transition-all whitespace-nowrap ${
+              className={`boxed-btn px-2.5 sm:px-3 py-1 text-[10px] sm:text-[11px] font-mono flex items-center gap-1 sm:gap-1.5 cursor-pointer rounded-full active:scale-95 transition-all ${
                 showRoster
                   ? 'bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] font-bold'
                   : 'bg-[var(--bg-card)] text-[var(--text-main)] border-[var(--border-strong)] hover:border-[var(--text-main)]'
@@ -159,14 +159,14 @@ export default function TopHeader({
           {/* Theme Toggle Button */}
           <button
             onClick={cycleTheme}
-            className="boxed-btn px-2 sm:px-2.5 py-1 text-[10px] sm:text-[11px] font-mono uppercase text-[var(--text-sub)] hover:text-[var(--text-main)] bg-[var(--bg-card)] border-[var(--border-strong)] hover:border-[var(--text-main)] flex items-center gap-1 sm:gap-1.5 cursor-pointer rounded-full active:scale-95 transition-all whitespace-nowrap"
+            className="boxed-btn px-2.5 sm:px-3 py-1 text-[10px] sm:text-[11px] font-mono uppercase text-[var(--text-sub)] hover:text-[var(--text-main)] bg-[var(--bg-card)] border-[var(--border-strong)] hover:border-[var(--text-main)] flex items-center gap-1 sm:gap-1.5 cursor-pointer rounded-full active:scale-95 transition-all"
             title={`Switch Theme (currently ${theme})`}
             aria-label={`Switch Theme: ${theme.toUpperCase()}`}
             aria-pressed={theme === 'dark'}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-current" />
             <span className="hidden xl:inline">THEME: </span>
-            <span className="hidden sm:inline">{theme.toUpperCase()}</span>
+            <span>{theme.toUpperCase()}</span>
           </button>
 
           {/* Settings Trigger */}

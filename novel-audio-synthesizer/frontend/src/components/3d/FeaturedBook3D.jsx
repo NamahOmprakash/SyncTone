@@ -498,8 +498,8 @@ export default function FeaturedBook3D({
       />
 
       {/* Floating 3D Interaction Hint Badge */}
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 group-hover:opacity-100 sm:opacity-85 transition-opacity duration-300 z-20">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/15 text-[10px] font-mono uppercase text-white/95 shadow-md whitespace-nowrap">
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 group-hover:opacity-100 sm:opacity-80 transition-opacity duration-300">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[10px] font-mono uppercase text-white/90 shadow-md">
           <svg viewBox="0 0 24 24" className="w-3 h-3 text-[#C5A059]" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M4 12a8 8 0 0 1 14.93-4M20 12a8 8 0 0 1-14.93 4" strokeLinecap="round" />
             <path d="M19 8h-4V4M5 16h4v4" strokeLinecap="round" strokeLinejoin="round" />

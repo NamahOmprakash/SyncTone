@@ -754,14 +754,40 @@ function AppContent() {
     }
   }, [view, handleNavigate]);
 
-  // Seamless Reader Launch: opens current chapter or immediately transitions to /reader for auto-resolution
-  const handleOpenReaderQuick = useCallback(() => {
+  // Seamless Reader Launch: opens current chapter, or novel chapter 1, or flagship novel chapter 1
+  const handleOpenReaderQuick = useCallback(async () => {
     if (currentChapter?.id) {
       handleNavigate('reader', currentChapter.id);
       return;
     }
-    handleNavigate('reader');
-  }, [currentChapter?.id, handleNavigate]);
+    const targetNovelId = currentNovel?.id || selectedNovelId || routeNovelId;
+    if (targetNovelId) {
+      try {
+        const nData = await api.novels.get(targetNovelId);
+        const ch1 = (nData.chapters || []).find((c) => c.chapter_number === 1) || nData.chapters?.[0];
+        if (ch1) {
+          handleSelectChapter(nData.novel || currentNovel || { id: targetNovelId }, ch1);
+          return;
+        }
+      } catch (_) {}
+    }
+    // Launch flagship volume with active audio
+    try {
+      const data = await api.novels.list();
+      const targetNovel = (data.novels || []).find((n) => n.chapter_count > 0) || data.novels?.[0];
+      if (targetNovel) {
+        const nData = await api.novels.get(targetNovel.id);
+        const ch1 = (nData.chapters || []).find((c) => c.chapter_number === 1) || nData.chapters?.[0];
+        if (ch1) {
+          handleSelectChapter(targetNovel, ch1);
+          return;
+        }
+        handleNavigate('details', targetNovel.id);
+        return;
+      }
+    } catch (_) {}
+    handleNavigate('catalog');
+  }, [currentChapter, currentNovel, selectedNovelId, routeNovelId, handleNavigate, handleSelectChapter]);
 
   // Seamless Voice Studio Launch: opens cast and voices tab
   const handleOpenVoices = useCallback(async () => {
@@ -937,9 +963,9 @@ function AppContent() {
             {(view === 'catalog' || view === 'archive') && (
               <ErrorBoundary resetKey={view === 'catalog' || view === 'archive' ? 'catalog' : pathname} friendlyMessage="Couldn't load library catalog.">
                 <NovelCatalog
-                  initialChannel={view === 'archive' ? 'all' : 'verified'}
+                  initialChannel={view === 'archive' ? 'community' : 'verified'}
                   onChannelChange={(ch) => {
-                    if (ch === 'all' && view !== 'archive') navigate('/archive');
+                    if (ch === 'community' && view !== 'archive') navigate('/archive');
                     else if (ch === 'verified' && view !== 'catalog') navigate('/');
                   }}
                   onSelectNovel={handleSelectNovel}

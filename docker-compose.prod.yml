@@ -109,7 +109,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      JWT_SECRET: "${JWT_SECRET:-synctone_production_jwt_secret_token_key_2026}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set to a strong cryptographic secret (minimum 32 characters) in production}"
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       DATABASE_URL: postgresql://${POSTGRES_USER:-synctone_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-synctone}
       MONGO_URI: mongodb://${MONGO_USER:-synctone_user}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DB:-synctone}?authSource=admin

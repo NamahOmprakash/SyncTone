@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { voiceProfiler, VOICE_PALETTE } = require('../engine/voiceProfiler');
 const { ttsEngine, VALID_KOKORO_VOICES } = require('../engine/ttsEngine');
 const { audioStitcher } = require('../engine/audioStitcher');
-const { optionalAuth } = require('../middleware/auth');
+const { authenticateUser, requireRole } = require('../middleware/auth');
 const { parseByteRange } = require('../services/storageService');
 
 const router = Router();
@@ -281,7 +281,7 @@ router.get('/voices', (_req, res) => {
 });
 
 // POST /api/voices/assign
-router.post('/voices/assign', optionalAuth, async (req, res) => {
+router.post('/voices/assign', authenticateUser, requireRole('writer', 'admin'), async (req, res) => {
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   const { character_id, new_voice_id: rawNewVoiceId, voice_id: rawVoiceId, chapter_id, novel_id } = body;
   const new_voice_id = rawNewVoiceId || rawVoiceId;
@@ -294,6 +294,14 @@ router.post('/voices/assign', optionalAuth, async (req, res) => {
     !new_voice_id.trim()
   ) {
     return res.status(400).json({ detail: 'character_id and new_voice_id strings are required' });
+  }
+
+  const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (chapter_id !== undefined && chapter_id !== null && chapter_id !== '' && (typeof chapter_id !== 'string' || !UUID_PATTERN.test(chapter_id))) {
+    return res.status(400).json({ error: 'Invalid chapter_id UUID.' });
+  }
+  if (novel_id !== undefined && novel_id !== null && novel_id !== '' && (typeof novel_id !== 'string' || !UUID_PATTERN.test(novel_id))) {
+    return res.status(400).json({ error: 'Invalid novel_id UUID.' });
   }
 
   const { EDGE_TO_KOKORO_MAP } = require('../engine/voiceProfiler');
@@ -316,10 +324,8 @@ router.post('/voices/assign', optionalAuth, async (req, res) => {
   }
 
   const effectiveVoiceId = VOICE_PALETTE[new_voice_id] || new_voice_id;
-  voiceProfiler.assignVoice(character_id, effectiveVoiceId);
 
-  // Resolve character aliases (UUID <-> canonical_name <-> slug) for thorough MongoDB & cache invalidation
-  const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // Resolve and authorize character & novel ownership BEFORE mutating any state or caches
   const isUuid = UUID_PATTERN.test(String(character_id));
   let canonicalName = null;
   let isNarratorChar = String(character_id).trim().toLowerCase() === 'narrator';
@@ -328,23 +334,51 @@ router.post('/voices/assign', optionalAuth, async (req, res) => {
 
   try {
     const { pool } = require('../db');
-    if (!targetNovelId && chapter_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(chapter_id))) {
-      const chRow = await pool.query('SELECT novel_id FROM chapters WHERE id = $1', [chapter_id]);
-      if (chRow.rows.length > 0) {
-        targetNovelId = chRow.rows[0].novel_id;
+    if (chapter_id) {
+      const chRow = await pool.query('SELECT id, novel_id FROM chapters WHERE id = $1', [chapter_id]);
+      if (chRow.rows.length === 0) {
+        return res.status(404).json({ error: `Chapter with id '${chapter_id}' not found.` });
       }
+      const chNovelId = chRow.rows[0].novel_id;
+      if (targetNovelId && targetNovelId !== chNovelId) {
+        return res.status(400).json({ error: 'chapter_id does not belong to the specified novel_id.' });
+      }
+      targetNovelId = chNovelId;
     }
+
     const pgCharMatchSql =
       "(LOWER(canonical_name) = LOWER($2) OR TRIM(BOTH '_' FROM REGEXP_REPLACE(LOWER(canonical_name), '[^a-z0-9]+', '_', 'g')) = LOWER($2))";
 
     if (isUuid) {
-      const charRow = await pool.query('SELECT id, canonical_name, novel_id, is_narrator FROM characters WHERE id = $1::uuid', [character_id]);
-      if (charRow.rows.length > 0) {
-        canonicalName = charRow.rows[0].canonical_name;
-        isNarratorChar = isNarratorChar || Boolean(charRow.rows[0].is_narrator);
-        if (!targetNovelId) targetNovelId = charRow.rows[0].novel_id;
+      const charRow = await pool.query(
+        'SELECT id, canonical_name, novel_id, is_narrator FROM characters WHERE id = $1::uuid',
+        [character_id]
+      );
+      if (charRow.rows.length === 0) {
+        return res.status(404).json({ error: `Character with id '${character_id}' not found.` });
       }
-    } else if (targetNovelId) {
+      const charNovelId = charRow.rows[0].novel_id;
+      if (targetNovelId && charNovelId !== targetNovelId) {
+        return res.status(403).json({ error: 'Forbidden: character does not belong to the specified novel.' });
+      }
+      targetNovelId = charNovelId;
+      canonicalName = charRow.rows[0].canonical_name;
+      isNarratorChar = isNarratorChar || Boolean(charRow.rows[0].is_narrator);
+    }
+
+    if (!targetNovelId) {
+      return res.status(400).json({ error: 'chapter_id, novel_id, or a valid character UUID is required.' });
+    }
+
+    const novelRes = await pool.query('SELECT id, added_by FROM novels WHERE id = $1', [targetNovelId]);
+    if (novelRes.rows.length === 0) {
+      return res.status(404).json({ error: `Novel with id '${targetNovelId}' not found.` });
+    }
+    if (req.user.role !== 'admin' && novelRes.rows[0].added_by !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden: you do not own the novel for this voice assignment.' });
+    }
+
+    if (!isUuid) {
       const charRow = await pool.query(
         isNarratorChar
           ? `SELECT id, canonical_name, is_narrator FROM characters WHERE novel_id = $1 AND (is_narrator = true OR ${pgCharMatchSql}) LIMIT 1`
@@ -357,9 +391,12 @@ router.post('/voices/assign', optionalAuth, async (req, res) => {
         isNarratorChar = isNarratorChar || Boolean(charRow.rows[0].is_narrator);
       }
     }
-  } catch (_) {
-    // Non-fatal if PG is offline
+  } catch (dbErr) {
+    console.error('[Voices Assign Auth/Lookup Error]:', dbErr.message);
+    return res.status(500).json({ error: 'Failed to validate voice assignment ownership.' });
   }
+
+  voiceProfiler.assignVoice(character_id, effectiveVoiceId);
 
   if (canonicalName) {
     const slug = canonicalName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');

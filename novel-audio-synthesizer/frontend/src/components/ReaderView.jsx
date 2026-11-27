@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { getSpeakerColor } from '../utils/speakerColors';
-import { parseSegmentImage, handleCoverImageError } from '../utils/segmentUtils';
+import { parseSegmentImage } from '../utils/segmentUtils';
 import { formatNovelAuthor } from '../utils/authorDisplay';
 import { useTheme } from '../context/ThemeContext';
 import { sanitizeSegmentsWithTtsDomCleaner } from '../utils/ttsSanitizer';
@@ -404,7 +404,9 @@ export default function ReaderView({
           src={imgUrl}
           alt="Book illustration"
           className="my-4 mx-auto max-h-72 rounded-xl border border-white/15 shadow-lg object-contain"
-          onError={(e) => handleCoverImageError(e)}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
         />
       </div>
     ) : null;
@@ -752,7 +754,7 @@ export default function ReaderView({
                 <select
                   value={currentChapter?.id}
                   onChange={(e) => onSelectChapter?.(e.target.value)}
-                  className="boxed-btn px-2 py-0.5 text-xs font-mono font-semibold bg-[var(--bg-card)] text-[var(--text-main)] cursor-pointer focus:outline-none appearance-none pr-6 truncate max-w-[90px] sm:max-w-[180px]"
+                  className="boxed-btn px-2 py-0.5 text-xs font-mono font-semibold bg-[var(--bg-card)] text-[var(--text-main)] cursor-pointer focus:outline-none appearance-none pr-4 truncate max-w-[90px] sm:max-w-[180px]"
                   aria-label="Select Chapter"
                 >
                   {chapters.map((ch) => (
@@ -765,7 +767,7 @@ export default function ReaderView({
                     </option>
                   ))}
                 </select>
-                <span className="pointer-events-none absolute right-2 text-[9px] text-[var(--text-muted)]" aria-hidden="true">▾</span>
+                <span className="pointer-events-none text-[9px] text-[var(--text-muted)] -ml-3">▾</span>
               </div>
               <button
                 type="button"
@@ -893,7 +895,7 @@ export default function ReaderView({
           </button>
 
           {/* Reading Content Stage: Strictly 60-75ch Measure */}
-          <section className="reader-content-stage" aria-label="Chapter reading stage">
+          <main className="reader-content-stage">
             <header className="reader-book-header select-none">
               <div className="mono-xs" style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>
                 {currentNovel?.title ? currentNovel.title.toUpperCase() : 'THE ADVENTURES OF SHERLOCK HOLMES'}
@@ -1024,7 +1026,7 @@ export default function ReaderView({
                 </div>
               )}
             </article>
-          </section>
+          </main>
         </div>
       )}
     </div>

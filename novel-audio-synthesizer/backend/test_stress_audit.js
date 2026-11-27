@@ -101,9 +101,19 @@ async function runStressAudit() {
 
     // 3. Malformed & edge-case payloads (verify 400/413/416, ZERO 500s)
     console.log('▶ [3/6] Testing malformed & boundary payloads across routes...');
+    const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const regRes = await axios.post(`${baseApi}/auth/register`, {
+      username: `stress_writer_${uniqueSuffix}`,
+      email: `stress_${uniqueSuffix}@example.com`,
+      password: 'StressPassword123!',
+      role: 'writer',
+    });
+    cleanup.writerId = regRes.data.user.id;
+    const cookie = regRes.headers['set-cookie'][0].split(';')[0];
+
     const malformedJsonRes = await fetch(`${baseApi}/novels`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
       body: '{"title": "broken',
     });
     assert.strictEqual(malformedJsonRes.status, 400, `Malformed JSON should return 400, got ${malformedJsonRes.status}`);
@@ -131,16 +141,16 @@ async function runStressAudit() {
 
     const badAssetRes = await fetch(`${baseApi}/novels/upload-asset`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
       body: JSON.stringify({ data_url: 'data:text/plain;base64,SGVsbG8=' }),
     });
     assert.strictEqual(badAssetRes.status, 400, `Non-image data_url should return 400, got ${badAssetRes.status}`);
 
     const badPlaybackRes = await fetch(`${baseApi}/playback/progress`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
       body: JSON.stringify({
-        user_id: '11111111-1111-4111-a111-111111111111',
+        user_id: cleanup.writerId,
         novel_id: '22222222-2222-4222-a222-222222222222',
         chapter_id: '33333333-3333-4333-a333-333333333333',
         segment_order: 0,
@@ -151,7 +161,7 @@ async function runStressAudit() {
 
     const badVoiceAssignRes = await fetch(`${baseApi}/voices/assign`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
       body: JSON.stringify({ character_id: { bad: 1 }, new_voice_id: 'en-GB-ThomasNeural' }),
     });
     assert.strictEqual(badVoiceAssignRes.status, 400, `Non-string character_id should return 400, got ${badVoiceAssignRes.status}`);
@@ -200,16 +210,6 @@ async function runStressAudit() {
 
     // 5. Concurrent parse & synthesis races + novels cache invalidation + range streaming
     console.log('▶ [5/6] Testing concurrent parse/synthesis races, cache invalidation & range streaming...');
-    const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const regRes = await axios.post(`${baseApi}/auth/register`, {
-      username: `stress_writer_${uniqueSuffix}`,
-      email: `stress_${uniqueSuffix}@example.com`,
-      password: 'StressPassword123!',
-      role: 'writer',
-    });
-    cleanup.writerId = regRes.data.user.id;
-    const cookie = regRes.headers['set-cookie'][0].split(';')[0];
-
     const novelRes = await axios.post(
       `${baseApi}/novels`,
       {

@@ -1950,7 +1950,6 @@ body.focus-fullscreen-mode footer {
 
 .reader-opening-para {
   text-indent: 0 !important;
-  text-align: left !important;
   overflow: hidden;
   padding-top: 2px;
 }
@@ -1959,12 +1958,11 @@ body.focus-fullscreen-mode footer {
 .drop-cap {
   float: left;
   font-family: var(--font-serif, 'Newsreader Variable', serif);
-  font-size: 2.9rem;
-  line-height: 0.82;
+  font-size: 3.6rem;
+  line-height: 0.85;
   padding-top: 2px;
-  padding-right: 3px;
-  margin-right: 1px;
-  padding-bottom: 0;
+  padding-right: 4px;
+  padding-bottom: 2px;
   font-weight: 700;
   color: var(--text-main);
 }

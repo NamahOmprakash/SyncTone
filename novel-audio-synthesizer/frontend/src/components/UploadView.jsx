@@ -520,7 +520,7 @@ export default function UploadView({
                 type="button"
                 onClick={handleQuickDemoLogin}
                 disabled={quickLoginLoading}
-                className="boxed-btn-primary px-4 py-2 text-xs font-mono uppercase inline-flex items-center gap-1.5 cursor-pointer rounded-full active:scale-95 transition-all shadow-md hover:scale-105 whitespace-nowrap shrink-0"
+                className="boxed-btn-primary px-4 py-2 text-xs font-mono uppercase inline-flex items-center gap-1.5 cursor-pointer rounded-full active:scale-95 transition-all shadow-md hover:scale-105"
               >
                 <IconUser className="w-3.5 h-3.5" />
                 <span>{quickLoginLoading ? 'Signing In...' : 'Quick Demo Writer'}</span>
